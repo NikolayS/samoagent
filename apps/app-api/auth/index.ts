@@ -73,3 +73,22 @@ export {
   type CallbackResult,
 } from "./service.ts";
 export { createAuthHandler, clientIp } from "./http.ts";
+export {
+  OAUTH_STATE_COOKIE_NAME,
+  OAUTH_STATE_TTL_MS,
+  OAUTH_STATE_PURPOSE,
+  DEFAULT_RETURN_TO,
+  type OAuthStateClaims,
+  signOAuthState,
+  verifyOAuthState,
+  verifyOAuthStateForCallback,
+  buildOAuthStateCookie,
+  buildClearedOAuthStateCookie,
+  issueOAuthStateCookie,
+  readOAuthStateCookie,
+  codeChallengeS256,
+  validateReturnTo,
+} from "./oauth-state.ts";
+// Appended (not folded into the crypto block above) to keep this PR's diff off
+// the lines sibling #209 PRs also touch.
+export { randomToken } from "./crypto.ts";

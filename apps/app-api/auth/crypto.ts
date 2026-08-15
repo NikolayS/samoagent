@@ -8,7 +8,7 @@
  * delegates to `crypto.timingSafeEqual`, which compares in time independent of
  * the contents — asserted by the statistical timing test in `crypto.test.ts`.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 /** Base64url-encode bytes or a UTF-8 string (no padding, URL-safe alphabet). */
 export function base64url(data: Uint8Array | Buffer | string): string {
@@ -19,6 +19,22 @@ export function base64url(data: Uint8Array | Buffer | string): string {
 /** Decode a base64url string back to raw bytes. */
 export function fromBase64url(s: string): Buffer {
   return Buffer.from(s, "base64url");
+}
+
+/**
+ * A CSPRNG-drawn token, base64url-encoded (32 bytes → 43 URL-safe chars).
+ *
+ * `node:crypto`'s {@link randomBytes} is the ONLY acceptable source here:
+ * `Math.random` is a seeded PRNG whose output is predictable from a handful of
+ * observed draws, which for an OAuth `state`/`nonce`/PKCE verifier means an
+ * attacker can PREDICT the value that binds a login flow to a browser — the
+ * exact fixation the state cookie exists to prevent. 32 bytes is the floor
+ * (RFC 7636 §7.1 wants ≥ 256 bits of entropy in a PKCE code verifier), and the
+ * base64url rendering keeps the token safe to put in a URL and in a cookie with
+ * no escaping.
+ */
+export function randomToken(bytes = 32): string {
+  return base64url(randomBytes(bytes));
 }
 
 /** HMAC-SHA256 of `message` under `key`, as raw 32 bytes. */
