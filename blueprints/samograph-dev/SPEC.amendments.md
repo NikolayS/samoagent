@@ -8,7 +8,8 @@ spec, and explains why. These are reviewed decisions — not silent drift.
 > Sections: **[Sprint 1 — "the seams"](#sprint-1--the-seams)** ·
 > **[Sprint 2 — "the live transcript"](#sprint-2--the-live-transcript)** ·
 > **[Sprint 3 — "multi-region"](#sprint-3--multi-region)** ·
-> **[Sprint 4 — "hosting & polish"](#sprint-4--hosting--polish)**.
+> **[Sprint 4 — "hosting & polish"](#sprint-4--hosting--polish)** ·
+> **[Sprint 5 — "post-v1"](#sprint-5--post-v1)**.
 
 ---
 
@@ -889,3 +890,219 @@ shared model reuses `src/dict.ts` (`loadDict`) and `src/chime.ts` rather than fo
 them. Settings flow per-tenant into the Deepgram config at bot-create (keyterms +
 language), realizing the §5.12 "cheap Recall/Deepgram passthrough". **Migration:**
 `0010_settings.sql` (tenant-scoped table + RLS/FORCE RLS + InitPlan-wrapped policy).
+
+---
+
+## Sprint 5 — "post-v1"
+
+This section records the **intentional** deviations from `SPEC.md` made *after* v1
+shipped (v0.8.0). Same legend (**Extension** / **Clarification** / **Superset** /
+**Deviation (v1)**), plus **Deviation (post-v1)** = a documented v1 non-goal that is
+deliberately reversed once v1 is out, with owner sign-off. That status exists for
+exactly one reason: §1 requires that the v1 non-goals are never *silently*
+re-introduced, so reversing one is an amendment, not a commit.
+
+---
+
+### S5-1. §1 / §2 / §5.1 / §5.11 / §5.12 / §5.14 / §5.16 / §9 — sign up & sign in with Google (OIDC) — *Deviation (post-v1)*
+
+**Amends:** §1 (the "Explicit non-goals for v1 (do not silently re-introduce)"
+paragraph, which names "no Google OAuth"), §2 v1 ("Email magic-link auth only
+(passwordless)"), §5.1 (auth), §5.11 + §9 (activation funnel + the W1 target),
+§5.12 (Settings), §5.14 (erasure), §5.16 (error-code reference). Issue **#209**.
+Migrations `0011_user_identities.sql` and `0012_users_signup_method.sql`.
+
+> **Citation note.** The "no Google OAuth" non-goal lives in **§1**, not §2 — §2's
+> corresponding statement is the v1 bullet "Email magic-link auth only
+> (passwordless)". Both are amended here; the §1 sentence is the one that carries
+> the "do not silently re-introduce" obligation this entry discharges.
+
+**What differs:** §1 lists "no Google OAuth" among the explicit v1 non-goals that
+must "not [be] silently re-introduce[d]". This amendment **REVERSES that non-goal
+for post-v1** — deliberately, in writing, and with owner sign-off — and records
+exactly how far the reversal goes and where it stops.
+
+1. **§1 / §2 / §5.1 — a second credential path, never the only one.** Google
+   OAuth 2.0 / OIDC sign-in is added alongside magic link, with the same
+   auto-provisioning semantics §5.1 already has (completing auth for an unknown
+   email creates the account; for a known one, signs into it) and terminating in
+   the **same `samo_session` cookie** the magic-link path mints — one cookie mint
+   site, no second session shape. **Magic link stays enabled on every environment
+   where Google is enabled**, so Google is never the only credential on any
+   deployment: a revoked, suspended or deleted Google account always leaves the
+   user a working recovery path into their own tenant. The flow is a confidential
+   authorization-code client with **PKCE S256** and a **nonce**, terminating in a
+   **locally verified RS256 ID token** (full `alg`/`iss`/`aud`/`azp`/`exp`/`iat`/
+   `nonce` verification against cached JWKS) — the OIDC Core 3.1.3.7
+   direct-channel exemption is deliberately **not** taken, because this design
+   introduces a fake-IdP seam and that exemption stops holding the moment the
+   exchange can be swapped.
+2. **§5.1 — identity is keyed on `(provider, provider_subject)`, NOT on
+   `users.email`.** A new privileged `user_identities` table (migration `0011`;
+   no RLS and no `samograph_app` grant, exactly like `users` and `magic_links`,
+   because the callback runs before any tenant context exists) is the identity
+   key. Resolution order is itself the security property: a `(provider, sub)` hit
+   resolves the user and **does not consult email at all**; email is used only on
+   the miss branch, to link to an existing account. Email-keyed identity was
+   rejected because it produces four concrete failures — a Google-side email
+   change silently locks a user out of her own tenant; a **reassigned** corporate
+   address walks a new holder into the previous holder's tenant on a legitimately
+   verified token; a consumer and a Workspace account carrying the same address
+   as two distinct `sub`s collapse into one account with no record; and the new
+   address may already be `UNIQUE`-taken by someone else.
+3. **§5.1 — `users.email` becomes IMMUTABLE after creation.** This is the
+   invariant that makes (2) safe: no `UPDATE users SET email` exists anywhere, so
+   a Google-side email change is a **no-op** rather than a silent lockout, and a
+   reassigned Workspace address cannot re-point an existing account. The
+   provider-asserted email is written only to `user_identities.email`, for audit.
+4. **§5.1 — `idToken.email_verified === true` is a hard, boolean-strict
+   precondition for touching any store.** `users.email` is `UNIQUE` and
+   `createOrLoadUser` upserts on it, so `createOrLoadUser(idToken.email)` without
+   this gate is a one-line account-takeover endpoint against every existing
+   magic-link user. Read **only** from the locally verified ID token — never from
+   `userinfo` or any other Google side channel — and enforced in the service
+   **before** any store call. On `false`, absent, the string `"true"`, or the
+   number `1`: create nothing, link nothing, mint no cookie → `SAMO-AUTH-009`.
+   The fallback is **FAIL**, not "then create a new user": creating would squat
+   the victim's address before they ever sign up.
+5. **§5.1 — same-email linking to an existing magic-link account is SILENT, and
+   is therefore paired with a mandatory one-time notification email** on the
+   link-to-existing branch (never on new-user, never on returning). Since **no
+   session revocation exists anywhere in this system** (sign-out is a cookie
+   clear; a session is a 30-day stateless HMAC), that email is the only mechanism
+   by which a successful takeover would ever be noticed. Email normalization is
+   trim + lowercase only, identical to the magic-link path — explicitly **no**
+   Gmail dot/plus canonicalization, which is a cross-user collision (and so a
+   takeover primitive) on non-Gmail domains.
+6. **§1 / §5.12 — the CALENDAR non-goal is NOT reversed.** Scopes are
+   **`openid email` only**. `profile` is not requested, no refresh token is
+   requested (`access_type=online`), and no access token is stored. The §5.12 v2
+   "calendar auto-join" row must request calendar scopes **INCREMENTALLY from
+   Settings, at the moment the user enables it — never bundled into sign-in**,
+   because bundling would convert a non-sensitive-scope app into a
+   **sensitive-scope** one requiring Google review, and would put a scope the
+   user never asked for on the sign-in consent screen. The minimum scope set is
+   simultaneously the trust decision and the ship-date decision: `openid` and
+   `email` are non-sensitive, so the client publishes with no Google security
+   assessment and no restricted-scope review.
+7. **§5.11 / §9 — funnel stage 2 is renamed `magic_link_clicked` →
+   `auth_completed`** (arity stays 5, so the cumulative index math is unchanged).
+   `magic_link_clicked` is derived from a **consumed `magic_links` row**; a Google
+   signup never produces one, and `aggregateFunnel` counts each user at every
+   stage up to their furthest, so a Google user who creates a call would have
+   stage 2 **IMPUTED** — the metric would not visibly break, which is worse than
+   breaking. `samograph_funnel_stage` gains a `method` label (per-method series
+   only); `samograph_activation_w1_by_method`, `samograph_magic_link_status`,
+   `auth_google_start_total`, `auth_google_callback_total` and
+   `auth_identity_linked_total` are added; `users.signup_method` lands in
+   migration `0012` (its own PR — a metrics column does not belong in an identity
+   migration). For the first full week after Google ships, the **§9 `≥ 0.5`
+   activation target is judged against `method="magic_link"`** and the blended
+   number is reported but not targeted, then re-baselined — one-click signup
+   raises the denominator faster than the numerator, so the headline metric can
+   fall while the product improves.
+8. **§5.12 — Settings gains a read-only "Sign-in" block** listing linked methods
+   (`magic_link` always; `google` when an identity exists; the `google` row is
+   omitted entirely on environments where connecting is impossible). It is the
+   direct counterpart of (5): once we attach a Google account to an existing user
+   without asking, the user acquires a right to *see* that it happened.
+   Connect/disconnect from Settings are deferred `[POSTPONED post-v1]`.
+9. **§5.14 — erasure must additionally delete `user_identities`.** The §5.14
+   account erasure writes an `audit_log(action='account_deleted')` tombstone and
+   **never deletes the `users` row** (verified: `apps/app-api/account/http.ts`
+   purges `calls`/`transcripts`/`tokens`/`workers`/audit detail only), so the
+   `user_identities → users` FK cascade never fires and a Google `sub` — personal
+   data — would otherwise survive "erase all my data". The delete runs on the
+   **privileged** connection, outside the `SET LOCAL ROLE samograph_app`
+   transaction, because the table is deliberately ungranted and the RLS-scoped tx
+   would `42501`.
+10. **§5.16 — five new codes, plus two pre-existing undocumented rows.** See the
+    table below. `SAMO-AUTH-004` is broadened to cover the Google start bucket,
+    and `SAMO-AUTH-500` is reused rather than given a Google-specific twin, so
+    retryable-infra semantics stay in one place.
+11. **Branding deviation.** Google's button spec mandates Roboto Medium 14px; we
+    ship `var(--font-body)` at 14px/500 because this app loads no webfonts and
+    will not start loading one for a single button. Every other branding
+    requirement (the approved label string `Continue with Google`, the unmodified
+    four-colour mark, 4px radius, 40px min height, the approved colour sets, no
+    extra content inside the button) is honored exactly. The mark's four brand
+    hexes live as literal fills in the TSX, which `test/greenroom-tokens.test.ts`
+    does not scan — a **documented exception**, not an oversight.
+
+**§5.16 rows to fold into the table.** `SAMO-AUTH-005` and `SAMO-AUTH-500` already
+exist in `apps/app-api/auth/errors.ts` and were never documented — drift closed
+here. Failures on the Google path occur during a **browser redirect** and so
+cannot carry a JSON body: they are delivered as `302 → /auth?error=<CODE>` and
+rendered from the same code→copy map the magic-link page already uses.
+
+| Code | HTTP / call status | Meaning | User-facing message | Client behavior |
+|---|---|---|---|---|
+| `SAMO-AUTH-005` | 401 + clear-cookie | Stateless session outlived its tenant (#114 / §5.14 erasure, or a recreated dev DB) | "You've been signed out. Please sign in again." | Re-authenticate |
+| `SAMO-AUTH-500` | 500 | Infra/provisioning failure **after** a valid credential verified (e.g. the pre-tenant `INSERT INTO tenants` errors — #180). The single-use link is left OUTSTANDING | "Something went wrong on our end — please try again." | Retryable — click again |
+| `SAMO-AUTH-006` | `302 → /auth?error=…` | User cancelled at Google's consent screen (`error=access_denied`) | (info tone, not an error) | None — offer both sign-in options again |
+| `SAMO-AUTH-007` | `302 → /auth?error=…` | OAuth state / PKCE / nonce failure: tampered or missing `__Host-samo_oauth`, wrong `v`, expired (>10 min), or state mismatch | "That sign-in attempt expired — please try again." | Restart sign-in |
+| `SAMO-AUTH-008` | `302 → /auth?error=…` | Google-side or token/ID-token failure (token exchange, JWKS, signature, `iss`/`aud`/`exp`/`nonce`) | "Google couldn't sign you in right now." | Retry, or use magic link |
+| `SAMO-AUTH-009` | `302 → /auth?error=…` | `email_verified` is not boolean `true` on the verified ID token | "Your Google account's email isn't verified." | Verify with Google, or use magic link |
+| `SAMO-AUTH-010` | `302 → /auth?error=…` | Google sign-in is not configured on this deployment (branch previews, by design) | "Google sign-in isn't available here." | Use magic link |
+
+The equivalent status recorded in logs/metrics for `006`–`010` is **not pinned by
+this amendment** — the design that produced this entry did not fix one, and
+inventing one here would put an unverifiable number in the contract. It is set by
+the implementing PR (issue #209, PR 5) alongside `AUTH_ERRORS`, and this table is
+updated to match once it lands. The user-facing copy above is likewise indicative:
+the shipped strings come from the same PR's code→copy map.
+
+None of `006`–`010` distinguishes "this email exists in our DB" from "it does
+not" — the split is "your browser/tab went stale" vs "Google's side failed" vs
+"your own Google email is unverified", which is not a fact about our user table
+and materially changes what the user does next. The security constraint is applied
+*inside* each bucket instead: sub-reasons are indistinguishable, and Google's
+`error` / `error_description` is **never** reflected into a URL, a response body,
+or a rendered log (Google's token endpoint reflects request parameters back).
+
+**Why:** the v1 non-goal was a **scope** decision made to ship the core loop, not a
+security or architectural objection — nothing in §4 or §5 was designed around the
+absence of a second credential. Google sign-in removes the highest-friction step in
+the §5.11 funnel, and it gives the "my magic link never arrived" user an escape
+hatch that **§10 #7** (magic-link deliverability on corporate mail, a tracked
+*launch blocker*) currently leaves as a dead end. Reversing it in writing, with the
+scope boundary in (6) held, is the honest way to take that back; doing it in a
+commit message would be exactly the silent re-introduction §1 forbids.
+
+**Explicitly accepted and recorded rather than fixed here:**
+
+- **No session revocation anywhere.** A Google-linked session stays a 30-day
+  stateless HMAC regardless of Google-side revocation, password change, or account
+  deletion — exactly as a magic-link session already is. Mitigated only by the
+  link-notification email in (5). Fix when session revocation lands.
+- **Branch previews have no Google sign-in, by design.** Google exact-matches
+  `redirect_uri` with no wildcards, and an unbounded set of preview hostnames must
+  never be registrable redirect targets. `GET /auth/providers` returns
+  `{"google": false}` there and the button does not render; magic link — the same
+  credential every preview already has — keeps working. Two OAuth clients
+  (`samograph-prod`, `samograph-nonprod`) rather than one, so a leaked preview
+  credential cannot mint anything prod accepts (the verifier pins `aud`). The
+  fixed-host broker/bounce that *would* give previews Google sign-in is a separate
+  issue with its own threat model. See `docs/runbooks/google-oauth.md`.
+- **State is single-use only by virtue of Google's authorization code being
+  single-use**, inside a 10-minute window. No server-side burn.
+- **Duplicate accounts from Gmail dot/plus variants are accepted** — see (5).
+- **Workspace domain reassignment** (an ex-employee's address handed to a new hire)
+  carries exactly the exposure magic link already carries, since the new hire also
+  receives mail at that address. Not a new risk class.
+- **The state cookie reuses `SESSION_SECRET`**, domain-separated by a mandatory
+  `"samo.oauth.state.v1|"` prefix in the signing input, because three protocols in
+  this repo already share the `base64url(json).base64url(hmac)` wire shape and a
+  fourth signed under the same key with the same input would be cross-verifiable.
+  Accepted cost: rotating `SESSION_SECRET` invalidates in-flight logins inside a
+  10-minute window. A dedicated secret was rejected in part because
+  `.samohost.toml`'s `secrets` array is a per-env **generator** — see the runbook.
+
+**Action:** fold the §5.16 rows above into the SPEC's table (including the two
+`005`/`500` drift rows) once the implementing PR pins their log statuses and copy;
+rename stage 2 in the §5.11 funnel list and add the `method` label; add the §9
+re-baselining sentence; add the §5.12 Settings "Sign-in" row; extend the §5.14
+erasure list with `user_identities`; and amend the §1 non-goals sentence to record
+that "no Google OAuth" was reversed post-v1 by this amendment (the calendar
+non-goal is untouched). **Operator setup:**
+[`docs/runbooks/google-oauth.md`](../../docs/runbooks/google-oauth.md).
