@@ -8,8 +8,10 @@
  * purged. Then the tenant's audit DETAIL is purged and a single
  * `audit_log(action='account_deleted')` tombstone is written — the durable
  * erasure record whose PRESENCE marks the tenant deleted, revoking every
- * stateless session cookie (see {@link tenantActive}). Finally a confirmation
- * email is sent and the caller's own cookie is cleared.
+ * stateless session cookie (see {@link tenantActive}). The owner's external
+ * sign-in identities (`user_identities`, #209) are erased too — a privileged,
+ * non-tenant-scoped delete RLS cannot reach and the FK cascade never fires for.
+ * Finally a confirmation email is sent and the caller's own cookie is cleared.
  *
  * CRITICAL (defence-in-depth, §5.10): the destructive DB work runs as the
  * NON-superuser `samograph_app` role (`SET LOCAL ROLE`) with `app.tenant_id` set
@@ -129,11 +131,25 @@ export function createAccountHandler(
         VALUES (${tenantId}, ${actor}, ${ACCOUNT_DELETED_ACTION})`;
     });
 
-    // 4) Confirmation email (§5.14). The erasure has already committed; a transport
+    // 4) Erase the tenant owner's external sign-in identities (#209). A provider
+    //    `sub` is personal data, and it is the one piece RLS cannot reach:
+    //    `user_identities` is a PRIVILEGED pre-tenant table (migration 0011,
+    //    ungranted to samograph_app), so this runs on the privileged connection
+    //    and deliberately OUTSIDE the `SET LOCAL ROLE samograph_app` transaction
+    //    above — inside it the statement would fail 42501. It is NOT covered by
+    //    the FK ON DELETE CASCADE either: the erasure writes a tombstone and
+    //    never deletes the `users` row, so the cascade never fires and the sub
+    //    would otherwise survive "erase all my data". With no RLS to lean on,
+    //    the DELETE is scoped by the tenant's own owner.
+    await sql`
+      DELETE FROM user_identities
+      WHERE user_id IN (SELECT owner_user_id FROM tenants WHERE id = ${tenantId})`;
+
+    // 5) Confirmation email (§5.14). The erasure has already committed; a transport
     //    failure surfaces typed, never a silent hang.
     if (ownerEmail) await emailSender.sendAccountDeletion({ to: ownerEmail });
 
-    // 5) 200 + clear the caller's cookie (they are signed out on the spot; the dead
+    // 6) 200 + clear the caller's cookie (they are signed out on the spot; the dead
     //    cookie now 401s on every route via the #159 deleted-tenant path anyway).
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
