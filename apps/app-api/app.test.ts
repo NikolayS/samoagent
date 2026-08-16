@@ -13,6 +13,7 @@ import { describe, it, expect } from "bun:test";
 import type { SQL } from "bun";
 import { createAppApi, type AppApiConfig, type DevShortcuts } from "./app.ts";
 import { InMemoryEmailSender } from "./auth/index.ts";
+import { devCookieFix } from "./dev-server.ts";
 
 const SESSION_SECRET = "app-test-session-secret-aaaaaaaaaaaaaaaaaaaa";
 
@@ -31,16 +32,14 @@ function baseConfig(): AppApiConfig {
   };
 }
 
-/** The exact dev shortcuts the dev wrapper injects. */
+/**
+ * The exact dev shortcuts the dev wrapper injects. `stripSecureCookie` is the
+ * REAL `devCookieFix` from `dev-server.ts`, not a re-implementation — an inline
+ * copy silently drifts from the shim that actually runs locally.
+ */
 const devShortcuts: DevShortcuts = {
   lastMagicLink: () => Response.json({ ok: true, link: "http://web.test/auth/callback?token=x" }, { status: 200 }),
-  stripSecureCookie: (res) => {
-    const sc = res.headers.get("set-cookie");
-    if (!sc) return res;
-    const headers = new Headers(res.headers);
-    headers.set("set-cookie", sc.replace(/;\s*Secure/gi, ""));
-    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
-  },
+  stripSecureCookie: devCookieFix,
 };
 
 describe("createAppApi — PROD composition (no devShortcuts)", () => {
@@ -65,6 +64,17 @@ describe("createAppApi — PROD composition (no devShortcuts)", () => {
     const res = await api.fetch(new Request("http://api.test/health"));
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("ok");
+  });
+
+  it("with devShortcuts EXPLICITLY undefined, the Secure cookie survives byte-for-byte", async () => {
+    const api = createAppApi({ ...baseConfig(), devShortcuts: undefined });
+    const res = await api.fetch(new Request("http://api.test/auth/logout", { method: "POST" }));
+    expect(res.status).toBe(204);
+    // Byte-for-byte the value `buildClearedSessionCookie()` emits: the shim is
+    // ABSENT from the prod handler, so nothing rewrote this header.
+    expect(res.headers.getSetCookie()).toEqual([
+      "samo_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+    ]);
   });
 });
 
