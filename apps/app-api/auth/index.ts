@@ -73,3 +73,12 @@ export {
   type CallbackResult,
 } from "./service.ts";
 export { createAuthHandler, clientIp } from "./http.ts";
+export {
+  type IdentityProvider,
+  type IdentityStore,
+  type LinkedIdentity,
+  type LinkIdentityInput,
+  type UserDirectory,
+  InMemoryIdentityStore,
+} from "./identities.ts";
+export { PostgresIdentityStore } from "./pg-identity-store.ts";
