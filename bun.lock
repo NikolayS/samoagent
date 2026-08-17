@@ -51,6 +51,10 @@
       "name": "@samograph/shared",
       "version": "0.0.0",
     },
+    "packages/test-fakes/google-oauth": {
+      "name": "@samograph/test-fakes-google-oauth",
+      "version": "0.0.0",
+    },
     "packages/test-fakes/recall": {
       "name": "@samograph/test-fakes-recall",
       "version": "0.0.0",
@@ -144,6 +148,8 @@
     "@samograph/ingest": ["@samograph/ingest@workspace:apps/ingest"],
 
     "@samograph/shared": ["@samograph/shared@workspace:packages/shared"],
+
+    "@samograph/test-fakes-google-oauth": ["@samograph/test-fakes-google-oauth@workspace:packages/test-fakes/google-oauth"],
 
     "@samograph/test-fakes-recall": ["@samograph/test-fakes-recall@workspace:packages/test-fakes/recall"],
 

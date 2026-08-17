@@ -101,3 +101,29 @@ export {
 // Appended (not folded into the crypto block above) to keep this PR's diff off
 // the lines sibling #209 PRs also touch.
 export { randomToken } from "./crypto.ts";
+// Google sign-in (issue #209). Appended at the END so the sibling PRs in that
+// series each add their block here without colliding.
+export {
+  GOOGLE_JWKS_URL,
+  GOOGLE_ID_TOKEN_ISSUERS,
+  GOOGLE_ID_TOKEN_MAX_BYTES,
+  GOOGLE_ID_TOKEN_MAX_SUBJECT_LENGTH,
+  ID_TOKEN_CLOCK_SKEW_MS,
+  ID_TOKEN_MAX_IAT_AGE_MS,
+  JWKS_TIMEOUT_MS,
+  JWKS_MAX_BYTES,
+  JWKS_MAX_KEYS,
+  JWKS_MIN_CACHE_MS,
+  JWKS_MAX_CACHE_MS,
+  JWKS_REFRESH_COOLDOWN_MS,
+  JWKS_FAILURE_RETRY_MS,
+  JWKS_MIN_MODULUS_BYTES,
+  GoogleJwks,
+  verifyGoogleIdToken,
+  type GoogleIdentity,
+  type GoogleIdTokenRejection,
+  type VerifyGoogleIdTokenResult,
+  type VerifyGoogleIdTokenOptions,
+  type JwksKeySource,
+  type GoogleJwksOptions,
+} from "./google-id-token.ts";
