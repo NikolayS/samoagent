@@ -1,5 +1,11 @@
 import { describe, it, expect } from "bun:test";
-import { base64url, fromBase64url, hmacSha256, constantTimeEqual } from "./crypto.ts";
+import {
+  base64url,
+  fromBase64url,
+  hmacSha256,
+  constantTimeEqual,
+  randomToken,
+} from "./crypto.ts";
 
 describe("auth/crypto", () => {
   it("base64url round-trips bytes exactly, URL-safe and unpadded", () => {
@@ -90,5 +96,30 @@ describe("auth/crypto", () => {
     expect(constantTimeEqual(base, lateDiff)).toBe(false);
     expect(early).toBeGreaterThan(0);
     expect(ratio).toBeLessThan(3);
+  });
+});
+
+describe("auth/crypto randomToken (CSPRNG)", () => {
+  it("defaults to 32 bytes rendered as 43 unpadded base64url chars", () => {
+    const t = randomToken();
+    // 32 bytes → ceil(32 * 4 / 3) = 43 base64 chars with the padding stripped.
+    expect(t).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(t.length).toBe(43);
+    expect(fromBase64url(t).length).toBe(32);
+  });
+
+  it("honours an explicit byte length and stays URL-safe and unpadded", () => {
+    const t = randomToken(16);
+    expect(t).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(fromBase64url(t).length).toBe(16);
+    expect(t).not.toContain("=");
+    expect(t).not.toContain("+");
+    expect(t).not.toContain("/");
+  });
+
+  it("draws unpredictable values — 1000 draws collide zero times", () => {
+    const draws = new Set<string>();
+    for (let i = 0; i < 1000; i++) draws.add(randomToken());
+    expect(draws.size).toBe(1000);
   });
 });
