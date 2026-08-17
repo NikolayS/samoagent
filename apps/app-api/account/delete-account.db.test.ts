@@ -96,6 +96,18 @@ d("DELETE /account — full account GDPR erasure (§5.14, RLS-enforced §5.10)",
     return callId;
   }
 
+  /**
+   * Link a Google identity to a user (#209 criterion 11). `user_identities` is a
+   * PRIVILEGED, non-tenant-scoped table, so it is seeded — and later counted —
+   * on the superuser connection: the `samograph_app` role cannot see it at all.
+   */
+  async function seedIdentity(userId: string): Promise<string> {
+    const subject = `sub_${randomUUID()}`;
+    await sql`INSERT INTO user_identities (user_id, provider, provider_subject, email)
+      VALUES (${userId}, 'google', ${subject}, ${`${userId}@acct.test`})`;
+    return subject;
+  }
+
   async function count(table: string, where: string, arg: string): Promise<number> {
     const rows = (await sql.unsafe(
       `SELECT count(*)::int AS c FROM ${table} WHERE ${where} = $1`,
@@ -120,6 +132,7 @@ d("DELETE /account — full account GDPR erasure (§5.14, RLS-enforced §5.10)",
   //        confirmation email + account_deleted tombstone ───────────────────────
   it("owner DELETE /account purges every call's data, calls Recall-delete per call, emails a confirmation, and writes the account_deleted tombstone", async () => {
     const owner = await freshOwner();
+    await seedIdentity(owner.userId);
     const bot1 = `bot_${randomUUID().slice(0, 8)}`;
     const bot2 = `bot_${randomUUID().slice(0, 8)}`;
     const call1 = await seedCall({ tenantId: owner.tenantId, botId: bot1, status: "ENDED" });
@@ -159,12 +172,20 @@ d("DELETE /account — full account GDPR erasure (§5.14, RLS-enforced §5.10)",
     expect(audit.length).toBe(1);
     expect(audit[0].action).toBe("account_deleted");
     expect(audit[0].actor).toBe(`user:${owner.userId}`);
+
+    // #209 criterion 11: the linked Google identity — a provider `sub` is personal
+    // data — is ERASED too. The erasure writes a tombstone and deliberately never
+    // deletes the `users` row, so the FK ON DELETE CASCADE never fires; without an
+    // explicit privileged DELETE the sub would survive "erase all my data".
+    expect(await count("user_identities", "user_id", owner.userId)).toBe(0);
   });
 
   // ── (b) RLS NEGATIVE: erasing tenant A does NOT touch tenant B's data ─────────
   it("erasing tenant A leaves tenant B's calls, transcripts, sessions and tenant row UNTOUCHED", async () => {
     const a = await freshOwner();
     const b = await freshOwner();
+    await seedIdentity(a.userId);
+    await seedIdentity(b.userId);
     const botA = `bot_${randomUUID().slice(0, 8)}`;
     const botB = `bot_${randomUUID().slice(0, 8)}`;
     await seedCall({ tenantId: a.tenantId, botId: botA, status: "ENDED" });
@@ -197,6 +218,12 @@ d("DELETE /account — full account GDPR erasure (§5.14, RLS-enforced §5.10)",
     expect(bAudit[0].c).toBe(0);
     const bList = await calls(req("GET", "/calls", { cookie: b.cookie }));
     expect(bList.status).toBe(200);
+
+    // The privileged `user_identities` DELETE runs OUTSIDE the RLS-scoped tx, so it
+    // gets no help from RLS — it must be scoped by the tenant's owner itself. A's
+    // identity is gone, B's is untouched (#209 criterion 11).
+    expect(await count("user_identities", "user_id", a.userId)).toBe(0);
+    expect(await count("user_identities", "user_id", b.userId)).toBe(1);
   });
 
   // ── (c) A still-LIVE call force-leaves the bot BEFORE purging the row ──────────
