@@ -376,6 +376,20 @@ function assertRedirectUriShape(value: string, source: string): void {
         `set GOOGLE_OAUTH_REDIRECT_URI to https://<host>${GOOGLE_OAUTH_CALLBACK_PATH}`,
     );
   }
+  // The value must ALREADY be canonical. We send it verbatim (see below), so a
+  // form that URL parsing would normalise — an explicit `:443`, an uppercase
+  // host, a doubled slash — is a value that will not byte-match what Google has
+  // registered. Rejecting it at boot beats sending it and having every user's
+  // click die at Google with `redirect_uri_mismatch` and nothing in our logs.
+  // It also makes "we never normalise the operator's string" structural rather
+  // than a promise: verbatim and canonical are the same string here.
+  if (url.toString() !== value) {
+    throw new GoogleOAuthError(
+      `${source} is not in canonical form (it would normalise to a different string, ` +
+        `so it cannot byte-match the URI registered with Google) — set ` +
+        `GOOGLE_OAUTH_REDIRECT_URI to ${url.toString()}`,
+    );
+  }
 }
 
 /** Derive `<origin>/auth/google/callback`, against the registered-origin list. */

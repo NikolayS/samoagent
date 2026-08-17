@@ -579,6 +579,27 @@ describe("googleOAuthFromEnv — redirect URI resolution", () => {
     expect(googleOAuthFromEnv(envWith(uri), WEB_ORIGIN)?.redirectUri).toBe(uri);
   });
 
+  it("REJECTS a non-canonical override rather than silently normalizing it", () => {
+    // Each of these is accepted by `new URL(...)` and comes back as a DIFFERENT
+    // string, so an implementation that re-serialized would quietly send Google
+    // something the operator never registered. Found by mutation testing: with
+    // only canonical fixtures, "returns the override verbatim" and "returns
+    // `new URL(override).toString()`" are indistinguishable.
+    for (const [given, canonical] of [
+      ["https://x.test:443/auth/google/callback", "https://x.test/auth/google/callback"],
+      ["https://X.TEST/auth/google/callback", "https://x.test/auth/google/callback"],
+      [
+        "http://localhost:3000/auth/google/../google/callback",
+        "http://localhost:3000/auth/google/callback",
+      ],
+    ] as const) {
+      expect(new URL(given).toString()).toBe(canonical);
+      expect(() => googleOAuthFromEnv(envWith(given), WEB_ORIGIN)).toThrow(
+        /GOOGLE_OAUTH_REDIRECT_URI/,
+      );
+    }
+  });
+
   it("REJECTS http on a non-localhost host", () => {
     expect(() =>
       googleOAuthFromEnv(envWith("http://evil.test/auth/google/callback"), WEB_ORIGIN),
