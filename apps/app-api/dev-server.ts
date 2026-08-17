@@ -99,12 +99,35 @@ class DevEmailSender implements EmailSender {
   }
 }
 
-/** Strip `Secure` from Set-Cookie so the session cookie stores over http://localhost (DEV). */
-function devCookieFix(res: Response): Response {
-  const sc = res.headers.get("set-cookie");
-  if (!sc) return res;
+/**
+ * DEV-ONLY: strip `Secure` from Set-Cookie so the session cookie stores over
+ * http://localhost. Injected as `devShortcuts.stripSecureCookie` and therefore
+ * ABSENT from the prod handler entirely (see `app.ts`) — never merely disabled.
+ *
+ * Two rules this must honour, both of which the naive `get`/`set` form broke:
+ *
+ *  1. **Per-header, never joined.** `Headers.get("set-cookie")` returns every
+ *     cookie COMMA-JOINED into one string, and writing that back with `set()`
+ *     produces a single malformed header — so a response carrying two cookies
+ *     (the Google callback: new session + cleared `__Host-samo_oauth`) lost one.
+ *     `getSetCookie()` + `append()` keeps each cookie its own header.
+ *  2. **Never touch a `__Host-` cookie.** The prefix REQUIRES `Secure` (plus
+ *     `Path=/` and no `Domain=`), so stripping it does not "help it work on
+ *     localhost" — the browser DISCARDS the cookie outright, and the failure
+ *     presents as "the state cookie vanished". The prefix is matched
+ *     case-insensitively, as RFC 6265bis §4.1.3.2 specifies.
+ */
+export function devCookieFix(res: Response): Response {
+  const cookies = res.headers.getSetCookie();
+  if (cookies.length === 0) return res;
   const headers = new Headers(res.headers);
-  headers.set("set-cookie", sc.replace(/;\s*Secure/gi, ""));
+  headers.delete("set-cookie");
+  for (const cookie of cookies) {
+    headers.append(
+      "set-cookie",
+      /^__Host-/i.test(cookie.trimStart()) ? cookie : cookie.replace(/;\s*Secure/gi, ""),
+    );
+  }
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
