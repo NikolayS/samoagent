@@ -99,3 +99,29 @@ export {
   type JwksKeySource,
   type GoogleJwksOptions,
 } from "./google-id-token.ts";
+export {
+  IN_MEMORY_AUTHORIZE_URL,
+  IN_MEMORY_REDIRECT_URI,
+  IN_MEMORY_DEFAULT_IDENTITY,
+  InMemoryOAuthProvider,
+  type OAuthProvider,
+  type OAuthIdentity,
+  type AuthorizeParams,
+  type ExchangeParams,
+  type ExchangeResult,
+  type OAuthExchangeRejection,
+  type InMemoryOAuthProviderOptions,
+} from "./oauth.ts";
+export {
+  GOOGLE_AUTHORIZE_URL,
+  GOOGLE_TOKEN_URL,
+  GOOGLE_OAUTH_SCOPE,
+  GOOGLE_OAUTH_CALLBACK_PATH,
+  GOOGLE_TOKEN_TIMEOUT_MS,
+  GOOGLE_TOKEN_RESPONSE_MAX_BYTES,
+  GOOGLE_REGISTERED_REDIRECT_ORIGINS,
+  GoogleOAuthError,
+  GoogleOAuthProvider,
+  googleOAuthFromEnv,
+  type GoogleOAuthProviderOptions,
+} from "./google-oauth.ts";
