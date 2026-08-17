@@ -47,6 +47,7 @@ a call can be `IN_CALL` **and** degraded at the same time. See
 | Toggle | Effect | Doc |
 |---|---|---|
 | `RECALL_LIVE` + `RECALL_API_KEY` | Flip the bot-orchestrator from the deterministic fake to the REAL Recall client so an actual bot joins (default = fake; never set in CI) | [real-recall-flag.md](./real-recall-flag.md) |
+| `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET` | Enable "Continue with Google" on an env (default = OFF; `GET /auth/providers` → `{"google":false}` and no button). Magic link stays enabled everywhere Google is (SPEC.amendments S5-1) | [google-oauth.md](./google-oauth.md) |
 
 ## Deployment invariants
 
@@ -54,6 +55,7 @@ a call can be `IN_CALL` **and** degraded at the same time. See
 |---|---|---|
 | app-api sits behind a trusted edge that **overwrites** `X-Forwarded-For`; never exposed directly | `clientIp()` trusts the first XFF hop — without a trusted proxy the 20/hr per-IP magic-link limit is spoofable and direct callers collapse into one `unknown` bucket (§5.1 / SPEC.amendments item 11) | [trusted-proxy.md](./trusted-proxy.md) |
 | Run the superuser DB bootstrap **before** migrate, per env / per fresh DB | `bootstrap.sql` wires the app login role's `GRANT samograph_app` + `BYPASSRLS`; without it every redeploy / DBLab clone breaks sign-in (`SET ROLE`/pre-tenant INSERT throw `42501`). Broke prod twice — #186 / #180 (§5.10) | [db-bootstrap.md](./db-bootstrap.md) |
+| `GOOGLE_OAUTH_CLIENT_SECRET` is **never** added to `.samohost.toml`'s `secrets` array | That array is a per-env **generator** — samohost would mint a random string, the presence gate would report "configured", the button would render, and every sign-in would fail at Google's token endpoint. Strictly worse than absent | [google-oauth.md](./google-oauth.md#the-samohosttoml-trap--never-put-the-secret-in-secrets) |
 
 ## Conventions
 

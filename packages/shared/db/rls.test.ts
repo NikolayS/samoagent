@@ -14,11 +14,16 @@ import { migrate } from "./migrate.ts";
 const HAVE_DB = !!process.env.DATABASE_URL;
 const d = HAVE_DB ? describe : describe.skip;
 
-// The tenant-scoped tables that MUST carry an RLS policy (§5.10). `users` and
-// `regions` are not tenant-scoped and are intentionally excluded. `webhook_events`
-// is tenant-scoped via its call's tenant (recall_bot_id join, 0003 / §5.3).
-// `deleted_calls` is the §5.14 per-call erasure tombstone — tenant-scoped by its
-// own `tenant_id` (0009), same isolation contract as `audit_log`.
+// The tenant-scoped tables that MUST carry an RLS policy (§5.10). `users`,
+// `regions` and `user_identities` are not tenant-scoped and are intentionally
+// excluded — `user_identities` (0011) is a PRIVILEGED pre-tenant auth table like
+// `users`/`magic_links`: the OAuth callback resolves an identity BEFORE any
+// tenant context exists, so it is ungranted to `samograph_app` and carries no
+// RLS (its ungrantedness is asserted in pg-identity-store.db.test.ts).
+// `webhook_events` is tenant-scoped via its call's tenant (recall_bot_id join,
+// 0003 / §5.3). `deleted_calls` is the §5.14 per-call erasure tombstone —
+// tenant-scoped by its own `tenant_id` (0009), same isolation contract as
+// `audit_log`.
 const TENANT_SCOPED = [
   "audit_log",
   "calls",
