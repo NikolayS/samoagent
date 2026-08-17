@@ -59,6 +59,11 @@ function declares(body: string, name: string): boolean {
   return new RegExp(`--${name}\\s*:`).test(body);
 }
 
+/** The declared value of `--name` in `body`, trimmed, or "" when absent. */
+function valueOf(body: string, name: string): string {
+  return body.match(new RegExp(`--${name}\\s*:\\s*([^;]+);`))?.[1]?.trim() ?? "";
+}
+
 const CORE_TOKENS = [
   "ground",
   "surface",
@@ -153,6 +158,65 @@ describe("Greenroom design tokens — globals.css contract (issue #178)", () => 
         if (HEX.test(value)) offenders.push(`${prop}: ${value.trim()}`);
       }
       expect(offenders).toEqual([]);
+    });
+  });
+
+  /**
+   * (d) "Continue with Google" chrome (issue #209, PR 6).
+   *
+   * These are Google's OWN approved colour sets, not Greenroom hues — but they
+   * still go through the token mechanism, both so the no-raw-hex rule above holds
+   * and so light/dark switch through the same machinery as everything else.
+   * The exact values are a condition of using the mark, so they are asserted
+   * literally: a redesign that retunes them is a branding violation, not a taste
+   * change, and must fail here rather than ship.
+   *
+   * Light: #ffffff surface / #747775 border / #1f1f1f label.
+   * Dark:  #131314 surface / #8e918f border / #e3e3e3 label.
+   */
+  describe("(d) Google button chrome themes in both directions (#209)", () => {
+    const GOOGLE_TOKENS = ["google-btn-bg", "google-btn-border", "google-btn-ink"];
+    const LIGHT = { bg: "#ffffff", border: "#747775", ink: "#1f1f1f" };
+    const DARK = { bg: "#131314", border: "#8e918f", ink: "#e3e3e3" };
+
+    it("declares Google's LIGHT colour set in the base :root", () => {
+      const root = baseRootBody();
+      for (const t of GOOGLE_TOKENS) expect(declares(root, t)).toBe(true);
+      expect(valueOf(root, "google-btn-bg")).toBe(LIGHT.bg);
+      expect(valueOf(root, "google-btn-border")).toBe(LIGHT.border);
+      expect(valueOf(root, "google-btn-ink")).toBe(LIGHT.ink);
+    });
+
+    it("declares Google's DARK colour set under prefers-color-scheme: dark", () => {
+      const media = nestedBlockBody("@media (prefers-color-scheme: dark)");
+      expect(valueOf(media, "google-btn-bg")).toBe(DARK.bg);
+      expect(valueOf(media, "google-btn-border")).toBe(DARK.border);
+      expect(valueOf(media, "google-btn-ink")).toBe(DARK.ink);
+    });
+
+    it('declares Google\'s DARK colour set under :root[data-theme="dark"]', () => {
+      const dark = flatBlockBody(':root\\[data-theme="dark"\\]');
+      expect(valueOf(dark, "google-btn-bg")).toBe(DARK.bg);
+      expect(valueOf(dark, "google-btn-border")).toBe(DARK.border);
+      expect(valueOf(dark, "google-btn-ink")).toBe(DARK.ink);
+    });
+
+    it('declares Google\'s LIGHT colour set under :root[data-theme="light"]', () => {
+      const light = flatBlockBody(':root\\[data-theme="light"\\]');
+      expect(valueOf(light, "google-btn-bg")).toBe(LIGHT.bg);
+      expect(valueOf(light, "google-btn-border")).toBe(LIGHT.border);
+      expect(valueOf(light, "google-btn-ink")).toBe(LIGHT.ink);
+    });
+
+    it("gives .samograph-google-signin Google's mandated 40px height and 4px radius", () => {
+      const rule = flatBlockBody("\\.samograph-google-signin");
+      expect(rule.length).toBeGreaterThan(0);
+      expect(/min-height\s*:\s*40px\s*;/.test(rule)).toBe(true);
+      expect(/border-radius\s*:\s*4px\s*;/.test(rule)).toBe(true);
+      // Chrome comes from the tokens above — never a raw hex, never a Greenroom hue.
+      expect(rule).toContain("var(--google-btn-bg)");
+      expect(rule).toContain("var(--google-btn-border)");
+      expect(rule).toContain("var(--google-btn-ink)");
     });
   });
 });

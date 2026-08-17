@@ -40,6 +40,28 @@ const nextConfig = {
                 has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
                 destination: `${apiOrigin}/auth/logout`,
               },
+              {
+                // `GET /auth/providers` — the `{google:boolean}` probe that gates
+                // the "Continue with Google" button (#209). Client `fetch` only
+                // (there is no /auth/providers page), so gate it on dest `empty`
+                // exactly like /auth/logout above.
+                source: "/auth/providers",
+                has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
+                destination: `${apiOrigin}/auth/providers`,
+              },
+              // Google OAuth (#209) — DELIBERATELY UNGATED, unlike every rule
+              // around them. Both legs are top-level DOCUMENT navigations: the
+              // user clicks a link to /auth/google/start (which 302s to Google),
+              // and Google redirects the browser back to /auth/google/callback.
+              // Sec-Fetch-Dest is therefore `document`, not `empty`. Copying the
+              // `has: sec-fetch-dest=empty` gate from /auth/callback onto these
+              // would make the proxy miss and land the whole sign-in on a Next
+              // 404. There is no page at either path, so nothing to disambiguate.
+              { source: "/auth/google/start", destination: `${apiOrigin}/auth/google/start` },
+              {
+                source: "/auth/google/callback",
+                destination: `${apiOrigin}/auth/google/callback`,
+              },
               { source: "/calls", destination: `${apiOrigin}/calls` },
               {
                 // ShareModal's mint/get/revoke fetches (§5.7, Story 2). Client

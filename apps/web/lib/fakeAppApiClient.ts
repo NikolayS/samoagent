@@ -9,6 +9,7 @@
 import {
   AppApiError,
   type AppApiClient,
+  type AuthProviders,
   type Call,
   type CreateCallInput,
   type HostedSettings,
@@ -68,6 +69,12 @@ export interface FakeAppApiClientOptions {
    * test can deterministically observe the "verifying" state with no race.
    */
   holdVerify?: boolean;
+  /**
+   * What `GET /auth/providers` reports for Google (#209). Defaults to `false` —
+   * the same answer a branch preview, an unconfigured env, and a FAILED probe all
+   * give, so a test must opt IN to the button existing.
+   */
+  googleEnabled?: boolean;
   /** Seed `listCalls` with pre-existing tenant calls (e.g. to test reload). */
   seedCalls?: Call[];
   /** DEV-link returned by `lastDevMagicLink` (simulates the `__dev` endpoint). */
@@ -133,6 +140,13 @@ export class FakeAppApiClient implements AppApiClient {
       method: "POST",
       body: { email: input.email },
     });
+  }
+
+  async authProviders(): Promise<AuthProviders> {
+    this.requests.push({ path: "/auth/providers", method: "GET", body: {} });
+    // Mirrors the real client's contract exactly: this never rejects, so the
+    // fake grows no `failAuthProvidersWith` — a "failed probe" IS `{google:false}`.
+    return { google: this.options.googleEnabled === true };
   }
 
   async verifyMagicLink(token: string): Promise<void> {

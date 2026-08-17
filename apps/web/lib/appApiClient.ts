@@ -72,9 +72,29 @@ export interface CreateCallInput {
   meetingUrl: string;
 }
 
+/**
+ * Which non-magic-link credentials this deployment offers (SPEC §5.16 / S5-1).
+ * Google is absent on branch previews by design — Google exact-matches redirect
+ * URIs and preview hostnames are dynamic — so `false` is a normal answer, not an
+ * error.
+ */
+export interface AuthProviders {
+  google: boolean;
+}
+
 export interface AppApiClient {
   /** `POST /auth/magic-link {email}` — server emails a one-time sign-in link. */
   requestMagicLink(input: RequestMagicLinkInput): Promise<void>;
+  /**
+   * `GET /auth/providers` — the SOLE gate on rendering "Continue with Google".
+   *
+   * NEVER rejects. Any failure (5xx, 404, network error, malformed JSON, a
+   * missing or non-boolean field) resolves to `{google:false}`, because this
+   * probe must not be able to break the sign-in page: magic link has to keep
+   * working when the probe is broken, and a button that cannot possibly work is
+   * worse than no button.
+   */
+  authProviders(): Promise<AuthProviders>;
   /** `GET /auth/callback?token=…` — verifies the link; throws `AppApiError` on failure. */
   verifyMagicLink(token: string): Promise<void>;
   /** `POST /auth/logout` — clears the session cookie server-side; throws `AppApiError` on failure. */
@@ -197,6 +217,22 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
     async requestMagicLink(input) {
       const res = await post("/auth/magic-link", { email: input.email });
       if (!res.ok) await throwTyped(res, "SAMO-AUTH-004");
+    },
+    async authProviders() {
+      // Fail-closed and NEVER throw: one `try` around fetch AND `res.json()`, so
+      // a network error and a malformed body land on the same `{google:false}`.
+      try {
+        const res = await fetch(`${baseUrl}/auth/providers`, {
+          credentials: "same-origin",
+        });
+        if (!res.ok) return { google: false };
+        const data = (await res.json()) as { google?: unknown } | null;
+        // Boolean-STRICT, mirroring the server's `email_verified` rule on this
+        // same feature: the string "true" and the number 1 are not `true`.
+        return { google: data?.google === true };
+      } catch {
+        return { google: false };
+      }
     },
     async verifyMagicLink(token) {
       const res = await fetch(
