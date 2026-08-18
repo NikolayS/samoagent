@@ -435,6 +435,21 @@ describe("GET /auth/google/callback — happy paths", () => {
     expect(claims).toEqual({ userId: existing.id, tenantId: existing.tenantId, iat: NOW });
   });
 
+  it("notifies the address ON FILE, not the one the ID token asserted", async () => {
+    const h = harness();
+    // The account was created by magic link as `alice@example.com`; the Google
+    // token asserts a differently-cased spelling of the same mailbox.
+    const existing = await h.userStore.createOrLoadUser("alice@example.com");
+    const { callbackRes } = await roundTrip(h, {
+      overrides: { claims: { email: "ALICE@example.com" } },
+    });
+    expect(callbackRes.status).toBe(302);
+    expect(h.identityStore.records[0].userId).toBe(existing.id);
+    expect(h.emailSender.sentIdentityLinks).toEqual([
+      { to: "alice@example.com", provider: "google" },
+    ]);
+  });
+
   it("emails the link notification ONLY on the first link, never on the next sign-in", async () => {
     const h = harness();
     await h.userStore.createOrLoadUser("alice@example.com");

@@ -271,7 +271,11 @@ export class GoogleAuthService {
 
     let userId: string;
     let tenantId: string;
-    let linkedToExisting = false;
+    // Set ONLY on the link-to-existing branch, and set to the address ALREADY ON
+    // FILE — never to the one this token asserted. The recipient of a "someone
+    // attached a Google account to yours" warning must not be chosen by the party
+    // the warning is about.
+    let notifyExistingUserAt: string | undefined;
     try {
       // 7. `(provider, subject)` FIRST. On a hit we are done: the email on this
       //    token — whatever it now says — is never consulted, which is exactly
@@ -301,7 +305,7 @@ export class GoogleAuthService {
         });
         userId = record.userId;
         tenantId = record.tenantId;
-        linkedToExisting = existingUser !== undefined;
+        notifyExistingUserAt = existingUser?.email;
       }
     } catch (err) {
       // Pre-tenant path: no tenant context exists yet, so this uses plain
@@ -318,9 +322,12 @@ export class GoogleAuthService {
     // link-to-existing branch only. BEST-EFFORT — the sign-in has already
     // succeeded and a mail outage must not undo it — but never silently
     // swallowed: a failure is logged.
-    if (linkedToExisting) {
+    if (notifyExistingUserAt !== undefined) {
       try {
-        await emailSender.sendIdentityLinked({ to: identity.email, provider: "google" });
+        await emailSender.sendIdentityLinked({
+          to: notifyExistingUserAt,
+          provider: "google",
+        });
       } catch (err) {
         this.#logger.error("auth.google.callback: link notification email failed", {
           userId,
