@@ -18,6 +18,11 @@ type Phase = "idle" | "sending" | "sent" | "error";
  * in-memory email fake exposes the link at `GET /__dev/last-magic-link`; we
  * surface it inline so local testing can proceed without a real inbox (the probe
  * returns `null` in production, so nothing dev-only ever renders there).
+ *
+ * HEADINGS: this component owns NO `<h1>`. `AuthLanding` does (issue #209) — the
+ * page heading has to sit above BOTH credential options, and two components each
+ * owning an `<h1>` is precisely how a page ends up with two. The
+ * check-your-email heading is therefore an `<h2>` beneath that `<h1>`.
  */
 export function MagicLinkRequestForm({ client }: MagicLinkRequestFormProps) {
   const emailId = useId();
@@ -76,7 +81,7 @@ export function MagicLinkRequestForm({ client }: MagicLinkRequestFormProps) {
   if (phase === "sent") {
     return (
       <section aria-live="polite">
-        <h1>Check your email</h1>
+        <h2>Check your email</h2>
         <p>We sent a sign-in link to {sentTo}.</p>
         <p>Didn&apos;t get it?</p>
         <button type="button" onClick={onResend} disabled={resending}>
@@ -97,7 +102,6 @@ export function MagicLinkRequestForm({ client }: MagicLinkRequestFormProps) {
 
   return (
     <form onSubmit={onSubmit} noValidate>
-      <h1>Sign in to samograph</h1>
       <label htmlFor={emailId}>Email</label>
       <input
         id={emailId}

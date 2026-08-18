@@ -79,7 +79,7 @@ describe("MagicLinkRequestForm", () => {
 
   it("offers an alternate-email path back to the form (SPEC §10 #7)", async () => {
     const client = createFakeAppApiClient();
-    const { container, getByLabelText, findByText, getByText } = render(
+    const { container, getByLabelText, findByText, getByText, queryByText } = render(
       <MagicLinkRequestForm client={client} />,
     );
     fireEvent.change(getByLabelText("Email"), {
@@ -90,7 +90,35 @@ describe("MagicLinkRequestForm", () => {
     fireEvent.click(getByText("Use a different email"));
     // Back on the form.
     expect(getByLabelText("Email")).toBeDefined();
-    expect(getByText("Sign in to samograph")).toBeDefined();
+    expect(queryByText("Check your email")).toBeNull();
+  });
+
+  /**
+   * Heading ownership moved to `AuthLanding` (issue #209, PR 6): the page `<h1>`
+   * has to precede BOTH credential options, and two components each owning an
+   * `<h1>` is how a page ends up with two. This form owns NO `<h1>` in any state;
+   * its check-your-email heading is an `<h2>` beneath the landing's `<h1>`.
+   */
+  it("owns no <h1> — the landing does (#209)", () => {
+    const client = createFakeAppApiClient();
+    const { container } = render(<MagicLinkRequestForm client={client} />);
+    expect(container.querySelectorAll("h1").length).toBe(0);
+  });
+
+  it("headings the check-your-email state as an <h2>, not an <h1> (#209)", async () => {
+    const client = createFakeAppApiClient();
+    const { container, getByLabelText, findByText } = render(
+      <MagicLinkRequestForm client={client} />,
+    );
+    fireEvent.change(getByLabelText("Email"), {
+      target: { value: "h2@samograph.dev" },
+    });
+    submit(container);
+    await findByText("Check your email");
+    expect(container.querySelectorAll("h1").length).toBe(0);
+    const h2s = container.querySelectorAll("h2");
+    expect(h2s.length).toBe(1);
+    expect(h2s[0].textContent).toBe("Check your email");
   });
 
   it("DEV: surfaces the magic link inline when the __dev endpoint returns one", async () => {
