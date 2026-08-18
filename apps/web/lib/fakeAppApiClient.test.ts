@@ -19,6 +19,19 @@ describe("FakeAppApiClient — records request shape, no network", () => {
     ]);
   });
 
+  it("authProviders records GET /auth/providers and defaults to {google:false}", async () => {
+    const client = createFakeAppApiClient();
+    expect(await client.authProviders()).toEqual({ google: false });
+    expect(client.requests).toEqual([
+      { path: "/auth/providers", method: "GET", body: {} },
+    ]);
+  });
+
+  it("authProviders reports {google:true} when the env configures Google", async () => {
+    const client = createFakeAppApiClient({ googleEnabled: true });
+    expect(await client.authProviders()).toEqual({ google: true });
+  });
+
   it("verifyMagicLink rejects with the configured typed AppApiError", async () => {
     const client = createFakeAppApiClient({
       failVerifyWith: {

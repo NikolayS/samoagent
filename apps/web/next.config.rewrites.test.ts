@@ -35,6 +35,13 @@ beforeAll(async () => {
 
 const SEC_FETCH_DEST_EMPTY = [{ type: "header", key: "sec-fetch-dest", value: "empty" }];
 
+/** The single rule for `source`, or `undefined` when none is registered. */
+function ruleFor(source: string): Rewrite | undefined {
+  const matches = beforeFiles.filter((r) => r.source === source);
+  if (matches.length > 1) throw new Error(`duplicate rewrite for ${source}`);
+  return matches[0];
+}
+
 describe("next.config.mjs — share-route dev-proxy rewrites (§4.1/§5.7)", () => {
   it("proxies the client's /calls/:id/share fetch (dest empty) to the app-api", () => {
     expect(beforeFiles).toContainEqual({
@@ -57,6 +64,65 @@ describe("next.config.mjs — share-route dev-proxy rewrites (§4.1/§5.7)", () 
       source: "/calls/:id",
       has: SEC_FETCH_DEST_EMPTY,
       destination: `${ORIGIN}/calls/:id`,
+    });
+  });
+});
+
+/**
+ * Google sign-in dev-proxy rewrites (issue #209, PR 6).
+ *
+ * The trap this locks: `/auth/callback` above is gated on `sec-fetch-dest: empty`
+ * because it is BOTH a Next page and a client `fetch`. An OAuth round trip is the
+ * opposite — `/auth/google/start` and `/auth/google/callback` are reached by a
+ * top-level DOCUMENT navigation (dest `document`), so copying that `has` gate onto
+ * them would make the browser miss the proxy and land on a Next 404 instead of the
+ * API. These two rules must therefore carry NO `has` condition at all.
+ *
+ * `/auth/providers` is the opposite again: a client `fetch` with no page behind
+ * it, so it follows the `/auth/logout` pattern and IS gated.
+ */
+describe("next.config.mjs — Google sign-in dev-proxy rewrites (#209)", () => {
+  it("proxies /auth/google/start UNGATED (OAuth start is a document navigation)", () => {
+    expect(beforeFiles).toContainEqual({
+      source: "/auth/google/start",
+      destination: `${ORIGIN}/auth/google/start`,
+    });
+  });
+
+  it("registers NO `has` condition on /auth/google/start", () => {
+    const rule = ruleFor("/auth/google/start");
+    // `source` + `destination` and nothing else — asserted on the key set so this
+    // cannot pass vacuously when the rule is missing altogether.
+    expect(Object.keys(rule ?? {}).sort()).toEqual(["destination", "source"]);
+    expect(rule?.has).toBeUndefined();
+  });
+
+  it("proxies /auth/google/callback UNGATED (Google redirects the document back)", () => {
+    expect(beforeFiles).toContainEqual({
+      source: "/auth/google/callback",
+      destination: `${ORIGIN}/auth/google/callback`,
+    });
+  });
+
+  it("registers NO `has` condition on /auth/google/callback", () => {
+    const rule = ruleFor("/auth/google/callback");
+    expect(Object.keys(rule ?? {}).sort()).toEqual(["destination", "source"]);
+    expect(rule?.has).toBeUndefined();
+  });
+
+  it("proxies the client's /auth/providers fetch (dest empty) to the app-api", () => {
+    expect(beforeFiles).toContainEqual({
+      source: "/auth/providers",
+      has: SEC_FETCH_DEST_EMPTY,
+      destination: `${ORIGIN}/auth/providers`,
+    });
+  });
+
+  it("leaves the existing /auth/callback rule EXACTLY as it was (still gated)", () => {
+    expect(ruleFor("/auth/callback")).toEqual({
+      source: "/auth/callback",
+      has: SEC_FETCH_DEST_EMPTY,
+      destination: `${ORIGIN}/auth/callback`,
     });
   });
 });

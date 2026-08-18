@@ -62,6 +62,19 @@
   --state-ended: var(--muted);
   --state-error: var(--crit);
 
+  /* "Continue with Google" chrome (issue #209) — GOOGLE'S approved colour sets,
+     NOT Greenroom hues. They are tokens so that light/dark switches through the
+     same machinery as everything else and no raw hex escapes into a rule; the
+     VALUES are fixed by Google's branding guidelines and are a condition of using
+     the mark. Retuning them to taste is a branding violation, not a design
+     change — `test/greenroom-tokens.test.ts` asserts them literally. (The mark's
+     own four brand hexes are NOT here: they must never be theme-swapped, so they
+     live as literals in GoogleSignInButton.tsx. See that file's comment.)
+     Light set: white surface, #747775 border, #1f1f1f label. */
+  --google-btn-bg: #ffffff;
+  --google-btn-border: #747775;
+  --google-btn-ink: #1f1f1f;
+
   /* Type */
   --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
@@ -90,6 +103,10 @@
     --crit: #ff6b7d;
     --on-green: #06210f;
     --on-pink: #2a0f1c;
+    /* Google's approved DARK button set (#209) — not our palette to tune. */
+    --google-btn-bg: #131314;
+    --google-btn-border: #8e918f;
+    --google-btn-ink: #e3e3e3;
   }
 }
 
@@ -110,6 +127,10 @@
   --crit: #b00020;
   --on-green: #ffffff;
   --on-pink: #ffffff;
+  /* Google's approved LIGHT button set (#209). */
+  --google-btn-bg: #ffffff;
+  --google-btn-border: #747775;
+  --google-btn-ink: #1f1f1f;
 }
 
 :root[data-theme="dark"] {
@@ -128,6 +149,10 @@
   --crit: #ff6b7d;
   --on-green: #06210f;
   --on-pink: #2a0f1c;
+  /* Google's approved DARK button set (#209). */
+  --google-btn-bg: #131314;
+  --google-btn-border: #8e918f;
+  --google-btn-ink: #e3e3e3;
 }
 
 /* =============================================================================
@@ -221,6 +246,95 @@ button:hover {
 
 [role="alert"] {
   color: var(--crit);
+}
+
+/* =============================================================================
+ * Sign-in page — "Continue with Google" + the divider above the magic-link form
+ * (issue #209, SPEC.amendments S5-1)
+ *
+ * This block is BRANDING, not taste. Google's "Sign in with Google" guidelines
+ * fix the geometry (40px minimum height, 4px corner radius, the 18px mark, 8-12px
+ * gap) and the colour sets (`--google-btn-*` above). The one recorded deviation
+ * is the typeface: Google specifies Roboto Medium 14px; this app loads no
+ * webfont and will not start loading one for a single button, so it renders
+ * `var(--font-body)` at 14px/500 (S5-1 item 11).
+ *
+ * Deliberately NOT tinted with Greenroom hues: an "on-brand" green Google button
+ * is exactly what the guidelines forbid.
+ * ========================================================================== */
+
+.samograph-google-signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem; /* 12px — inside Google's 8–12px mark-to-label range */
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px; /* Google's stated minimum — do not shrink */
+  margin-top: 1rem;
+  padding: 0 0.75rem;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--google-btn-ink);
+  background: var(--google-btn-bg);
+  border: 1px solid var(--google-btn-border);
+  border-radius: 4px; /* Google's stated radius */
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+/* Google permits a hover/focus state; it must stay within the same colour set,
+   so tint the button's own surface with its own ink rather than a brand hue. */
+.samograph-google-signin:hover,
+.samograph-google-signin:focus-visible {
+  color: var(--google-btn-ink);
+  background: color-mix(in srgb, var(--google-btn-ink) 8%, var(--google-btn-bg));
+}
+
+.samograph-google-signin:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* The mark is a fixed-size asset — never scaled by the flex layout. */
+.samograph-google-mark {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+/* "or" between the two credentials, with a rule either side. `aria-hidden` in
+   the markup, so this is purely visual. */
+.samograph-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.samograph-auth-divider::before,
+.samograph-auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* Info-tone sign-in note (§5.16 SAMO-AUTH-006 — "you cancelled" is not a
+   failure, so it must not read like the red `[role="alert"]` copy). */
+.samograph-auth-note {
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samograph-google-signin {
+    transition: none;
+  }
 }
 
 /* =============================================================================
