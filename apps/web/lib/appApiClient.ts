@@ -59,9 +59,45 @@ export interface SettingsOptions {
   presets: string[];
 }
 
-export interface SettingsSnapshot {
+/**
+ * One external sign-in method linked to the account (S5-1 item 8, §5.12).
+ *
+ * PRESENCE AND CONNECTION METADATA ONLY. The provider's `sub` and the
+ * provider-asserted email are never sent by the server and must never be added
+ * here: this block is rendered on a page people screenshot, and the `sub` is the
+ * identity key. `magic_link` is deliberately NOT a member of this list — it is
+ * the credential every environment has, so the UI lists it unconditionally
+ * rather than inferring it from data.
+ */
+export interface LinkedSignInMethod {
+  /** Mirrors migration 0011's CHECK domain — today always `"google"`. */
+  provider: string;
+  /** ISO-8601 instant the link was made, or `null` when the server sent none. */
+  connectedAt: string | null;
+}
+
+/** The read-only "Sign-in" facts behind the Settings block (S5-1 item 8). */
+export interface SignInInfo {
+  /** `users.email` — authoritative and immutable; the address magic links go to. */
+  email: string;
+  /** Linked external identities, oldest first. `[]` for a magic-link-only account. */
+  identities: LinkedSignInMethod[];
+}
+
+/** The `PUT /settings` response envelope: the stored document + the catalog. */
+export interface SavedSettings {
   settings: HostedSettings;
   options: SettingsOptions;
+}
+
+/**
+ * The `GET /settings` response envelope. It carries `signin` and the PUT
+ * envelope does not — the two are separate types precisely so a caller cannot
+ * read an empty `signin` off a save response and believe the account just lost
+ * its linked methods.
+ */
+export interface SettingsSnapshot extends SavedSettings {
+  signin: SignInInfo;
 }
 
 export interface RequestMagicLinkInput {
@@ -103,10 +139,13 @@ export interface AppApiClient {
   createCall(input: CreateCallInput): Promise<Call>;
   /** `GET /calls` — the caller's tenant's calls (newest first); throws on 401. */
   listCalls(): Promise<Call[]>;
-  /** `GET /settings` — the caller's hosted settings + option catalog (§5.12); throws on 401. */
+  /**
+   * `GET /settings` — the caller's hosted settings, the option catalog, and the
+   * read-only `signin` block (§5.12, S5-1 item 8); throws on 401.
+   */
   getSettings(): Promise<SettingsSnapshot>;
   /** `PUT /settings` — replace the caller's hosted settings (§5.12); returns the stored doc. */
-  saveSettings(input: HostedSettings): Promise<SettingsSnapshot>;
+  saveSettings(input: HostedSettings): Promise<SavedSettings>;
   /**
    * `DELETE /calls/:id` — permanently erase ONE call and all of its data
    * (transcript, share links, recording) — SPEC §5.14 GDPR per-call erasure.
@@ -155,7 +194,33 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
     };
   }
 
-  /** A server `/settings` response (snake_case) → the web `SettingsSnapshot`. */
+  /**
+   * The server's `signin` block (snake_case) → {@link SignInInfo}.
+   *
+   * TOTAL and never-throwing: a missing block, a non-array `identities`, or an
+   * entry without a `provider` string all degrade to an EXPLICITLY empty shape.
+   * The settings page must still render when the block is absent (an older
+   * app-api behind a newer web build), and "no linked methods" is a safe thing to
+   * show while "undefined" would blank the page.
+   */
+  function toSignIn(raw: unknown): SignInInfo {
+    const block = (raw ?? {}) as { email?: unknown; identities?: unknown };
+    const rows = Array.isArray(block.identities) ? block.identities : [];
+    return {
+      email: typeof block.email === "string" ? block.email : "",
+      identities: rows
+        .filter(
+          (r): r is { provider: string; connected_at?: unknown } =>
+            typeof (r as { provider?: unknown })?.provider === "string",
+        )
+        .map((r) => ({
+          provider: r.provider,
+          connectedAt: typeof r.connected_at === "string" ? r.connected_at : null,
+        })),
+    };
+  }
+
+  /** A server `/settings` response (snake_case) → the web `SavedSettings`. */
   function toSettingsSnapshot(data: {
     settings?: {
       dictionary_preset?: unknown;
@@ -168,7 +233,7 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
       languages?: unknown;
       presets?: unknown;
     };
-  }): SettingsSnapshot {
+  }): SavedSettings {
     const s = data.settings ?? {};
     const o = data.options ?? {};
     const strings = (v: unknown): string[] =>
@@ -305,7 +370,8 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
     async getSettings() {
       const res = await fetch(`${baseUrl}/settings`, { credentials: "same-origin" });
       if (!res.ok) await throwTyped(res, "SAMO-SETTINGS-GET");
-      return toSettingsSnapshot((await res.json()) as Record<string, never>);
+      const data = (await res.json()) as Record<string, never>;
+      return { ...toSettingsSnapshot(data), signin: toSignIn((data as { signin?: unknown }).signin) };
     },
     async saveSettings(input) {
       const res = await fetch(`${baseUrl}/settings`, {

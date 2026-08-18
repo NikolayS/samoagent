@@ -1007,6 +1007,43 @@ exactly how far the reversal goes and where it stops.
    direct counterpart of (5): once we attach a Google account to an existing user
    without asking, the user acquires a right to *see* that it happened.
    Connect/disconnect from Settings are deferred `[POSTPONED post-v1]`.
+
+   **SHIPPED (#223).** `GET /settings` gained a third top-level key beside
+   `settings` and `options`:
+
+   ```json
+   "signin": {
+     "email": "owner@example.com",
+     "identities": [{ "provider": "google", "connected_at": "2026-03-04T09:15:00.000Z" }]
+   }
+   ```
+
+   `identities` is ALWAYS an array — `[]` for a magic-link-only account, never
+   `null` and never an absent key, so "not connected" is a fact the UI read
+   rather than a shape it guessed. `email` is `users.email` (immutable,
+   authoritative, the address magic links go to); `user_identities.email` is
+   provider-asserted and is **never** served, and neither is `provider_subject`
+   (the identity key, and personal data) or `last_login_at`. `PUT /settings` is
+   untouched in both directions — its request document and its
+   `{settings, options}` response are unchanged.
+
+   The read lives in `apps/app-api/settings/signin.ts` and runs on the
+   **privileged** connection, scoped by `user_id` from the verified session
+   claims — NOT inside the `SET LOCAL ROLE samograph_app` transaction the
+   settings document uses, which would `42501` against the ungranted, RLS-free
+   `users`/`user_identities` (0011). Same split as the §5.14 erasure. Because no
+   RLS sits behind it, cross-user isolation is asserted directly against real
+   Postgres (`apps/app-api/settings/signin.db.test.ts`).
+
+   The UI is `SignInBlock` in `apps/web/components/SettingsPage.tsx`: a
+   `<section aria-label="Sign-in">` **outside** the settings `<form>`, with rows
+   carrying `data-provider="magic_link"` / `"google"` and zero buttons, inputs,
+   selects or links. `magic_link` is rendered unconditionally (item 1 guarantees
+   it on every environment). The `google` row renders only when
+   `GET /auth/providers` answers `{"google": true}` — a `false` **or a failed
+   probe** takes the omit branch, which is why the client's probe is wrapped in a
+   `catch` that resolves to the omit branch even though the contract says it
+   cannot reject.
 9. **§5.14 — erasure must additionally delete `user_identities`.** The §5.14
    account erasure writes an `audit_log(action='account_deleted')` tombstone and
    **never deletes the `users` row** (verified: `apps/app-api/account/http.ts`

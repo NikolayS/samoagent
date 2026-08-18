@@ -13,7 +13,9 @@ import {
   type Call,
   type CreateCallInput,
   type HostedSettings,
+  type LinkedSignInMethod,
   type RequestMagicLinkInput,
+  type SavedSettings,
   type SettingsOptions,
   type SettingsSnapshot,
 } from "./appApiClient.ts";
@@ -32,6 +34,9 @@ const DEFAULT_FAKE_SETTINGS: HostedSettings = {
   language: "multi",
   chime: "blip",
 };
+
+/** The account address the fake reports on the Sign-in block (§5.12, S5-1 #8). */
+const DEFAULT_FAKE_ACCOUNT_EMAIL = "owner@example.test";
 
 /** A representative option catalog (mirrors the server's `settingsOptions`). */
 const FAKE_SETTINGS_OPTIONS: SettingsOptions = {
@@ -109,6 +114,14 @@ export interface FakeAppApiClientOptions {
   failDeleteAccountWith?: FailSpec & { status?: number };
   /** Seed the tenant's hosted settings (§5.12); defaults to {@link DEFAULT_FAKE_SETTINGS}. */
   seedSettings?: HostedSettings;
+  /**
+   * Seed the account's linked external identities for the §5.12 Sign-in block
+   * (S5-1 item 8). Defaults to `[]` — a magic-link-only account, which is what
+   * every user is until they use Google, so a test must opt IN to a linked row.
+   */
+  seedIdentities?: LinkedSignInMethod[];
+  /** The account's authoritative `users.email` shown beside the magic-link row. */
+  seedAccountEmail?: string;
   /**
    * When set, `getSettings` rejects with this typed error AFTER recording the
    * request — e.g. a 401 to exercise the settings page's auth-gate redirect.
@@ -251,10 +264,18 @@ export class FakeAppApiClient implements AppApiClient {
     if (fail) {
       throw new AppApiError(fail.code, fail.message, fail.retryable ?? false, fail.status);
     }
-    return { settings: { ...this.settings }, options: FAKE_SETTINGS_OPTIONS };
+    return {
+      settings: { ...this.settings },
+      options: FAKE_SETTINGS_OPTIONS,
+      // Mirrors the server exactly: ALWAYS an array, never absent (#223).
+      signin: {
+        email: this.options.seedAccountEmail ?? DEFAULT_FAKE_ACCOUNT_EMAIL,
+        identities: (this.options.seedIdentities ?? []).map((i) => ({ ...i })),
+      },
+    };
   }
 
-  async saveSettings(input: HostedSettings): Promise<SettingsSnapshot> {
+  async saveSettings(input: HostedSettings): Promise<SavedSettings> {
     // Record the SERVER's snake_case wire body so tests assert the exact contract.
     this.requests.push({
       path: "/settings",
