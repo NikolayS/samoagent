@@ -72,3 +72,26 @@ describe("auth/stores — InMemoryUserStore", () => {
     expect(store.users.size).toBe(1);
   });
 });
+
+/**
+ * `findByEmail` is the READ-ONLY lookup the Google callback needs to tell its two
+ * miss-branch outcomes apart (issue #209 / S5-1 item 5): linking a Google `sub`
+ * to an ALREADY-EXISTING magic-link account fires a one-time notification email,
+ * while creating a brand-new account must not. `createOrLoadUser` cannot answer
+ * that question — by the time it returns, the row exists either way — and it must
+ * never be used to ask it, because asking would create the account.
+ */
+describe("auth/stores — InMemoryUserStore.findByEmail (issue #209)", () => {
+  it("returns undefined for an unknown address and CREATES NOTHING", async () => {
+    const store = new InMemoryUserStore();
+    expect(await store.findByEmail("nobody@example.com")).toBeUndefined();
+    expect(store.users.size).toBe(0);
+  });
+
+  it("returns the existing user + tenant, normalizing the address first", async () => {
+    const store = new InMemoryUserStore();
+    const created = await store.createOrLoadUser("person@example.com");
+    expect(await store.findByEmail("  Person@Example.COM ")).toEqual(created);
+    expect(store.users.size).toBe(1);
+  });
+});

@@ -44,4 +44,29 @@ export class PostgresUserStore implements UserStore {
 
     return { id: userId, email: norm, tenantId };
   }
+
+  /**
+   * Read-only lookup for the Google callback's miss branch (issue #209): does
+   * this address ALREADY have an account? No INSERT, no upsert, no side effect —
+   * the answer decides whether the silent link fires its one-time notification
+   * email, and asking with `createOrLoadUser` would create the very row it is
+   * asking about.
+   *
+   * The JOIN mirrors `createOrLoadUser`'s 1:1 invariant: a user with no tenant
+   * row is treated as a miss rather than returned with a fabricated tenant id.
+   */
+  async findByEmail(email: string): Promise<AuthUser | undefined> {
+    const norm = normalizeEmail(email);
+    const rows = (await this.sql`
+      SELECT u.id, u.email, t.id AS tenant_id
+      FROM users u
+      JOIN tenants t ON t.owner_user_id = u.id
+      WHERE u.email = ${norm}`) as unknown as Array<{
+      id: string;
+      email: string;
+      tenant_id: string;
+    }>;
+    if (rows.length === 0) return undefined;
+    return { id: rows[0].id, email: rows[0].email, tenantId: rows[0].tenant_id };
+  }
 }

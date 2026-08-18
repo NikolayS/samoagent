@@ -25,8 +25,12 @@ import {
   InMemoryMagicLinkStore,
   InMemoryRateLimiter,
   PostgresUserStore,
+  PostgresIdentityStore,
+  GoogleAuthService,
+  createGoogleAuthHandler,
   type EmailSender,
   type MagicLinkStore,
+  type OAuthProvider,
 } from "./auth/index.ts";
 import { createCallsHandler } from "./calls/http.ts";
 import { createAccountHandler } from "./account/http.ts";
@@ -62,6 +66,20 @@ export interface AppApiConfig {
   emailSender: EmailSender;
   /** Origin the magic-link callback URL is built against (the web app). */
   webOrigin: string;
+  /**
+   * The composed Google OAuth client, or ABSENT when this deployment has no
+   * Google credentials (issue #209 / SPEC amendment S5-1).
+   *
+   * Resolved by the CALLER — `googleOAuthFromEnv(env, webOrigin)` in the two
+   * entrypoints — because this factory reads no environment. Its presence IS the
+   * on/off switch: `GET /auth/providers` reports it verbatim, and there is no
+   * second "enabled" flag that could disagree with whether a client exists.
+   * Absent is the DESIGNED state of every branch preview (Google exact-matches
+   * redirect URIs with no wildcards, so an unbounded set of preview hostnames can
+   * never be registered) — those environments sign in with magic link, which
+   * stays enabled everywhere Google is enabled.
+   */
+  googleOAuth?: OAuthProvider;
   /** The bot-orchestrator seam: enqueue a join job for a new call (§5.2). */
   enqueue: (job: OrchestratorJob) => void | Promise<void>;
   /**
@@ -96,6 +114,11 @@ export interface AppApi {
 export function createAppApi(config: AppApiConfig): AppApi {
   const clock = config.clock ?? (() => Date.now());
 
+  // ONE PostgresUserStore for both credential paths: the magic-link callback and
+  // the Google callback must provision through the same code, or "sign in with
+  // Google, then with a link" could end up as two accounts.
+  const userStore = new PostgresUserStore(config.sql);
+
   const authService = new AuthService({
     keyring: new SigningKeyring(config.magicLinkKid, {
       [config.magicLinkKid]: config.magicLinkSecret,
@@ -104,7 +127,7 @@ export function createAppApi(config: AppApiConfig): AppApi {
     linkStore: config.linkStore ?? new InMemoryMagicLinkStore(),
     // Real Postgres user/tenant store so the session's tenant_id is a real
     // `tenants` row — required for the FK on `calls` and for RLS to scope reads.
-    userStore: new PostgresUserStore(config.sql),
+    userStore,
     rateLimiter: new InMemoryRateLimiter(),
     sessionSecret: config.sessionSecret,
     clock,
@@ -137,6 +160,27 @@ export function createAppApi(config: AppApiConfig): AppApi {
     now: clock,
   });
 
+  // §5.1 / S5-1 "Continue with Google" (issue #209). Composed UNCONDITIONALLY:
+  // an environment with no credentials still serves `GET /auth/providers`
+  // (reporting `{"google":false}`) and still answers `/auth/google/*` with the
+  // SAMO-AUTH-010 stub, rather than 404-ing and looking like a broken deploy.
+  // `user_identities` is privileged and un-RLS'd (migration 0011), so it rides
+  // the same privileged connection the user store does.
+  const googleHandler = createGoogleAuthHandler(
+    new GoogleAuthService({
+      provider: config.googleOAuth,
+      identityStore: new PostgresIdentityStore(config.sql),
+      userStore,
+      emailSender: config.emailSender,
+      // Its own limiter instance: the Google buckets are keyed apart from the
+      // magic-link ones (see google-service.ts), and sharing the object would
+      // only couple two independent budgets' storage for no benefit.
+      rateLimiter: new InMemoryRateLimiter(),
+      sessionSecret: config.sessionSecret,
+      clock,
+    }),
+  );
+
   const dev = config.devShortcuts;
   // §5.11 `/metrics` scrape endpoint over the SHARED registry (issue #108).
   const metrics = config.registry ? metricsHttpHandler(config.registry, config.funnel) : undefined;
@@ -159,6 +203,8 @@ export function createAppApi(config: AppApiConfig): AppApi {
         path === "/auth/logout"
       ) {
         res = await authHandler(req);
+      } else if (path === "/auth/providers" || path.startsWith("/auth/google/")) {
+        res = await googleHandler(req);
       } else if (path === "/calls" || path.startsWith("/calls/")) {
         res = await callsHandler(req);
       } else if (path === "/account") {

@@ -23,6 +23,10 @@ class ToggleableUserStore implements UserStore {
     }
     return this.inner.createOrLoadUser(email);
   }
+  /** Read-only lookup (issue #209) — delegated; the toggle models a WRITE failure. */
+  async findByEmail(email: string) {
+    return this.inner.findByEmail(email);
+  }
 }
 
 /** A service wired to in-memory fakes + a mutable clock; jti is deterministic. */

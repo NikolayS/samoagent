@@ -12,6 +12,7 @@ import {
   ResendEmailError,
   RESEND_EMAILS_URL,
   MAGIC_LINK_SUBJECT,
+  IDENTITY_LINKED_SUBJECT,
   emailSenderFromEnv,
 } from "./resend-email.ts";
 import { InMemoryEmailSender } from "./email.ts";
@@ -169,6 +170,74 @@ describe("ResendEmailSender", () => {
       .catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ResendEmailError);
+  });
+});
+
+/**
+ * The one-time "a Google account was added to your sign-in" notice (issue #209 /
+ * S5-1 item 5). It is the ONLY signal a user gets that a Google `sub` was
+ * silently attached to their existing account, so what it contains — and what it
+ * deliberately does NOT contain — is a security property, not copy.
+ */
+describe("ResendEmailSender.sendIdentityLinked (#209)", () => {
+  it("POSTs the exact Resend request with the identity-linked subject", async () => {
+    const captured: Captured[] = [];
+    const sender = new ResendEmailSender({
+      apiKey: API_KEY,
+      from: FROM,
+      fetchImpl: fakeFetch(okResponse(), captured),
+    });
+
+    await sender.sendIdentityLinked({ to: TO, provider: "google" });
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].url).toBe(RESEND_EMAILS_URL);
+    expect((captured[0].init.headers as Record<string, string>).authorization).toBe(
+      `Bearer ${API_KEY}`,
+    );
+    const body = JSON.parse(String(captured[0].init.body)) as {
+      from: string;
+      to: string;
+      subject: string;
+      html: string;
+    };
+    expect(body.from).toBe(FROM);
+    expect(body.to).toBe(TO);
+    expect(body.subject).toBe(IDENTITY_LINKED_SUBJECT);
+    expect(body.subject).toBe("A Google account was added to your samograph.dev sign-in");
+  });
+
+  it("carries NO link and NO token — a 'wasn't me?' mail with an action is a phishing template", async () => {
+    const captured: Captured[] = [];
+    const sender = new ResendEmailSender({
+      apiKey: API_KEY,
+      from: FROM,
+      fetchImpl: fakeFetch(okResponse(), captured),
+    });
+
+    await sender.sendIdentityLinked({ to: TO, provider: "google" });
+
+    const html = (JSON.parse(String(captured[0].init.body)) as { html: string }).html;
+    expect(html).not.toContain("href");
+    expect(html).not.toContain("http");
+    expect(html).toContain("A Google account was added to your sign-in");
+  });
+
+  it("wraps a rejection in ResendEmailError and never leaks the API key", async () => {
+    const sender = new ResendEmailSender({
+      apiKey: API_KEY,
+      from: FROM,
+      fetchImpl: fakeFetch(new Response(`bad auth for key ${API_KEY}`, { status: 401 }), []),
+    });
+
+    const err = (await sender
+      .sendIdentityLinked({ to: TO, provider: "google" })
+      .catch((e: unknown) => e)) as ResendEmailError;
+
+    expect(err).toBeInstanceOf(ResendEmailError);
+    expect(err.status).toBe(401);
+    expect(err.message).not.toContain(API_KEY);
+    expect(err.message).toContain("[REDACTED]");
   });
 });
 

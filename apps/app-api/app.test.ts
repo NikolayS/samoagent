@@ -12,7 +12,11 @@
 import { describe, it, expect } from "bun:test";
 import type { SQL } from "bun";
 import { createAppApi, type AppApiConfig, type DevShortcuts } from "./app.ts";
-import { InMemoryEmailSender } from "./auth/index.ts";
+import {
+  InMemoryEmailSender,
+  InMemoryOAuthProvider,
+  IN_MEMORY_AUTHORIZE_URL,
+} from "./auth/index.ts";
 import { devCookieFix } from "./dev-server.ts";
 
 const SESSION_SECRET = "app-test-session-secret-aaaaaaaaaaaaaaaaaaaa";
@@ -95,5 +99,71 @@ describe("createAppApi — DEV composition (devShortcuts present)", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
+  });
+});
+
+/**
+ * Google sign-in wiring (issue #209, PR 5 of 7).
+ *
+ * `createAppApi` stays PURE: it reads no environment. The caller resolves the
+ * provider (`googleOAuthFromEnv` in the entrypoints) and hands it in, so the
+ * presence of `googleOAuth` in the config IS the on/off switch — which is why
+ * branch previews, which are given no Google credentials, compose the exact same
+ * handler and simply report `{"google":false}`.
+ *
+ * DB-free: `/auth/providers` and the unconfigured `/auth/google/*` stubs never
+ * reach a store, so the bare `sql` object above is enough.
+ */
+describe("createAppApi — Google sign-in routes (#209)", () => {
+  it("GET /auth/providers reports {\"google\":false} with no provider configured", async () => {
+    const api = createAppApi(baseConfig());
+    const res = await api.fetch(new Request("http://api.test/auth/providers"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ google: false });
+  });
+
+  it("GET /auth/providers reports {\"google\":true} once a provider is composed", async () => {
+    const api = createAppApi({
+      ...baseConfig(),
+      googleOAuth: new InMemoryOAuthProvider(),
+    });
+    const res = await api.fetch(new Request("http://api.test/auth/providers"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ google: true });
+  });
+
+  it("GET /auth/google/start 302s to SAMO-AUTH-010 on an env with no provider", async () => {
+    const api = createAppApi(baseConfig());
+    const res = await api.fetch(new Request("http://api.test/auth/google/start"));
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/auth?error=SAMO-AUTH-010");
+  });
+
+  it("GET /auth/google/start 302s to the provider and sets the __Host- state cookie", async () => {
+    const api = createAppApi({
+      ...baseConfig(),
+      googleOAuth: new InMemoryOAuthProvider(),
+    });
+    const res = await api.fetch(new Request("http://api.test/auth/google/start"));
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain(IN_MEMORY_AUTHORIZE_URL);
+    const cookies = res.headers.getSetCookie();
+    expect(cookies).toHaveLength(1);
+    expect(cookies[0].startsWith("__Host-samo_oauth=")).toBe(true);
+    // PROD composition: `Secure` is never stripped — a `__Host-` cookie without
+    // it is DISCARDED by the browser.
+    expect(cookies[0]).toContain("Secure");
+  });
+
+  it("DEV composition keeps `Secure` on the __Host- state cookie (never stripped)", async () => {
+    const api = createAppApi({
+      ...baseConfig(),
+      googleOAuth: new InMemoryOAuthProvider(),
+      devShortcuts,
+    });
+    const res = await api.fetch(new Request("http://api.test/auth/google/start"));
+    const cookies = res.headers.getSetCookie();
+    expect(cookies).toHaveLength(1);
+    expect(cookies[0]).toContain("Secure");
   });
 });
