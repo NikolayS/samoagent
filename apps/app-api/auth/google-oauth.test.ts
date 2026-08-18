@@ -123,6 +123,76 @@ function formOf(captured: Captured[]): URLSearchParams {
 // authorize URL
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A RAW TCP server that speaks just enough HTTP/1.1 to answer one request with a
+ * 200 whose `Content-Length` promises more bytes than it ever sends, and then
+ * kills the socket. `Bun.serve` cannot express this — it rewrites a short body
+ * into a clean chunked response, which the client reads as a SUCCESSFUL short
+ * read — so the defect only reproduces against a real socket.
+ *
+ * This is the shape of a connection reset by a load balancer mid-body: the
+ * status line and headers arrive (so `fetch` RESOLVES and `res.ok` is true) and
+ * the failure lands later, inside the body read.
+ */
+function brokenBodyServer(opts: { terminateAfterMs: number }): {
+  url: string;
+  stop: () => void;
+} {
+  const listener = Bun.listen({
+    hostname: "127.0.0.1",
+    port: 0,
+    socket: {
+      open() {},
+      data(socket) {
+        socket.write(
+          "HTTP/1.1 200 OK\r\n" +
+            "content-type: application/json\r\n" +
+            // Under the 16KB cap, so the byte budget is NOT what fails here.
+            "content-length: 1000\r\n\r\n" +
+            // A prefix of a plausible token response — deliberately truncated.
+            '{"access_token":"ya29.partial","id_token":"eyJ',
+        );
+        socket.flush();
+        setTimeout(() => socket.terminate(), opts.terminateAfterMs);
+      },
+    },
+  });
+  return {
+    url: `http://127.0.0.1:${listener.port}${GOOGLE_OAUTH_CALLBACK_PATH}`,
+    stop: () => listener.stop(true),
+  };
+}
+
+/** A provider whose token endpoint is the local socket server, JWKS via the IdP. */
+function providerAgainst(tokenUrl: string, timeoutMs?: number): GoogleOAuthProvider {
+  const idp = new FakeGoogleIdp({ clientId: CLIENT_ID, nonce: NONCE, nowMs: T0 });
+  const fetchImpl = (async (input: unknown, init?: RequestInit) => {
+    if (String(input) === GOOGLE_TOKEN_URL) return await fetch(tokenUrl, init);
+    return idp.fetchImpl(input as never, init);
+  }) as typeof fetch;
+  return new GoogleOAuthProvider({
+    clientId: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
+    redirectUri: REDIRECT_URI,
+    fetchImpl,
+    timeoutMs,
+    jwks: new GoogleJwks({ fetchImpl }),
+  });
+}
+
+/**
+ * Turn a REJECTION into a value, so a broken contract shows up as a readable
+ * diff instead of an unhandled rejection with no expected/actual to compare.
+ */
+async function settle(promise: Promise<ExchangeResult>): Promise<unknown> {
+  try {
+    return await promise;
+  } catch (err) {
+    const e = err as Error;
+    return { threw: `THREW (contract VIOLATED): ${e.name} - ${e.message}` };
+  }
+}
+
 describe("GoogleOAuthProvider.authorizeUrl", () => {
   const provider = new GoogleOAuthProvider({
     clientId: CLIENT_ID,
@@ -451,6 +521,40 @@ describe("GoogleOAuthProvider.exchange — typed failures, never a throw", () =>
       reason: "response_too_large",
       detail: `google token exchange failed: response body exceeds ${GOOGLE_TOKEN_RESPONSE_MAX_BYTES} bytes`,
     });
+  });
+  // The body-read step is the ONE await in `exchange` that used to sit outside a
+  // try/catch. A 200 whose body then dies made `exchange` REJECT, breaking the
+  // "Never throws" contract in `oauth.ts` that every caller is written against.
+  it("RESOLVES to 500 when the socket is reset MID-BODY after a 200", async () => {
+    const server = brokenBodyServer({ terminateAfterMs: 10 });
+    try {
+      const provider = providerAgainst(server.url);
+      expect(await settle(exchange(provider))).toEqual({
+        ok: false,
+        code: "SAMO-AUTH-500",
+        reason: "transport_failed",
+        detail: "google token exchange failed: the response body did not arrive intact",
+      });
+    } finally {
+      server.stop();
+    }
+  });
+
+  it("RESOLVES to 500 when the abort timeout fires WHILE the body streams", async () => {
+    // The socket stays open past the timeout, so the abort lands during the body
+    // read rather than during the request — a distinct trigger, same guard.
+    const server = brokenBodyServer({ terminateAfterMs: 5_000 });
+    try {
+      const provider = providerAgainst(server.url, 50);
+      expect(await settle(exchange(provider))).toEqual({
+        ok: false,
+        code: "SAMO-AUTH-500",
+        reason: "transport_failed",
+        detail: "google token exchange failed: the response body did not arrive intact",
+      });
+    } finally {
+      server.stop();
+    }
   });
 });
 

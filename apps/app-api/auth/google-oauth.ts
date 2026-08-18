@@ -268,7 +268,24 @@ export class GoogleOAuthProvider implements OAuthProvider {
       );
     }
 
-    const text = await readCappedText(res, GOOGLE_TOKEN_RESPONSE_MAX_BYTES);
+    // GUARDED, exactly as `google-id-token.ts` guards its own body read: the
+    // status line arriving does NOT mean the body will. A reset mid-body, or the
+    // abort timeout firing while the body is still streaming, rejects HERE — and
+    // an unguarded await would turn that into a THROW out of `exchange`, which
+    // the "Never throws" contract in `oauth.ts` forbids and no caller handles.
+    let text: string | null;
+    try {
+      text = await readCappedText(res, GOOGLE_TOKEN_RESPONSE_MAX_BYTES);
+    } catch {
+      // Discarded, like the transport error above: a stream error message can
+      // quote the request (and therefore the secret), and the detail must stay
+      // fixed text derived from our own control flow.
+      return reject(
+        "SAMO-AUTH-500",
+        "transport_failed",
+        "google token exchange failed: the response body did not arrive intact",
+      );
+    }
     if (text === null) {
       return reject(
         "SAMO-AUTH-500",
