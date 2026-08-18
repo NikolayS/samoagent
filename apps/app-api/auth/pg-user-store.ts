@@ -14,13 +14,25 @@
  * same rows idempotently (no duplicate user, no duplicate tenant).
  */
 import type { SQL } from "bun";
-import type { AuthUser } from "./types.ts";
+import type { AuthUser, SignupMethod } from "./types.ts";
+import { DEFAULT_SIGNUP_METHOD } from "./types.ts";
 import { normalizeEmail, type UserStore } from "./stores.ts";
 
 export class PostgresUserStore implements UserStore {
   constructor(private readonly sql: SQL) {}
 
-  async createOrLoadUser(email: string): Promise<AuthUser> {
+  /**
+   * `signupMethod` is written ONLY on INSERT. The `DO UPDATE` list below
+   * deliberately omits it (migration 0012, S5-1 item 7), so a user who signs in
+   * down the other credential path — or two callbacks racing on one address —
+   * keeps the method the account was CREATED with. The column feeds the `method`
+   * label on the §5.11 funnel, and a metric that silently reclassified
+   * historical cohorts would make every week-over-week comparison a lie.
+   */
+  async createOrLoadUser(
+    email: string,
+    signupMethod: SignupMethod = DEFAULT_SIGNUP_METHOD,
+  ): Promise<AuthUser> {
     const norm = normalizeEmail(email);
     let userId!: string;
     let tenantId!: string;
@@ -29,7 +41,7 @@ export class PostgresUserStore implements UserStore {
       // Idempotent upsert: the no-op DO UPDATE makes RETURNING fire whether the
       // row was just inserted or already existed.
       const users = await tx`
-        INSERT INTO users (email) VALUES (${norm})
+        INSERT INTO users (email, signup_method) VALUES (${norm}, ${signupMethod})
         ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
         RETURNING id`;
       userId = users[0].id as string;

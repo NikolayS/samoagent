@@ -23,7 +23,12 @@ const DASHBOARD = join(
 describe("activation-funnel Grafana dashboard — §5.11 / §9", () => {
   const dash = JSON.parse(readFileSync(DASHBOARD, "utf8")) as {
     title: string;
-    panels: Array<{ title: string; type: string; targets?: Array<{ expr: string }>; fieldConfig?: any }>;
+    panels: Array<{
+      title: string;
+      type: string;
+      targets?: Array<{ expr: string; legendFormat?: string }>;
+      fieldConfig?: any;
+    }>;
   };
 
   const exprs = () =>
@@ -70,5 +75,45 @@ describe("activation-funnel Grafana dashboard — §5.11 / §9", () => {
     expect(funnelPanel?.targets?.[0]?.expr).toBe("samograph_funnel_stage");
     // Sanity: the aggregator exposes exactly five ordered stages.
     expect(FUNNEL_STAGES.length).toBe(5);
+  });
+});
+
+/**
+ * S5-1 item 7 / issue #222: the funnel series is now `{stage, method}`, so the
+ * committed legend has to render BOTH labels or the panel silently collapses two
+ * distinct series onto one indistinguishable name.
+ */
+describe("activation-funnel dashboard — the method label (#222)", () => {
+  const dash = JSON.parse(readFileSync(DASHBOARD, "utf8")) as {
+    panels: Array<{ targets?: Array<{ expr: string; legendFormat?: string }> }>;
+  };
+
+  const funnelTarget = () =>
+    dash.panels
+      .flatMap((p) => p.targets ?? [])
+      .find((t) => t.expr === "samograph_funnel_stage");
+
+  test("the funnel panel expr still resolves to the emitted metric name", () => {
+    expect(funnelTarget()).toBeDefined();
+    expect(funnelTarget()!.expr).toBe("samograph_funnel_stage");
+  });
+
+  test("its legendFormat renders both {{stage}} and {{method}}", () => {
+    const legend = funnelTarget()!.legendFormat ?? "";
+    expect(legend).toContain("{{stage}}");
+    expect(legend).toContain("{{method}}");
+  });
+
+  test("references the five S5-1 item 7 metrics", () => {
+    const all = dash.panels.flatMap((p) => p.targets ?? []).map((t) => t.expr).join("\n");
+    for (const metric of [
+      "samograph_activation_w1_by_method",
+      "samograph_magic_link_status",
+      "auth_google_start_total",
+      "auth_google_callback_total",
+      "auth_identity_linked_total",
+    ]) {
+      expect(all).toContain(metric);
+    }
   });
 });

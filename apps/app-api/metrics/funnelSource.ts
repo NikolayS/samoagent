@@ -10,10 +10,14 @@
  * ── Stage → SQL signal mapping (§5.11) ─────────────────────────────────────
  *   signup             — a `users` row exists (every user has a 1:1 `tenants`
  *                        row; §5.10). This is the W1 denominator.
- *   magic_link_clicked — the user's email has a `magic_links` row with
- *                        `status = 'consumed'` (the single-use callback consumed
- *                        it; §5.1, migration 0007). Keyed by email because
- *                        `magic_links` is the pre-tenant, pre-user table.
+ *   auth_completed     — the user finished authenticating down EITHER credential
+ *                        path: a `magic_links` row with `status = 'consumed'`
+ *                        (§5.1, migration 0007; keyed by email because
+ *                        `magic_links` is the pre-tenant, pre-user table) OR a
+ *                        `user_identities` row (§5.1, migration 0011 — Google).
+ *                        A `users` row with NEITHER is real and is NOT counted
+ *                        here: issue #180 provisions the user BEFORE consuming
+ *                        the link, so a failed consume leaves exactly that.
  *   call_created       — the user's tenant owns at least one `calls` row (§5.2).
  *   first_line         — one of those calls has `calls.first_line_at` set — the
  *                        exact "first transcript line landed" stamp (§5.2).
@@ -33,6 +37,19 @@
  * monotonic: a call that reaches `streamed_30s` still counts at `first_line`
  * even when `first_line_at` is NULL (silent-call convention, funnel.ts).
  *
+ * ── The imputation bug this feed used to have (S5-1 item 7, issue #222) ────
+ * Stage 2 was called `magic_link_clicked` and was derived from a consumed
+ * `magic_links` row and NOTHING ELSE. A Google signup never produces one — the
+ * callback writes `users` + `user_identities` only. But this funnel is
+ * CUMULATIVE, so a Google user who reached `call_created` had stage 2 back-filled
+ * anyway: a magic-link click that never happened, IMPUTED, silently, into THE v1
+ * success metric. Nothing 500'd and no test went red, which is why it survived a
+ * whole merged sequence. The over-count was exactly the Google-only users whose
+ * furthest stage was at or beyond `call_created`; a Google user who signed up and
+ * stopped had `furthest = 0` and was already counted correctly. The stage is now
+ * `auth_completed` and reads BOTH credential tables, and every row carries
+ * `users.signup_method` (migration 0012) so the metric can be split by `method`.
+ *
  * ── Privacy ─────────────────────────────────────────────────────────────────
  * Every query is a read-only COUNT/EXISTS aggregate over the PRIVILEGED
  * connection (the same pre-tenant handle auth uses — `users`/`tenants`/
@@ -51,7 +68,44 @@ import {
   aggregateFunnel,
   type ActivationEvent,
   type FunnelSnapshot,
+  type SignupMethod,
 } from "../../../packages/shared/observe/funnel.ts";
+import type { MagicLinkStatus } from "../auth/types.ts";
+
+/**
+ * Every magic-link lifecycle status, exhaustively (§5.1). The `Record` type is
+ * the point: adding a `MagicLinkStatus` without adding it here fails
+ * `bunx tsc --noEmit`, so `samograph_magic_link_status` can never quietly stop
+ * reporting a state.
+ */
+const ZERO_MAGIC_LINK_STATUS: Record<MagicLinkStatus, number> = {
+  outstanding: 0,
+  consumed: 0,
+  superseded: 0,
+};
+
+/** The §5.11 gauge sink this feed writes into (satisfied by `MetricsRegistry`). */
+export interface MagicLinkStatusMetrics {
+  setMagicLinkStatus(status: string, count: number): void;
+}
+
+/**
+ * Count magic links by lifecycle status (`samograph_magic_link_status`, S5-1
+ * item 7). Counts only — no email, no jti ever leaves this function. Statuses
+ * with no rows are reported as an explicit 0 rather than omitted: "nothing is
+ * outstanding" and "the scrape is broken" must not look the same.
+ */
+export async function queryMagicLinkStatusCounts(
+  sql: SQL,
+): Promise<Record<MagicLinkStatus, number>> {
+  const rows = (await sql`
+    SELECT status::text AS status, count(*)::int AS count
+      FROM magic_links
+     GROUP BY status`) as Array<{ status: MagicLinkStatus; count: number }>;
+  const counts = { ...ZERO_MAGIC_LINK_STATUS };
+  for (const row of rows) counts[row.status] = row.count;
+  return counts;
+}
 
 /**
  * Emit one {@link ActivationEvent} per (user, stage-reached) pair, read from
@@ -62,24 +116,28 @@ import {
 export async function queryActivationEvents(sql: SQL): Promise<ActivationEvent[]> {
   const rows = (await sql`
     -- signup: every user (1:1 tenant; §5.10).
-    SELECT u.id::text AS user_id, 'signup' AS stage
+    SELECT u.id::text AS user_id, 'signup' AS stage, u.signup_method AS method
       FROM users u
     UNION ALL
-    -- magic_link_clicked: a consumed single-use link for this email (§5.1).
-    SELECT u.id::text, 'magic_link_clicked'
+    -- auth_completed: EITHER credential path finished (§5.1). A consumed
+    -- single-use magic link (0007) OR a linked provider identity (0011) — the
+    -- Google callback writes only the latter, and deriving this stage from
+    -- magic links alone is what imputed a click that never happened (#222).
+    SELECT u.id::text, 'auth_completed', u.signup_method
       FROM users u
      WHERE EXISTS (
-       SELECT 1 FROM magic_links m
-        WHERE lower(m.email) = lower(u.email) AND m.status = 'consumed')
+             SELECT 1 FROM magic_links m
+              WHERE lower(m.email) = lower(u.email) AND m.status = 'consumed')
+        OR EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = u.id)
     UNION ALL
     -- call_created: the user's tenant owns a call (§5.2).
-    SELECT u.id::text, 'call_created'
+    SELECT u.id::text, 'call_created', u.signup_method
       FROM users u
       JOIN tenants t ON t.owner_user_id = u.id
      WHERE EXISTS (SELECT 1 FROM calls c WHERE c.tenant_id = t.id)
     UNION ALL
     -- first_line: a call has the first-transcript-line stamp (§5.2).
-    SELECT u.id::text, 'first_line'
+    SELECT u.id::text, 'first_line', u.signup_method
       FROM users u
       JOIN tenants t ON t.owner_user_id = u.id
      WHERE EXISTS (
@@ -87,7 +145,7 @@ export async function queryActivationEvents(sql: SQL): Promise<ActivationEvent[]
         WHERE c.tenant_id = t.id AND c.first_line_at IS NOT NULL)
     UNION ALL
     -- streamed_30s: a call's transcript SPANS >= 30 s (documented proxy, §9).
-    SELECT u.id::text, 'streamed_30s'
+    SELECT u.id::text, 'streamed_30s', u.signup_method
       FROM users u
       JOIN tenants t ON t.owner_user_id = u.id
      WHERE EXISTS (
@@ -96,9 +154,13 @@ export async function queryActivationEvents(sql: SQL): Promise<ActivationEvent[]
           AND (SELECT max(tr.ts) - min(tr.ts)
                  FROM transcripts tr
                 WHERE tr.call_id = c.id) >= interval '30 seconds')
-  `) as Array<{ user_id: string; stage: ActivationEvent["stage"] }>;
+  `) as Array<{
+    user_id: string;
+    stage: ActivationEvent["stage"];
+    method: SignupMethod;
+  }>;
 
-  return rows.map((r) => ({ userId: r.user_id, stage: r.stage }));
+  return rows.map((r) => ({ userId: r.user_id, stage: r.stage, method: r.method }));
 }
 
 /** Compute the exact activation-funnel snapshot from the DB right now. */
@@ -127,7 +189,18 @@ export const DEFAULT_FUNNEL_REFRESH_MS = 30_000;
  */
 export function createCachedFunnelSource(
   sql: SQL,
-  opts: { refreshMs?: number; logger?: { error: (msg: string) => void } } = {},
+  opts: {
+    refreshMs?: number;
+    logger?: { error: (msg: string) => void };
+    /**
+     * When supplied, the same refresh also republishes
+     * `samograph_magic_link_status` (S5-1 item 7). It rides THIS timer rather
+     * than a second one because it is the same kind of thing — a periodic
+     * counts-only read on the privileged connection — and two timers would be
+     * two places to forget to start.
+     */
+    registry?: MagicLinkStatusMetrics;
+  } = {},
 ): CachedFunnelSource {
   const refreshMs = opts.refreshMs ?? DEFAULT_FUNNEL_REFRESH_MS;
   let latest: FunnelSnapshot = aggregateFunnel([]);
@@ -135,6 +208,12 @@ export function createCachedFunnelSource(
   const refresh = async (): Promise<void> => {
     try {
       latest = await computeFunnelSnapshot(sql);
+      if (opts.registry) {
+        const counts = await queryMagicLinkStatusCounts(sql);
+        for (const [status, count] of Object.entries(counts)) {
+          opts.registry.setMagicLinkStatus(status, count);
+        }
+      }
     } catch (err) {
       opts.logger?.error(
         `[funnel] activation-funnel refresh failed; serving last snapshot: ${
