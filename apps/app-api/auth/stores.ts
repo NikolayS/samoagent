@@ -30,6 +30,22 @@ export interface MagicLinkStore {
 export interface UserStore {
   /** Create (or load) the user for `email` and ensure their 1:1 tenant exists. */
   createOrLoadUser(email: string): Promise<AuthUser>;
+  /**
+   * Look up the user for `email` WITHOUT creating one; `undefined` on a miss.
+   *
+   * Exists for the Google callback's miss branch (issue #209 / S5-1 item 5):
+   * attaching a Google `sub` to an ALREADY-EXISTING magic-link account is
+   * silent, so it is paired with a mandatory one-time notification email — the
+   * only mechanism by which a takeover on that branch would ever be noticed,
+   * since no session revocation exists anywhere in this system. Distinguishing
+   * "linked to an existing account" from "created a new account" is what decides
+   * whether that email is sent, and {@link createOrLoadUser} cannot answer it:
+   * by the time it returns, the row exists either way.
+   *
+   * Read-only BY CONTRACT. A callback that asked this question with
+   * `createOrLoadUser` would answer it by creating the account.
+   */
+  findByEmail(email: string): Promise<AuthUser | undefined>;
 }
 
 /** Lower-case + trim so `User@X.com` and `user@x.com` are one identity. */
@@ -78,5 +94,11 @@ export class InMemoryUserStore implements UserStore {
     const user: AuthUser = { id: randomUUID(), email: norm, tenantId: randomUUID() };
     this.users.set(norm, user);
     return user;
+  }
+
+  /** Read-only lookup — normalizes exactly as `createOrLoadUser` does, so the
+   *  two can never disagree about whether an address is already taken. */
+  async findByEmail(email: string): Promise<AuthUser | undefined> {
+    return this.users.get(normalizeEmail(email));
   }
 }

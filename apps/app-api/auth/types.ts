@@ -18,6 +18,17 @@ export type AuthErrorCode =
   | "SAMO-AUTH-003" // already used (replay) or superseded by a newer link
   | "SAMO-AUTH-004" // rate limit (5/hr email OR 20/hr IP)
   | "SAMO-AUTH-005" // stale session — the tenant no longer exists (#114, §5.14)
+  // ── Google sign-in, issue #209 / SPEC amendment S5-1 §5.16 ────────────────
+  // These five are delivered as a `302 → /auth?error=<CODE>` (a browser redirect
+  // carries no JSON body), which is why their `httpStatus` in `errors.ts` is 302
+  // rather than a 4xx. None of them distinguishes "this email exists in our DB"
+  // from "it does not": the split is "your browser/tab went stale" vs "Google's
+  // side failed" vs "your own Google email is unverified".
+  | "SAMO-AUTH-006" // user cancelled at Google's consent screen (`error=access_denied`)
+  | "SAMO-AUTH-007" // OAuth state / PKCE / nonce failure — missing, tampered, expired or mismatched
+  | "SAMO-AUTH-008" // Google-side or ID-token failure (exchange, JWKS, signature, iss/aud/exp/nonce)
+  | "SAMO-AUTH-009" // `email_verified` is not boolean `true` on the verified ID token
+  | "SAMO-AUTH-010" // Google sign-in is not configured on this deployment (branch previews)
   | "SAMO-AUTH-500"; // our fault — provisioning/infra failure; link stays retryable (#180)
 
 /** A signed-in principal: a user and their 1:1 tenant (SPEC §5.1, §5.10). */

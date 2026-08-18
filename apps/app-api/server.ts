@@ -25,10 +25,12 @@
 import { createAppApi } from "./app.ts";
 import {
   emailSenderFromEnv,
+  googleOAuthFromEnv,
   PostgresMagicLinkStore,
   type EmailSender,
   type MagicLinkEmail,
   type AccountDeletionEmail,
+  type IdentityLinkedEmail,
 } from "./auth/index.ts";
 import { connect } from "../../packages/shared/db/index.ts";
 import {
@@ -77,6 +79,11 @@ function unconfiguredEmailSender(): EmailSender {
         "no email transport configured in prod: set RESEND_API_KEY + MAGIC_LINK_FROM",
       );
     },
+    async sendIdentityLinked(_email: IdentityLinkedEmail): Promise<void> {
+      throw new Error(
+        "no email transport configured in prod: set RESEND_API_KEY + MAGIC_LINK_FROM",
+      );
+    },
   };
 }
 
@@ -119,6 +126,15 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   // REAL transactional email (Resend) when RESEND_API_KEY is set; otherwise the
   // prod fallback throws on send (no silent drop, no dev fake in prod).
   const sender = emailSenderFromEnv(env, unconfiguredEmailSender());
+
+  // §5.1 / S5-1 "Continue with Google" (issue #209). Resolved HERE, inside the
+  // start function — never at module top level, so a repo with no Google config
+  // stays importable under `bun test`. Returns `undefined` when NEITHER
+  // credential is set (Google sign-in is simply off, which is the designed state
+  // of every branch preview); THROWS at boot when exactly one is set or the
+  // redirect URI cannot be derived, rather than letting every user's click die
+  // at Google with `redirect_uri_mismatch`. See docs/runbooks/google-oauth.md.
+  const googleOAuth = googleOAuthFromEnv(env, webOrigin);
 
   // Validate PUBLIC_WEBHOOK_BASE once (fail fast on a malformed value).
   const webhookBase = publicWebhookBase(env);
@@ -180,6 +196,7 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
     tokenKeyring: { current: { kid: tokenKid, secret: tokenSecret } },
     emailSender: sender,
     webOrigin,
+    googleOAuth,
     enqueue,
     // §5.14 per-call delete: force-leave a live bot + erase its Recall recording.
     // Real acts when RECALL_LIVE, else the in-repo fake (no key, no network).
@@ -199,7 +216,9 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   console.log(
     `\n[app-api] PROD server listening on http://localhost:${server.port} (SAMO_ENV=prod)\n` +
       `  routes: GET /health | POST /auth/magic-link | GET /auth/callback |\n` +
-      `          POST /auth/logout | POST/GET /calls | share routes\n` +
+      `          POST /auth/logout | GET /auth/providers | GET /auth/google/start |\n` +
+      `          GET /auth/google/callback | POST/GET /calls | share routes\n` +
+      `  Google sign-in: ${googleOAuth ? `ON → redirect_uri ${googleOAuth.redirectUri}` : "OFF (no credentials — magic link only)"}\n` +
       `  magic-link callbacks point at ${webOrigin}\n` +
       `  Recall: ${isRecallLive() ? `REAL → webhook base ${webhookBase ?? "(regional default)"}` : "FAKE"}\n` +
       `  Email:  ${env.RESEND_API_KEY ? `REAL via Resend from ${env.MAGIC_LINK_FROM}` : "UNCONFIGURED (magic-link send will error)"}\n` +

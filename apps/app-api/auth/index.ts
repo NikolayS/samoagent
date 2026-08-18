@@ -28,6 +28,7 @@ export {
   type EmailSender,
   type MagicLinkEmail,
   type AccountDeletionEmail,
+  type IdentityLinkedEmail,
   InMemoryEmailSender,
 } from "./email.ts";
 export {
@@ -36,6 +37,7 @@ export {
   emailSenderFromEnv,
   RESEND_EMAILS_URL,
   MAGIC_LINK_SUBJECT,
+  IDENTITY_LINKED_SUBJECT,
   type ResendEmailSenderOptions,
 } from "./resend-email.ts";
 export {
@@ -153,3 +155,19 @@ export {
   googleOAuthFromEnv,
   type GoogleOAuthProviderOptions,
 } from "./google-oauth.ts";
+// The Google sign-in ROUTES + composition (issue #209, PR 5 of 7). Appended at
+// the END for the same reason the blocks above are: each PR in the series adds
+// its own block here without colliding with its siblings.
+export {
+  GOOGLE_START_LIMIT,
+  GOOGLE_CALLBACK_LIMIT,
+  GoogleAuthService,
+  type GoogleAuthServiceDeps,
+  type GoogleStartResult,
+  type GoogleCallbackResult,
+  type GoogleCallbackInput,
+} from "./google-service.ts";
+export {
+  AUTH_ERROR_REDIRECT_PATH,
+  createGoogleAuthHandler,
+} from "./google-http.ts";

@@ -55,4 +55,25 @@ d("PostgresUserStore (§5.1 user+tenant creation)", () => {
     const tenantsAfter = await sql`SELECT count(*)::int AS c FROM tenants WHERE owner_user_id = ${first.id}`;
     expect(tenantsAfter[0].c).toBe(1);
   });
+
+  /**
+   * `findByEmail` is the READ-ONLY lookup the Google callback uses to tell
+   * "attached a Google sub to an existing account" (which must fire the one-time
+   * notification email, S5-1 item 5) from "created a new account" (which must
+   * not). Its read-only-ness is asserted against the real database, not just
+   * promised in a comment: asking with `createOrLoadUser` would answer the
+   * question by creating the row.
+   */
+  it("findByEmail returns the existing user + tenant, normalized, and CREATES NOTHING", async () => {
+    const store = new PostgresUserStore(sql);
+    const created = await store.createOrLoadUser(email.toLowerCase());
+
+    expect(await store.findByEmail(email.toUpperCase())).toEqual(created);
+    expect(await store.findByEmail(`  ${email.toLowerCase()} `)).toEqual(created);
+
+    const missing = `absent-${Date.now()}@example.com`;
+    expect(await store.findByEmail(missing)).toBeUndefined();
+    const rows = await sql`SELECT count(*)::int AS c FROM users WHERE email = ${missing}`;
+    expect(rows[0].c).toBe(0);
+  });
 });

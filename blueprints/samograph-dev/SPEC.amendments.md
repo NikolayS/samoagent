@@ -1039,18 +1039,34 @@ rendered from the same code→copy map the magic-link page already uses.
 |---|---|---|---|---|
 | `SAMO-AUTH-005` | 401 + clear-cookie | Stateless session outlived its tenant (#114 / §5.14 erasure, or a recreated dev DB) | "You've been signed out. Please sign in again." | Re-authenticate |
 | `SAMO-AUTH-500` | 500 | Infra/provisioning failure **after** a valid credential verified (e.g. the pre-tenant `INSERT INTO tenants` errors — #180). The single-use link is left OUTSTANDING | "Something went wrong on our end — please try again." | Retryable — click again |
-| `SAMO-AUTH-006` | `302 → /auth?error=…` | User cancelled at Google's consent screen (`error=access_denied`) | (info tone, not an error) | None — offer both sign-in options again |
+| `SAMO-AUTH-006` | `302 → /auth?error=…` | User cancelled at Google's consent screen (`error=access_denied`) | "Sign-in cancelled. Choose a way to sign in below." (info tone, not an error) | None — offer both sign-in options again |
 | `SAMO-AUTH-007` | `302 → /auth?error=…` | OAuth state / PKCE / nonce failure: tampered or missing `__Host-samo_oauth`, wrong `v`, expired (>10 min), or state mismatch | "That sign-in attempt expired — please try again." | Restart sign-in |
 | `SAMO-AUTH-008` | `302 → /auth?error=…` | Google-side or token/ID-token failure (token exchange, JWKS, signature, `iss`/`aud`/`exp`/`nonce`) | "Google couldn't sign you in right now." | Retry, or use magic link |
 | `SAMO-AUTH-009` | `302 → /auth?error=…` | `email_verified` is not boolean `true` on the verified ID token | "Your Google account's email isn't verified." | Verify with Google, or use magic link |
 | `SAMO-AUTH-010` | `302 → /auth?error=…` | Google sign-in is not configured on this deployment (branch previews, by design) | "Google sign-in isn't available here." | Use magic link |
 
-The equivalent status recorded in logs/metrics for `006`–`010` is **not pinned by
-this amendment** — the design that produced this entry did not fix one, and
-inventing one here would put an unverifiable number in the contract. It is set by
-the implementing PR (issue #209, PR 5) alongside `AUTH_ERRORS`, and this table is
-updated to match once it lands. The user-facing copy above is likewise indicative:
-the shipped strings come from the same PR's code→copy map.
+**PINNED by the implementing PR (issue #209, PR 5).** `AUTH_ERRORS` in
+`apps/app-api/auth/errors.ts` records `httpStatus: 302` for all five of
+`006`–`010`, because a redirect is the only way any of them is ever delivered:
+they are decided while the browser is mid-redirect between us and
+`accounts.google.com`, with no fetch to answer in JSON and no page of ours
+rendering yet. Recording a 4xx would record a status we never send.
+`retryable` is `true` for `006`/`007`/`008` (try again, or use magic link) and
+`false` for `009`/`010` (clicking again changes nothing until Google verifies the
+address, or until an operator configures credentials on that environment).
+
+`SAMO-AUTH-004` is also reused on both Google legs (`start` and `callback` each
+have their OWN 20/hr/IP bucket, separate from the magic-link per-IP budget so
+neither credential path can exhaust the other's). On this path it too is
+delivered as `302 → /auth?error=SAMO-AUTH-004`, **not** as the 429 + `Retry-After`
+that `POST /auth/magic-link` returns — a 429 carrying a `Location` is a dead end
+for a browser that arrived by clicking a link. Its `AUTH_ERRORS` row is unchanged
+(429), since that is the status of its original, JSON-answering call site.
+
+The user-facing strings in the table above are the SHIPPED strings: they are
+asserted byte-for-byte on both sides — `apps/app-api/auth/errors.test.ts` and
+`apps/web/lib/authErrors.test.ts` — because a silent edit to either is a
+user-visible drift.
 
 None of `006`–`010` distinguishes "this email exists in our DB" from "it does
 not" — the split is "your browser/tab went stale" vs "Google's side failed" vs

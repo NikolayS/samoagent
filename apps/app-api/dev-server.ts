@@ -21,9 +21,11 @@ import { createAppApi } from "./app.ts";
 import {
   InMemoryMagicLinkStore,
   emailSenderFromEnv,
+  googleOAuthFromEnv,
   type EmailSender,
   type MagicLinkEmail,
   type AccountDeletionEmail,
+  type IdentityLinkedEmail,
 } from "./auth/index.ts";
 import { connect } from "../../packages/shared/db/index.ts";
 import {
@@ -97,6 +99,15 @@ class DevEmailSender implements EmailSender {
         `────────────────────────────────────────────────────\n`,
     );
   }
+
+  async sendIdentityLinked(email: IdentityLinkedEmail): Promise<void> {
+    console.log(
+      `\n──────── DEV IDENTITY LINKED (no email sent) ────────\n` +
+        `  to:       ${email.to}\n` +
+        `  provider: ${email.provider}\n` +
+        `────────────────────────────────────────────────────\n`,
+    );
+  }
 }
 
 /**
@@ -161,6 +172,16 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
   // DEV fake keeps printing links (local/test mode).
   const sender = emailSenderFromEnv(env, devSender);
   const emailIsLive = sender !== devSender;
+
+  // §5.1 / S5-1 "Continue with Google" (issue #209). Local dev is normally OFF
+  // (neither credential set) and keeps working on magic link. A developer who
+  // wants the real round trip puts the `samograph-nonprod` pair in their env; the
+  // derived redirect URI is then `http://localhost:3000/auth/google/callback`,
+  // which is one of that client's registered URIs (docs/runbooks/google-oauth.md).
+  // The `__Host-` state cookie keeps its `Secure` flag here — browsers accept
+  // Secure cookies on http://localhost, and stripping it would make the browser
+  // DISCARD the cookie outright (see `devCookieFix`).
+  const GOOGLE_OAUTH = googleOAuthFromEnv(env, WEB_ORIGIN);
 
   // Validate PUBLIC_WEBHOOK_BASE once (fail fast on a malformed value).
   const WEBHOOK_BASE = publicWebhookBase(env);
@@ -238,6 +259,7 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
     tokenKeyring: { current: { kid: "dev-share", secret: TOKEN_SECRET } },
     emailSender: sender,
     webOrigin: WEB_ORIGIN,
+    googleOAuth: GOOGLE_OAUTH,
     enqueue,
     // §5.14 per-call delete: force-leave a live bot + erase its Recall recording
     // (the in-repo fake locally; real acts only when RECALL_LIVE).
@@ -256,7 +278,10 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
   console.log(
     `\n[app-api] composed DEV server listening on http://localhost:${server.port} (SAMO_ENV=dev)\n` +
       `  routes: GET /health | POST /auth/magic-link | GET /auth/callback |\n` +
-      `          POST /auth/logout | POST/GET /calls | GET /calls/:id | GET /__dev/last-magic-link\n` +
+      `          POST /auth/logout | GET /auth/providers | GET /auth/google/start |\n` +
+      `          GET /auth/google/callback | POST/GET /calls | GET /calls/:id |\n` +
+      `          GET /__dev/last-magic-link\n` +
+      `  Google sign-in: ${GOOGLE_OAUTH ? `ON → redirect_uri ${GOOGLE_OAUTH.redirectUri}` : "OFF (no credentials — magic link only)"}\n` +
       `  magic-link callbacks point at ${WEB_ORIGIN} (the web app)\n` +
       `  Recall: ${recallMode}\n` +
       `  Email:  ${

@@ -16,7 +16,11 @@ function appWithRegistry(registry?: MetricsRegistry) {
     magicLinkKid: "k",
     magicLinkSecret: "m".repeat(32),
     tokenKeyring: { current: { kid: "t", secret: "t".repeat(32) } },
-    emailSender: { async sendMagicLink() {}, async sendAccountDeletion() {} },
+    emailSender: {
+      async sendMagicLink() {},
+      async sendAccountDeletion() {},
+      async sendIdentityLinked() {},
+    },
     webOrigin: "http://localhost:3000",
     enqueue: () => {},
     registry,
