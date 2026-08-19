@@ -116,14 +116,20 @@ export function createAccountHandler(
     const { userId, tenantId } = session.claims;
     const actor = `user:${userId}`;
 
-    // The account owner's email, for the confirmation. Read on the PRIVILEGED
-    // connection (`users`/`tenants` carry no samograph_app grant), BEFORE erasure.
+    // The account owner's id + email, for the confirmation and for the §5.14
+    // address release. Read on the PRIVILEGED connection (`users`/`tenants` carry
+    // no samograph_app grant), BEFORE erasure — step 4 anonymizes this address, so
+    // reading it afterwards would send the confirmation to `@deleted.invalid`.
+    // The id comes from `tenants.owner_user_id`, never from the cookie: the row we
+    // are about to rewrite must be identified by the DATABASE's idea of who owns
+    // this tenant, not by a claim the caller supplied.
     const ownerRows = (await sql`
-      SELECT u.email
+      SELECT u.id, u.email
       FROM users u
       JOIN tenants t ON t.owner_user_id = u.id
-      WHERE t.id = ${tenantId}`) as unknown as Array<{ email: string }>;
+      WHERE t.id = ${tenantId}`) as unknown as Array<{ id: string; email: string }>;
     const ownerEmail = ownerRows.length ? ownerRows[0].email : null;
+    const ownerUserId = ownerRows.length ? ownerRows[0].id : null;
 
     // 1) Gather every call in the tenant (id + bot + status), RLS-scoped.
     const calls = (await sql.begin(async (tx) => {
@@ -159,19 +165,42 @@ export function createAccountHandler(
         VALUES (${tenantId}, ${actor}, ${ACCOUNT_DELETED_ACTION})`;
     });
 
-    // 4) Erase the tenant owner's external sign-in identities (#209). A provider
-    //    `sub` is personal data, and it is the one piece RLS cannot reach:
-    //    `user_identities` is a PRIVILEGED pre-tenant table (migration 0011,
-    //    ungranted to samograph_app), so this runs on the privileged connection
-    //    and deliberately OUTSIDE the `SET LOCAL ROLE samograph_app` transaction
-    //    above — inside it the statement would fail 42501. It is NOT covered by
-    //    the FK ON DELETE CASCADE either: the erasure writes a tombstone and
-    //    never deletes the `users` row, so the cascade never fires and the sub
-    //    would otherwise survive "erase all my data". With no RLS to lean on,
-    //    the DELETE is scoped by the tenant's own owner.
-    await sql`
-      DELETE FROM user_identities
-      WHERE user_id IN (SELECT owner_user_id FROM tenants WHERE id = ${tenantId})`;
+    // 4) Erase the owner's PRE-TENANT personal data. `user_identities` and `users`
+    //    are PRIVILEGED tables (migrations 0011 / 0001, ungranted to
+    //    samograph_app), so this runs on the privileged connection and
+    //    deliberately OUTSIDE the `SET LOCAL ROLE samograph_app` transaction above
+    //    — inside it both statements would fail 42501. Neither is covered by the
+    //    FK ON DELETE CASCADE either: the erasure writes a tombstone and never
+    //    deletes the `users` row, so the cascade never fires.
+    //
+    //    (a) The external sign-in identities (#209 / S5-1 item 9). A provider
+    //        `sub` is personal data that would otherwise survive "erase all my
+    //        data". With no RLS to lean on, the DELETE is scoped by the tenant's
+    //        own owner.
+    //
+    //    (b) The owner's ADDRESS (#220). The `users` row is retained on purpose —
+    //        `tenantActive` reads its tenant's tombstone to revoke every stateless
+    //        session cookie — but retaining the ADDRESS with it left the erasure
+    //        both incomplete and REVERSIBLE: `users.email` is UNIQUE and every
+    //        sign-in path resolves by address, so the next Google callback's
+    //        `findByEmail` HIT re-linked a fresh `user_identities` row to the
+    //        erased account and emailed the erased person about it, and the
+    //        magic-link path's upsert adopted the same corpse. Releasing the
+    //        address removes the match: a returning person is provisioned a
+    //        genuinely FRESH user + tenant instead. See `erasedAccountEmail`.
+    //
+    //    ONE transaction, so an erasure can never come to rest having dropped the
+    //    provider `sub` while leaving the address that invites it straight back.
+    await sql.begin(async (tx) => {
+      await tx`
+        DELETE FROM user_identities
+        WHERE user_id IN (SELECT owner_user_id FROM tenants WHERE id = ${tenantId})`;
+      if (ownerUserId !== null) {
+        await tx`
+          UPDATE users SET email = ${erasedAccountEmail(ownerUserId)}
+          WHERE id = ${ownerUserId}`;
+      }
+    });
 
     // 5) Confirmation email (§5.14). The erasure has already committed; a transport
     //    failure surfaces typed, never a silent hang.
