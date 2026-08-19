@@ -33,6 +33,34 @@ import type { EmailSender } from "../auth/email.ts";
 import type { CallRecordingControl } from "../../bot-orchestrator/recallClient.ts";
 import { eraseCallRecording, purgeCallRows } from "../calls/erase.ts";
 
+/**
+ * The address a §5.14-erased account's RETAINED `users` row is left holding
+ * (#220). The erasure keeps the row — `tenantActive` reads its tenant's tombstone
+ * to revoke every stateless session cookie — but the row must not keep the
+ * person's real address, for two reasons that point the same way:
+ *
+ *  1. **Erasure.** An email is directly-identifying personal data. Retaining it
+ *     forever on a row that exists only to say "this account is gone" is exactly
+ *     the retention §5.14 promises to end.
+ *  2. **Resurrection.** `users.email` is UNIQUE and every sign-in path resolves
+ *     by address — `findByEmail` on the Google callback's miss branch, and
+ *     `createOrLoadUser`'s upsert on the magic-link one. While the tombstone still
+ *     carries the address, the next sign-in ADOPTS the erased account: the Google
+ *     path wrote a fresh `user_identities` row (re-creating the provider `sub`
+ *     that #218 went to the trouble of deleting) and emailed the erased address
+ *     about it, then handed back a session every route 401s. Releasing the address
+ *     removes the match, so a returning person is provisioned a genuinely FRESH
+ *     user + tenant with no history instead of being silently re-attached to
+ *     remnants — or locked out of the product forever by their own tombstone.
+ *
+ * DETERMINISTIC in the user id, so re-running the erasure is a no-op rather than a
+ * UNIQUE violation, and `.invalid` is the RFC 2606 reserved TLD: the result can
+ * never be routed, and can never collide with an address a person could own.
+ */
+export function erasedAccountEmail(userId: string): string {
+  return `deleted-${userId}@deleted.invalid`;
+}
+
 /** Injected collaborators for the `/account` handler. */
 export interface AccountHandlerDeps {
   /** Privileged connection (login role able to `SET ROLE samograph_app`). */
