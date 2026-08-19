@@ -1224,3 +1224,78 @@ erasure list with `user_identities`; and amend the §1 non-goals sentence to rec
 that "no Google OAuth" was reversed post-v1 by this amendment (the calendar
 non-goal is untouched). **Operator setup:**
 [`docs/runbooks/google-oauth.md`](../../docs/runbooks/google-oauth.md).
+
+---
+
+### S5-2. §5.14 — account erasure RELEASES the owner's email address; the tombstone keeps no address — *Extension*
+
+**Amends:** §5.14 (delete account and erase all tenant data), in service of §5.1
+(sign-in) and S5-1 item 9. Issue **#220** (follow-up to **#218** / **#209**).
+Migration `0013_release_erased_account_emails.sql`.
+
+**What differs:** §5.14 erasure is a **tombstone** erasure — the tenant's rows are
+purged, one `audit_log(action='account_deleted')` row is written, and the `users` +
+`tenants` rows are deliberately RETAINED so `tenantActive` can revoke every
+stateless session cookie. As written, the retained `users` row kept the person's
+real email address indefinitely. From this amendment on, `DELETE /account` also
+**releases that address**: the retained row's `email` is rewritten to the
+deterministic, non-routable `deleted-<user id>@deleted.invalid` (RFC 2606 reserved
+TLD), in the SAME privileged transaction that deletes the owner's
+`user_identities` rows. Migration `0013` backfills tombstones written before this
+shipped. Everything else about the tombstone contract is unchanged: the `users`
+and `tenants` rows still exist, the `account_deleted` row is still the durable
+erasure record, `tenantActive` still returns `false`, and a session cookie over an
+erased tenant still 401s `SAMO-AUTH-005` + clear-cookie.
+
+**Why:** retaining the address made the erasure both *incomplete* and *reversible*.
+
+1. **Incomplete.** An email address is directly-identifying personal data. Keeping
+   it forever on a row whose only remaining purpose is to say "this account is
+   gone" is exactly the retention the right to erasure ends. The erasure record
+   needs the tenant id and the actor id, not the address.
+2. **Reversible — the actual #220 defect.** `users.email` is UNIQUE and **every**
+   sign-in path resolves by address. While the tombstone still carried the
+   address, `PostgresUserStore.findByEmail` HIT it, so the Google callback's
+   miss branch (`google-service.ts`) linked a **new `user_identities` row to the
+   erased account** — re-creating the provider `sub` that S5-1 item 9 had just
+   gone to the trouble of deleting — and fired `sendIdentityLinked` at the erased
+   address, telling a person who deleted their account that a Google account had
+   just been attached to it. The magic-link path's `createOrLoadUser` upsert
+   adopted the same corpse, minting a session that then 401s on every route.
+   Releasing the address removes the match, so **no sign-in path can reach an
+   erased account at all** — one fence, inherited by both credentials, rather than
+   a per-path guard that the next credential path would have to remember.
+
+**Why release rather than refuse.** The alternative was a tombstone check in
+`google-service.ts` returning a new `SAMO-AUTH-0xx` "this account was deleted"
+code. It fixes the two privacy halves, but it makes the tombstone a **permanent
+blocklist keyed on the person's own address**: someone who exercised their right
+to erasure could never use the product again with that email, on any path — and
+the row retained to enforce that is itself the personal data they asked us to
+delete. Releasing the address serves the same person better and satisfies the
+requirement more completely: a returning user is provisioned a **genuinely fresh**
+`users` + `tenants` pair with no history and no link to the erased tenant, instead
+of being silently re-attached to erased remnants. It also needs **no new §5.16
+code** and no new web copy row.
+
+**Consequences, stated explicitly:**
+
+- **Signing up again on a previously-erased address is ALLOWED**, and produces a
+  brand-new empty tenant. It grants no access to erased data (there is none) and
+  no access to the erased tenant (a different `tenant_id`, still tombstoned).
+- **The magic-link path is fixed by the same change**, with no code change of its
+  own: `createOrLoadUser` no longer finds the erased row, so the pre-existing
+  "live cookie over a dead tenant" outcome (#114-adjacent, older than #218)
+  disappears for erased accounts.
+- The `account_deleted` audit row keeps `actor = user:<uuid>`, so the erasure
+  stays attributable and auditable without retaining an address.
+- Residual, narrow: the address release commits in a second transaction, after the
+  RLS-scoped tombstone transaction. A crash strictly between them leaves an
+  over-retained address (and, since both live in that one transaction, the
+  identity rows too) — the same class of window §5.14's multi-step erasure already
+  has, now no wider than it was.
+
+**Action:** when §5.14 is folded into the SPEC (issue **#225**), extend the
+erasure list with "the owner's `users.email` is released to
+`deleted-<user id>@deleted.invalid`" alongside S5-1 item 9's `user_identities`
+entry, and record that a previously-erased address may be used to sign up again.
