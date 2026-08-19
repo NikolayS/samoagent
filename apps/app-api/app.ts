@@ -178,6 +178,10 @@ export function createAppApi(config: AppApiConfig): AppApi {
       rateLimiter: new InMemoryRateLimiter(),
       sessionSecret: config.sessionSecret,
       clock,
+      // The SAME registry `/metrics` renders (S5-1 item 7, issue #222), so
+      // auth_google_start_total / auth_google_callback_total{result} /
+      // auth_identity_linked_total are scrapeable from the composed app.
+      metrics: config.registry,
     }),
   );
 

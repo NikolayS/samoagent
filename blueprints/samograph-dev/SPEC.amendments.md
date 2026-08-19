@@ -991,16 +991,81 @@ exactly how far the reversal goes and where it stops.
    signup never produces one, and `aggregateFunnel` counts each user at every
    stage up to their furthest, so a Google user who creates a call would have
    stage 2 **IMPUTED** — the metric would not visibly break, which is worse than
-   breaking. `samograph_funnel_stage` gains a `method` label (per-method series
-   only); `samograph_activation_w1_by_method`, `samograph_magic_link_status`,
-   `auth_google_start_total`, `auth_google_callback_total` and
-   `auth_identity_linked_total` are added; `users.signup_method` lands in
-   migration `0012` (its own PR — a metrics column does not belong in an identity
-   migration). For the first full week after Google ships, the **§9 `≥ 0.5`
+   breaking. For the first full week after Google ships, the **§9 `≥ 0.5`
    activation target is judged against `method="magic_link"`** and the blended
    number is reported but not targeted, then re-baselined — one-click signup
    raises the denominator faster than the numerator, so the headline metric can
    fall while the product improves.
+
+   **Shipped in issue #222** (this item was written with the Google sequence but
+   landed in none of its seven PRs, so the imputation was live on `main` at
+   `334cac8`). What exists now:
+
+   - **`FUNNEL_STAGES[1] === "auth_completed"`** (`packages/shared/observe/funnel.ts`).
+     The DB feed (`apps/app-api/metrics/funnelSource.ts`) emits it for a consumed
+     `magic_links` row **OR** a `user_identities` row — either credential path
+     finishing. A `users` row with **neither** is still not counted at stage 2:
+     issue #180 provisions the user *before* consuming the link, so a failed
+     consume leaves exactly that state, and it is the population that proves the
+     fix is not a blanket `+1`.
+   - **`samograph_funnel_stage{stage,method}`** — **per-method series only**;
+     there is deliberately **no** unlabelled series, so a dashboard cannot sum
+     the blend and the split together and double-count. `sum by (stage)` recovers
+     the blend exactly. Cardinality is fixed at 5 stages × 2 methods = 10 series,
+     every one rendered every scrape (zeroed, never absent).
+   - **`samograph_activation_w1_by_method{method}`** — `gauge`, one series per
+     method, always rendered. `samograph_activation_w1` stays the unlabelled
+     blended gauge, which is what makes the §9 re-baselining rule above readable:
+     the blend can fall while both per-method series hold.
+   - **`samograph_magic_link_status{status}`** — `gauge`, one series per
+     `MagicLinkStatus` (`outstanding` / `consumed` / `superseded`), counted from
+     `magic_links` on the same periodic refresh that recomputes the funnel and
+     published through the registry. Statuses with no rows report an explicit `0`.
+   - **`auth_google_start_total`** and **`auth_identity_linked_total`** —
+     `counter`, **no label**, and therefore rendered unconditionally *including at
+     0*: "Google has silently linked nobody to an existing account" is a fact the
+     dashboard must be able to read, and an absent series is indistinguishable
+     from a broken scrape. `auth_identity_linked_total` counts the item-5
+     silent-link branch and nothing else (never a new user, never a returning
+     signer) — it fires on exactly the same condition as the notification email,
+     so the metric and the email can never disagree.
+   - **`auth_google_callback_total{result}`** — `counter`, `result` is `ok` or the
+     §5.16 code, incremented once at a single exit point.
+   - **`users.signup_method`** — migration `0012_users_signup_method.sql`:
+     `text NOT NULL DEFAULT 'magic_link' CHECK (signup_method IN ('magic_link',
+     'google'))`. Written **on creation only**, by both credential paths
+     (`AuthService.callback` passes `magic_link`; `GoogleAuthService` passes
+     `google` on the create branch). `PostgresUserStore.createOrLoadUser`'s
+     `ON CONFLICT ... DO UPDATE` **omits** the column, so linking a second
+     credential to an existing account never rewrites it — the same immutability
+     `users.email` has under item 3, and for the same reason: a later sign-in is
+     not a re-signup, and silently reclassifying historical cohorts would make
+     every week-over-week comparison a lie. The `DEFAULT` doubles as the
+     **documented backfill** for pre-`0012` rows: every one of them was a
+     magic-link signup by construction, because Google sign-in had never been
+     enabled on an environment with real users.
+   - The domain lives in **three** places by necessity — the `CHECK` in `0012`,
+     `SignupMethod` in `apps/app-api/auth/types.ts` (the owner), and the metric
+     label list in `packages/shared/observe/funnel.ts` (the shared layer may not
+     import from an app). The last two are pinned to each other by a
+     **compile-time** mutual-assignability check in
+     `apps/app-api/auth/stores.test.ts`, so they cannot drift silently.
+   - **Deviation from the issue's acceptance criterion 2.** #222 AC2 expects a
+     second Google-only user with no call to leave `auth_completed` at `1`. That
+     contradicts the same issue's in-scope item 1 (stage 2 is emitted for a
+     `user_identities` row), under which such a user **has** completed auth and
+     counts at stage 2. Item 1 won, because it is the semantically correct
+     reading. The anti-`+1` discrimination AC2 exists to provide is preserved and
+     asserted instead by the `x1` fixture in
+     `apps/app-api/metrics/funnelSource.db.test.ts` — a `users` row with neither
+     credential row, which keeps `auth_completed` strictly below `signup`.
+   - **Operator note — this rename is a breaking metric change.** Any dashboard
+     or recording rule scraping `samograph_funnel_stage{stage="magic_link_clicked"}`,
+     or the unlabelled `samograph_funnel_stage{stage="…"}`, returns nothing after
+     this deploy. The committed Grafana artifact
+     (`docs/observability/activation-funnel.dashboard.json`) is updated in the
+     same PR; **`SPEC.md` §5.11 (`:371`) still names the old stage in prose and is
+     deliberately untouched here — issue #225 owns that fold-in.**
 8. **§5.12 — Settings gains a read-only "Sign-in" block** listing linked methods
    (`magic_link` always; `google` when an identity exists; the `google` row is
    omitted entirely on environments where connecting is impossible). It is the

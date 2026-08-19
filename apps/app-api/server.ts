@@ -121,6 +121,8 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   // gauges — THE v1 success metric.
   const funnelSource = createCachedFunnelSource(sql, {
     logger: { error: (msg) => console.error(msg) },
+    // The same periodic read republishes samograph_magic_link_status (#222).
+    registry,
   });
   funnelSource.start();
   // REAL transactional email (Resend) when RESEND_API_KEY is set; otherwise the

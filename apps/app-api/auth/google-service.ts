@@ -64,6 +64,26 @@ export const GOOGLE_START_LIMIT = 20;
  */
 export const GOOGLE_CALLBACK_LIMIT = 20;
 
+/**
+ * The §5.11 counters this flow feeds (SPEC amendment S5-1 item 7; issue #222).
+ *
+ * A PORT, exactly like the call-path components' metric ports: `MetricsRegistry`
+ * satisfies it structurally (the method names match), and a test can pass a
+ * counting fake or nothing at all. Deliberately three separate signals rather
+ * than one labelled counter, because they answer three different questions —
+ * "did anyone press the button", "how do callbacks end", and the one that has a
+ * user-facing obligation behind it: how often we attach a Google account to an
+ * ALREADY-EXISTING tenant without asking (S5-1 item 5).
+ */
+export interface GoogleAuthMetrics {
+  /** One accepted `GET /auth/google/start`. */
+  incGoogleStart(): void;
+  /** One finished callback: `ok`, or the §5.16 error code it failed with. */
+  incGoogleCallback(result: string): void;
+  /** One SILENT link to an existing account — never a new user, never a return. */
+  incIdentityLinked(): void;
+}
+
 /** Rate-limit bucket prefixes. Distinct strings ⇒ genuinely distinct budgets. */
 const START_BUCKET = "google-start:ip:";
 const CALLBACK_BUCKET = "google-callback:ip:";
@@ -87,6 +107,8 @@ export interface GoogleAuthServiceDeps {
   randomValue?: () => string;
   /** Where server-side diagnostics go; defaults to `console`. Never user-visible. */
   logger?: { error: (message: string, fields?: Record<string, unknown>) => void };
+  /** §5.11 counters (S5-1 item 7). Absent ⇒ counted nowhere; the flow is unchanged. */
+  metrics?: GoogleAuthMetrics;
 }
 
 /** What `GET /auth/google/start` produces. `location` is absolute (Google). */
@@ -116,12 +138,20 @@ export class GoogleAuthService {
   readonly #deps: GoogleAuthServiceDeps;
   readonly #random: () => string;
   readonly #logger: { error: (message: string, fields?: Record<string, unknown>) => void };
+  readonly #metrics: GoogleAuthMetrics;
 
   constructor(deps: GoogleAuthServiceDeps) {
     this.#deps = deps;
     this.#random = deps.randomValue ?? (() => randomToken());
     this.#logger = deps.logger ?? {
       error: (message, fields) => console.error(message, fields ?? {}),
+    };
+    // A no-op sink rather than an `if` at each call site: a metric that is only
+    // emitted "when metrics are wired" is a metric someone forgets to emit.
+    this.#metrics = deps.metrics ?? {
+      incGoogleStart() {},
+      incGoogleCallback() {},
+      incIdentityLinked() {},
     };
   }
 
@@ -152,6 +182,11 @@ export class GoogleAuthService {
       now,
     );
     if (!decision.allowed) return { ok: false, code: "SAMO-AUTH-004" };
+
+    // Counted AFTER the SAMO-AUTH-010 and rate-limit gates: this measures
+    // "sign-ins we actually started", not "requests that hit the route", so a
+    // flood cannot inflate it past the budget that admits it.
+    this.#metrics.incGoogleStart();
 
     const state = this.#random();
     const nonce = this.#random();
@@ -191,6 +226,16 @@ export class GoogleAuthService {
    *  7. Identity resolution, provisioning, and only then the session cookie.
    */
   async callback(input: GoogleCallbackInput): Promise<GoogleCallbackResult> {
+    const result = await this.#callback(input);
+    // EXACTLY ONE increment per callback, at the single exit — `ok` or the
+    // §5.16 code. Counting at each `return` inside the flow below would drift
+    // the moment a branch is added.
+    this.#metrics.incGoogleCallback(result.ok ? "ok" : result.code);
+    return result;
+  }
+
+  /** The flow itself; `callback` above wraps it purely to count the outcome. */
+  async #callback(input: GoogleCallbackInput): Promise<GoogleCallbackResult> {
     const {
       provider,
       identityStore,
@@ -292,7 +337,10 @@ export class GoogleAuthService {
         // lookup first, so we can tell "attached to an existing account" (which
         // must notify) from "created a new account" (which must not).
         const existingUser = await userStore.findByEmail(identity.email);
-        const user = existingUser ?? (await userStore.createOrLoadUser(identity.email));
+        // `google` is passed only on the CREATE branch, and migration 0012's
+        // upsert omits the column on conflict — so an account that already
+        // existed keeps the method it was created with (S5-1 item 7).
+        const user = existingUser ?? (await userStore.createOrLoadUser(identity.email, "google"));
         // The STORE decides who owns the subject: `link` upserts on
         // `(provider, provider_subject)` and its DO UPDATE omits `user_id`, so
         // two concurrent callbacks converge on one row still owned by the
@@ -323,6 +371,10 @@ export class GoogleAuthService {
     // succeeded and a mail outage must not undo it — but never silently
     // swallowed: a failure is logged.
     if (notifyExistingUserAt !== undefined) {
+      // The SAME condition that fires the notification fires the counter: the
+      // metric and the email can never disagree about what "silently linked"
+      // means. New users and returning signers take neither.
+      this.#metrics.incIdentityLinked();
       try {
         await emailSender.sendIdentityLinked({
           to: notifyExistingUserAt,

@@ -127,7 +127,9 @@ export class AuthService {
     //    and the user can click again once we recover. Never an unhandled throw.
     let user: AuthUser;
     try {
-      user = await userStore.createOrLoadUser(verified.claims.email);
+      // Explicit, not defaulted: this IS the magic-link credential path, and the
+      // §5.11 `method` label reads whatever is written here (S5-1 item 7).
+      user = await userStore.createOrLoadUser(verified.claims.email, "magic_link");
     } catch (err) {
       // Pre-tenant path: no tenant context yet, so do NOT use the tenant-scoped
       // structured logger (it fails closed without tenant_id). Plain console.error.

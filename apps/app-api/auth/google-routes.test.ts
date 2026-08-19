@@ -35,6 +35,7 @@ import { SESSION_COOKIE_NAME, verifySession } from "./session.ts";
 import { GOOGLE_START_LIMIT, GOOGLE_CALLBACK_LIMIT } from "./google-service.ts";
 import { GoogleAuthService } from "./google-service.ts";
 import { createGoogleAuthHandler } from "./google-http.ts";
+import { MetricsRegistry } from "../../../packages/shared/observe/registry.ts";
 
 const CLIENT_ID = "fake-client-id.apps.googleusercontent.com";
 const CLIENT_SECRET = "test-only-client-secret";
@@ -124,6 +125,7 @@ function harness(opts: { configured?: boolean } = {}) {
   const identityStore = new InMemoryIdentityStore(userStore);
   const emailSender = new InMemoryEmailSender();
   const rateLimiter = new InMemoryRateLimiter();
+  const registry = new MetricsRegistry();
   const logs: Array<{ message: string; fields?: Record<string, unknown> }> = [];
   let now = NOW;
 
@@ -145,6 +147,7 @@ function harness(opts: { configured?: boolean } = {}) {
     rateLimiter,
     sessionSecret: SESSION_SECRET,
     clock: () => now,
+    metrics: registry,
     // Captured rather than printed: these are the SERVER-SIDE diagnostics, and a
     // test that asserts what is in them is worth more than a noisy suite.
     logger: { error: (message, fields) => logs.push({ message, fields }) },
@@ -156,6 +159,7 @@ function harness(opts: { configured?: boolean } = {}) {
     userStore,
     identityStore,
     emailSender,
+    registry,
     logs,
     handler: createGoogleAuthHandler(service),
     advance(ms: number) {
@@ -789,5 +793,92 @@ describe("GET /auth/google/callback — Google-reported errors and unconfigured 
         )
       ).status,
     ).toBe(404);
+  });
+});
+
+/**
+ * The three auth counters S5-1 item 7 named (issue #222), driven through the
+ * REAL routes and the real fake-IdP round trip — not by calling the increment
+ * methods directly, which would only prove the registry works.
+ *
+ * `auth_identity_linked_total` counts the S5-1 item 5 SILENT-LINK branch and
+ * nothing else: link-to-existing only, never a new user, never a returning
+ * signer. It is the metric behind "how often did we attach a Google account to
+ * someone's existing tenant without asking", so counting anything else would
+ * make it useless.
+ */
+describe("auth_google_* / auth_identity_linked_total counters — #222", () => {
+  it("GET /auth/google/start increments auth_google_start_total exactly once", async () => {
+    const h = harness();
+    await get(h, "/auth/google/start");
+    expect(h.registry.getScalar("auth_google_start_total")).toBe(1);
+    expect(h.registry.renderPrometheus()).toContain("auth_google_start_total 1");
+  });
+
+  it("a successful callback increments auth_google_callback_total{result=\"ok\"}", async () => {
+    const h = harness();
+    const { callbackRes } = await roundTrip(h);
+    expect(callbackRes.status).toBe(302);
+    expect(h.registry.get("auth_google_callback_total", "ok")).toBe(1);
+    expect(h.registry.renderPrometheus()).toContain(
+      'auth_google_callback_total{result="ok"} 1',
+    );
+  });
+
+  it("a failing callback is counted under its §5.16 error code, not under ok", async () => {
+    const h = harness();
+    // `email_verified` is not boolean true → SAMO-AUTH-009, the S5-1 item 4 gate.
+    const { callbackRes } = await roundTrip(h, {
+      overrides: { claims: { email_verified: false } },
+    });
+    expect(callbackRes.status).toBe(302);
+    expect(h.registry.get("auth_google_callback_total", "SAMO-AUTH-009")).toBe(1);
+    expect(h.registry.get("auth_google_callback_total", "ok")).toBe(0);
+  });
+
+  it("linking to an EXISTING user increments auth_identity_linked_total to 1", async () => {
+    const h = harness();
+    await h.userStore.createOrLoadUser("alice@example.com", "magic_link");
+    await roundTrip(h);
+    expect(h.registry.getScalar("auth_identity_linked_total")).toBe(1);
+  });
+
+  it("creating a NEW user leaves auth_identity_linked_total at exactly 0", async () => {
+    const h = harness();
+    const { callbackRes } = await roundTrip(h);
+    expect(callbackRes.status).toBe(302);
+    expect(h.userStore.users.size).toBe(1);
+    expect(h.registry.getScalar("auth_identity_linked_total")).toBe(0);
+    expect(h.registry.renderPrometheus()).toContain("auth_identity_linked_total 0");
+  });
+
+  it("a RETURNING Google signer does not increment auth_identity_linked_total again", async () => {
+    const h = harness();
+    await h.userStore.createOrLoadUser("alice@example.com", "magic_link");
+    await roundTrip(h);
+    await roundTrip(h);
+    expect(h.registry.getScalar("auth_identity_linked_total")).toBe(1);
+    expect(h.registry.get("auth_google_callback_total", "ok")).toBe(2);
+  });
+});
+
+/**
+ * `users.signup_method` at the service level (S5-1 item 7 / #222): the Google
+ * callback stamps `google` on an account it CREATES, and the silent-link branch
+ * leaves an existing account's `magic_link` untouched — the column records how
+ * the account was created, not how its owner last signed in.
+ */
+describe("signup_method written by the Google callback — #222", () => {
+  it("a NEW account created by the Google callback is stamped 'google'", async () => {
+    const h = harness();
+    await roundTrip(h);
+    expect(h.userStore.signupMethods.get("alice@example.com")).toBe("google");
+  });
+
+  it("linking to an existing magic-link account leaves 'magic_link' in place", async () => {
+    const h = harness();
+    await h.userStore.createOrLoadUser("alice@example.com", "magic_link");
+    await roundTrip(h);
+    expect(h.userStore.signupMethods.get("alice@example.com")).toBe("magic_link");
   });
 });

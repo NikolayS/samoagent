@@ -4,6 +4,14 @@ import {
   InMemoryUserStore,
 } from "./stores.ts";
 import type { MagicLinkRecord } from "./types.ts";
+import {
+  SIGNUP_METHODS as AUTH_SIGNUP_METHODS,
+  type SignupMethod as AuthSignupMethod,
+} from "./types.ts";
+import {
+  SIGNUP_METHODS as OBSERVE_SIGNUP_METHODS,
+  type SignupMethod as ObserveSignupMethod,
+} from "../../../packages/shared/observe/funnel.ts";
 
 const rec = (jti: string, email: string): MagicLinkRecord => ({
   jti,
@@ -93,5 +101,51 @@ describe("auth/stores — InMemoryUserStore.findByEmail (issue #209)", () => {
     const created = await store.createOrLoadUser("person@example.com");
     expect(await store.findByEmail("  Person@Example.COM ")).toEqual(created);
     expect(store.users.size).toBe(1);
+  });
+});
+
+/**
+ * `signup_method` in the fake (S5-1 item 7 / issue #222). The fake ENFORCES what
+ * migration 0012's upsert enforces — the method is written once, at creation,
+ * and no later call moves it — so a service test that passes here cannot pass
+ * for the wrong reason against real Postgres.
+ */
+describe("auth/stores — InMemoryUserStore signup_method (#222)", () => {
+  it("records the method the account was CREATED with", async () => {
+    const store = new InMemoryUserStore();
+    await store.createOrLoadUser("m@x.com", "magic_link");
+    await store.createOrLoadUser("g@x.com", "google");
+    expect(store.signupMethods.get("m@x.com")).toBe("magic_link");
+    expect(store.signupMethods.get("g@x.com")).toBe("google");
+  });
+
+  it("defaults to magic_link when the caller does not say", async () => {
+    const store = new InMemoryUserStore();
+    await store.createOrLoadUser("d@x.com");
+    expect(store.signupMethods.get("d@x.com")).toBe("magic_link");
+  });
+
+  it("a later load with a different method NEVER rewrites it", async () => {
+    const store = new InMemoryUserStore();
+    const first = await store.createOrLoadUser("Person@Example.com", "magic_link");
+    const again = await store.createOrLoadUser("person@example.com", "google");
+    expect(again).toEqual(first);
+    expect(store.signupMethods.get("person@example.com")).toBe("magic_link");
+  });
+});
+
+/**
+ * The `method` label domain in `packages/shared/observe` is a DUPLICATE of the
+ * auth-side `SignupMethod` — shared may not import from an app (same rule that
+ * duplicates `nearestRankPercentiles`). These two assignments make the duplicate
+ * a COMPILE-TIME mirror: adding a value on either side without the other fails
+ * `bunx tsc --noEmit`, so the label domain cannot silently drift from the column.
+ */
+describe("signup-method domain — shared/observe mirrors auth (#222)", () => {
+  it("the two lists are mutually assignable and equal", () => {
+    const sharedIsAuth: readonly AuthSignupMethod[] = OBSERVE_SIGNUP_METHODS;
+    const authIsShared: readonly ObserveSignupMethod[] = AUTH_SIGNUP_METHODS;
+    expect([...sharedIsAuth]).toEqual([...authIsShared]);
+    expect([...OBSERVE_SIGNUP_METHODS]).toEqual(["magic_link", "google"]);
   });
 });

@@ -31,6 +31,28 @@ export type AuthErrorCode =
   | "SAMO-AUTH-010" // Google sign-in is not configured on this deployment (branch previews)
   | "SAMO-AUTH-500"; // our fault — provisioning/infra failure; link stays retryable (#180)
 
+/**
+ * How an account was CREATED — persisted as `users.signup_method` (migration
+ * 0012) and surfaced as the `method` label on the §5.11 activation funnel
+ * (SPEC amendment S5-1 item 7; issue #222).
+ *
+ * This module is the DOMAIN OWNER of the list: the migration's CHECK and the
+ * metric-label mirror in `packages/shared/observe/funnel.ts` both follow it
+ * (`stores.test.ts` pins the two lists together at compile time). It records
+ * creation and never the last sign-in, so linking a second credential to an
+ * existing account leaves it untouched.
+ */
+export const SIGNUP_METHODS = ["magic_link", "google"] as const;
+
+export type SignupMethod = (typeof SIGNUP_METHODS)[number];
+
+/**
+ * The method assumed when a caller does not say — and the DDL default migration
+ * 0012 stamps on every row that predates it. Both have to be the same string:
+ * every account created before Google sign-in existed was a magic-link signup.
+ */
+export const DEFAULT_SIGNUP_METHOD: SignupMethod = "magic_link";
+
 /** A signed-in principal: a user and their 1:1 tenant (SPEC §5.1, §5.10). */
 export interface AuthUser {
   id: string;

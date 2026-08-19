@@ -1,5 +1,5 @@
 {
-  "__comment": "samograph.dev observability dashboard (SPEC §5.11). Config-as-code: import into Grafana against a Prometheus datasource that scrapes the app `/metrics` endpoint (packages/shared/observe). The funnel panel and the W1-activation stat read the metrics the activation-funnel aggregator exports; the lower row reads the §5.11 counters. Hosted provisioning (datasource, Grafana instance) is intentionally out of scope (#87).",
+  "__comment": "samograph.dev observability dashboard (SPEC §5.11). Config-as-code: import into Grafana against a Prometheus datasource that scrapes the app `/metrics` endpoint (packages/shared/observe). The funnel panel and the W1-activation stat read the metrics the activation-funnel aggregator exports (the funnel series carries BOTH a `stage` and a `method` label since SPEC amendment S5-1 item 7 / issue #222 — there is deliberately no unlabelled series, so use `sum by (stage)` for the blend); the lower row reads the §5.11 counters. Hosted provisioning (datasource, Grafana instance) is intentionally out of scope (#87).",
   "title": "samograph.dev — Activation funnel & observability",
   "uid": "samograph-activation-funnel",
   "schemaVersion": 39,
@@ -46,14 +46,14 @@
       "id": 2,
       "title": "Activation funnel (cumulative by stage)",
       "type": "bargauge",
-      "description": "signup → magic-link clicked → call created → first transcript line → 30 s of stream (§5.11).",
+      "description": "signup → auth completed → call created → first transcript line → 30 s of stream (§5.11). Split by signup method (S5-1 item 7): magic_link vs google.",
       "gridPos": { "h": 6, "w": 16, "x": 8, "y": 0 },
       "options": { "orientation": "horizontal", "displayMode": "gradient" },
       "targets": [
         {
           "refId": "A",
           "expr": "samograph_funnel_stage",
-          "legendFormat": "{{stage}}",
+          "legendFormat": "{{stage}} — {{method}}",
           "instant": true
         }
       ]
@@ -66,6 +66,30 @@
       "targets": [
         { "refId": "A", "expr": "samograph_funnel_total", "legendFormat": "signups" },
         { "refId": "B", "expr": "samograph_funnel_activated", "legendFormat": "activated" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "W1 activation by signup method (§9 re-baselining)",
+      "type": "timeseries",
+      "description": "For the first full week after Google ships, the ≥ 0.5 §9 target is judged against method=\"magic_link\"; the blended number above is reported but NOT targeted (SPEC amendment S5-1 item 7). One-click signup raises the denominator faster than the numerator, so the headline metric can FALL while the product improves.",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [
+        { "refId": "A", "expr": "samograph_activation_w1_by_method", "legendFormat": "W1 {{method}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Sign-in & magic-link health (S5-1 item 7)",
+      "type": "timeseries",
+      "description": "auth_identity_linked_total counts Google identities SILENTLY attached to an already-existing account (S5-1 item 5) — the event the user only learns about from the one-time notification email.",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 6 },
+      "targets": [
+        { "refId": "A", "expr": "rate(auth_google_start_total[5m])", "legendFormat": "google start" },
+        { "refId": "B", "expr": "sum by (result) (rate(auth_google_callback_total[5m]))", "legendFormat": "google callback {{result}}" },
+        { "refId": "C", "expr": "rate(auth_identity_linked_total[5m])", "legendFormat": "identity linked" },
+        { "refId": "D", "expr": "samograph_magic_link_status", "legendFormat": "links {{status}}" }
       ]
     },
     {

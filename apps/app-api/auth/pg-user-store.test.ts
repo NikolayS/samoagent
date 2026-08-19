@@ -11,6 +11,8 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { connect } from "../../../packages/shared/db/index.ts";
 import { migrate } from "../../../packages/shared/db/index.ts";
 import { PostgresUserStore } from "./pg-user-store.ts";
+import { readdirSync } from "node:fs";
+import { MIGRATIONS_DIR, migrationVersions } from "../../../packages/shared/db/migrate.ts";
 
 const HAVE_DB = !!process.env.DATABASE_URL;
 const d = HAVE_DB ? describe : describe.skip;
@@ -75,5 +77,81 @@ d("PostgresUserStore (§5.1 user+tenant creation)", () => {
     expect(await store.findByEmail(missing)).toBeUndefined();
     const rows = await sql`SELECT count(*)::int AS c FROM users WHERE email = ${missing}`;
     expect(rows[0].c).toBe(0);
+  });
+});
+
+/**
+ * `users.signup_method` — migration 0012, S5-1 item 7 / issue #222.
+ *
+ * The column records HOW THE ACCOUNT WAS CREATED, and nothing else. It is the
+ * source of the `method` label on `samograph_funnel_stage`, which is what lets
+ * §9 be re-baselined per credential path after Google ships. Two invariants
+ * carry the weight: both credential paths WRITE it on creation, and NOTHING
+ * rewrites it afterwards — `users.email` immutability (S5-1 item 3) has exactly
+ * the same shape, and for the same reason: a later sign-in is not a re-signup.
+ */
+d("users.signup_method (migration 0012, §5.11 / §9 — #222)", () => {
+  let sql: ReturnType<typeof connect>;
+  const magicEmail = `sm-magic-${Date.now()}@example.com`;
+  const googleEmail = `sm-google-${Date.now()}@example.com`;
+
+  beforeAll(async () => {
+    sql = connect();
+    await migrate(sql);
+  });
+
+  afterAll(async () => {
+    await sql`DELETE FROM users WHERE email IN (${magicEmail}, ${googleEmail})`;
+    await sql.close();
+  });
+
+  it("ships as migration 0012_users_signup_method.sql", () => {
+    expect(migrationVersions()).toContain("0012_users_signup_method");
+    expect(readdirSync(MIGRATIONS_DIR)).toContain("0012_users_signup_method.sql");
+  });
+
+  it("a magic-link signup writes exactly 'magic_link'", async () => {
+    const store = new PostgresUserStore(sql);
+    const user = await store.createOrLoadUser(magicEmail, "magic_link");
+    const rows = await sql`SELECT signup_method FROM users WHERE id = ${user.id}`;
+    expect(rows[0].signup_method).toBe("magic_link");
+  });
+
+  it("a Google signup for a NEW user writes exactly 'google'", async () => {
+    const store = new PostgresUserStore(sql);
+    const user = await store.createOrLoadUser(googleEmail, "google");
+    const rows = await sql`SELECT signup_method FROM users WHERE id = ${user.id}`;
+    expect(rows[0].signup_method).toBe("google");
+  });
+
+  it("linking a second credential NEVER rewrites signup_method", async () => {
+    const store = new PostgresUserStore(sql);
+    const created = await store.createOrLoadUser(magicEmail, "magic_link");
+    // The upsert's DO UPDATE deliberately omits signup_method, so even the
+    // racing path that reaches createOrLoadUser with the other method loses.
+    const again = await store.createOrLoadUser(magicEmail, "google");
+    expect(again.id).toBe(created.id);
+    const rows = await sql`SELECT signup_method FROM users WHERE id = ${created.id}`;
+    expect(rows[0].signup_method).toBe("magic_link");
+  });
+
+  it("pre-existing rows default to the documented 'magic_link'", async () => {
+    // Rows written by code that predates 0012 (every prod row today, by
+    // construction — there are no Google users yet).
+    const legacy = `sm-legacy-${Date.now()}@example.com`;
+    const rows = await sql`INSERT INTO users (email) VALUES (${legacy}) RETURNING signup_method`;
+    expect(rows[0].signup_method).toBe("magic_link");
+    await sql`DELETE FROM users WHERE email = ${legacy}`;
+  });
+
+  it("rejects a signup_method outside the closed domain", async () => {
+    const bogus = `sm-bogus-${Date.now()}@example.com`;
+    let code = "";
+    try {
+      await sql`INSERT INTO users (email, signup_method) VALUES (${bogus}, 'carrier_pigeon')`;
+    } catch (err) {
+      code = (err as { errno?: string; code?: string }).errno ?? (err as { code?: string }).code ?? "";
+    }
+    expect(code).toBe("23514"); // check_violation
   });
 });

@@ -9,7 +9,8 @@
  * real user+tenant creation against `packages/shared/db`.
  */
 import { randomUUID } from "node:crypto";
-import type { AuthUser, MagicLinkRecord } from "./types.ts";
+import type { AuthUser, MagicLinkRecord, SignupMethod } from "./types.ts";
+import { DEFAULT_SIGNUP_METHOD } from "./types.ts";
 
 /** Outcome of attempting to consume (single-use) a magic link by `jti`. */
 export type ConsumeResult =
@@ -28,8 +29,16 @@ export interface MagicLinkStore {
 }
 
 export interface UserStore {
-  /** Create (or load) the user for `email` and ensure their 1:1 tenant exists. */
-  createOrLoadUser(email: string): Promise<AuthUser>;
+  /**
+   * Create (or load) the user for `email` and ensure their 1:1 tenant exists.
+   *
+   * `signupMethod` is recorded ONLY when the row is created (migration 0012,
+   * S5-1 item 7): it answers "how was this account created", so a returning
+   * user — or one arriving down the OTHER credential path — never rewrites it.
+   * It defaults to `magic_link`, which is both the historical truth for every
+   * pre-0012 row and the value the magic-link callback passes explicitly.
+   */
+  createOrLoadUser(email: string, signupMethod?: SignupMethod): Promise<AuthUser>;
   /**
    * Look up the user for `email` WITHOUT creating one; `undefined` on a miss.
    *
@@ -86,13 +95,24 @@ export class InMemoryMagicLinkStore implements MagicLinkStore {
 
 export class InMemoryUserStore implements UserStore {
   readonly users = new Map<string, AuthUser>();
+  /**
+   * normalized email → the method the account was CREATED with. Mirrors
+   * `users.signup_method`, whose upsert omits the column on DO UPDATE — so this
+   * fake, like the DDL, is first-write-wins and a service test cannot pass here
+   * for a reason that would fail against real Postgres.
+   */
+  readonly signupMethods = new Map<string, SignupMethod>();
 
-  async createOrLoadUser(email: string): Promise<AuthUser> {
+  async createOrLoadUser(
+    email: string,
+    signupMethod: SignupMethod = DEFAULT_SIGNUP_METHOD,
+  ): Promise<AuthUser> {
     const norm = normalizeEmail(email);
     const existing = this.users.get(norm);
     if (existing) return existing;
     const user: AuthUser = { id: randomUUID(), email: norm, tenantId: randomUUID() };
     this.users.set(norm, user);
+    this.signupMethods.set(norm, signupMethod);
     return user;
   }
 

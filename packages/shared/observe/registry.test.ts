@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { MetricsRegistry } from "./registry.ts";
+import { aggregateFunnel } from "./funnel.ts";
 
 /**
  * §5.11 counters — a single in-process aggregation surface for the counters the
@@ -88,20 +89,26 @@ describe("MetricsRegistry Prometheus exposition — §5.11", () => {
 
   test("renders the activation funnel gauges when a snapshot is provided", () => {
     const r = new MetricsRegistry();
-    const out = r.renderPrometheus({
-      stageCounts: {
-        signup: 7,
-        magic_link_clicked: 6,
-        call_created: 5,
-        first_line: 4,
-        streamed_30s: 3,
-      },
-      total: 7,
-      activated: 3,
-      w1Fraction: 3 / 7,
-    });
-    expect(out).toContain('samograph_funnel_stage{stage="signup"} 7');
-    expect(out).toContain('samograph_funnel_stage{stage="streamed_30s"} 3');
+    // Seven magic-link users at the seven historical furthest stages.
+    const out = r.renderPrometheus(
+      aggregateFunnel([
+        { userId: "u1", stage: "signup" },
+        { userId: "u2", stage: "auth_completed" },
+        { userId: "u2", stage: "signup" },
+        { userId: "u3", stage: "signup" },
+        { userId: "u3", stage: "call_created" },
+        { userId: "u4", stage: "signup" },
+        { userId: "u4", stage: "first_line" },
+        { userId: "u5", stage: "signup" },
+        { userId: "u5", stage: "streamed_30s" },
+        { userId: "u6", stage: "signup" },
+        { userId: "u6", stage: "streamed_30s" },
+        { userId: "u7", stage: "signup" },
+        { userId: "u7", stage: "streamed_30s" },
+      ]),
+    );
+    expect(out).toContain('samograph_funnel_stage{stage="signup",method="magic_link"} 7');
+    expect(out).toContain('samograph_funnel_stage{stage="streamed_30s",method="magic_link"} 3');
     expect(out).toContain("samograph_funnel_total 7");
     expect(out).toContain("samograph_funnel_activated 3");
     expect(out).toMatch(/samograph_activation_w1 0\.4285/);
@@ -112,5 +119,79 @@ describe("MetricsRegistry Prometheus exposition — §5.11", () => {
     r.incWsDropped('call"x\\y', 1);
     const out = r.renderPrometheus();
     expect(out).toContain('ws_dropped_total{call_id="call\\"x\\\\y"} 1');
+  });
+});
+
+/**
+ * The auth/observability surface S5-1 item 7 committed to (issue #222).
+ *
+ * `auth_google_start_total` and `auth_identity_linked_total` carry NO label, so
+ * they are rendered UNCONDITIONALLY at 0: "Google sign-in linked nobody to an
+ * existing account" has to be an observable zero, not an absent series.
+ */
+describe("S5-1 item 7 auth metrics — #222", () => {
+  test("the unlabelled auth counters render at 0 before anything happens", () => {
+    const out = new MetricsRegistry().renderPrometheus();
+    expect(out).toContain("# TYPE auth_google_start_total counter");
+    expect(out).toContain("auth_google_start_total 0");
+    expect(out).toContain("# TYPE auth_identity_linked_total counter");
+    expect(out).toContain("auth_identity_linked_total 0");
+  });
+
+  test("auth_google_start_total and auth_identity_linked_total count exactly", () => {
+    const r = new MetricsRegistry();
+    r.incGoogleStart();
+    r.incGoogleStart();
+    r.incIdentityLinked();
+    expect(r.getScalar("auth_google_start_total")).toBe(2);
+    expect(r.getScalar("auth_identity_linked_total")).toBe(1);
+    const out = r.renderPrometheus();
+    expect(out).toContain("auth_google_start_total 2");
+    expect(out).toContain("auth_identity_linked_total 1");
+  });
+
+  test("auth_google_callback_total keys by result", () => {
+    const r = new MetricsRegistry();
+    r.incGoogleCallback("ok");
+    r.incGoogleCallback("ok");
+    r.incGoogleCallback("SAMO-AUTH-009");
+    expect(r.get("auth_google_callback_total", "ok")).toBe(2);
+    expect(r.get("auth_google_callback_total", "SAMO-AUTH-009")).toBe(1);
+    const out = r.renderPrometheus();
+    expect(out).toContain('auth_google_callback_total{result="ok"} 2');
+    expect(out).toContain('auth_google_callback_total{result="SAMO-AUTH-009"} 1');
+  });
+
+  test("samograph_magic_link_status renders one series per set status", () => {
+    const r = new MetricsRegistry();
+    r.setMagicLinkStatus("outstanding", 4);
+    r.setMagicLinkStatus("consumed", 6);
+    r.setMagicLinkStatus("superseded", 2);
+    const out = r.renderPrometheus();
+    expect(out).toContain("# TYPE samograph_magic_link_status gauge");
+    expect(out).toContain('samograph_magic_link_status{status="outstanding"} 4');
+    expect(out).toContain('samograph_magic_link_status{status="consumed"} 6');
+    expect(out).toContain('samograph_magic_link_status{status="superseded"} 2');
+  });
+
+  test("a gauge is SET (last value wins), never accumulated", () => {
+    const r = new MetricsRegistry();
+    r.setMagicLinkStatus("consumed", 6);
+    r.setMagicLinkStatus("consumed", 9);
+    expect(r.renderPrometheus()).toContain('samograph_magic_link_status{status="consumed"} 9');
+  });
+
+  test("the funnel block is per-method only — no unlabelled stage series", () => {
+    const out = new MetricsRegistry().renderPrometheus(
+      aggregateFunnel([
+        { userId: "m1", stage: "signup", method: "magic_link" },
+        { userId: "m1", stage: "call_created", method: "magic_link" },
+        { userId: "g1", stage: "signup", method: "google" },
+        { userId: "g1", stage: "call_created", method: "google" },
+      ]),
+    );
+    expect(out).toContain('samograph_funnel_stage{stage="auth_completed",method="magic_link"} 1');
+    expect(out).toContain('samograph_funnel_stage{stage="auth_completed",method="google"} 1');
+    expect(out).not.toContain('samograph_funnel_stage{stage="auth_completed"}');
   });
 });

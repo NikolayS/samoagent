@@ -21,14 +21,20 @@ import {
 } from "./funnelSource.ts";
 import { createAppApi } from "../app.ts";
 import { MetricsRegistry } from "../../../packages/shared/observe/index.ts";
+import type { SignupMethod } from "../../../packages/shared/observe/funnel.ts";
 import type { SQL } from "bun";
 
 const HAVE_DB = !!process.env.DATABASE_URL;
 const d = HAVE_DB ? describe : describe.skip;
 
-/** Seed one signup and return its user id. */
-async function seedUser(sql: SQL, email: string): Promise<string> {
-  const users = await sql`INSERT INTO users (email) VALUES (${email}) RETURNING id`;
+/** Seed one signup (with its §5.11 signup method) and return its user id. */
+async function seedUser(
+  sql: SQL,
+  email: string,
+  signupMethod: SignupMethod = "magic_link",
+): Promise<string> {
+  const users = await sql`
+    INSERT INTO users (email, signup_method) VALUES (${email}, ${signupMethod}) RETURNING id`;
   const userId = users[0].id as string;
   await sql`INSERT INTO tenants (owner_user_id) VALUES (${userId})`;
   return userId;
@@ -82,7 +88,7 @@ d("activation-funnel DB feed — exact stage counts (§5.11 / §9)", () => {
     // u1: signup only (no consumed link, no call)            → furthest = signup (0)
     await seedUser(sql, "u1@test.local");
 
-    // u2: signup + consumed magic link                       → magic_link_clicked (1)
+    // u2: signup + consumed magic link                       → auth_completed (1)
     await seedUser(sql, "u2@test.local");
     await seedConsumedLink(sql, "u2@test.local");
 
@@ -122,7 +128,7 @@ d("activation-funnel DB feed — exact stage counts (§5.11 / §9)", () => {
     const snap = await computeFunnelSnapshot(sql);
     expect(snap.stageCounts).toEqual({
       signup: 7,
-      magic_link_clicked: 6,
+      auth_completed: 6,
       call_created: 5,
       first_line: 4, // includes u7 (streamed_30s) despite NULL first_line_at
       streamed_30s: 3, // u5, u6, u7
@@ -157,12 +163,179 @@ d("activation-funnel DB feed — exact stage counts (§5.11 / §9)", () => {
     expect(res.status).toBe(200);
     const body = await res.text();
 
-    expect(body).toContain('samograph_funnel_stage{stage="signup"} 7');
-    expect(body).toContain('samograph_funnel_stage{stage="magic_link_clicked"} 6');
-    expect(body).toContain('samograph_funnel_stage{stage="call_created"} 5');
-    expect(body).toContain('samograph_funnel_stage{stage="first_line"} 4');
-    expect(body).toContain('samograph_funnel_stage{stage="streamed_30s"} 3');
+    // Every seeded user signed up by magic link, so the whole funnel lands on
+    // the `magic_link` series and the `google` series is an explicit zero.
+    expect(body).toContain('samograph_funnel_stage{stage="signup",method="magic_link"} 7');
+    expect(body).toContain('samograph_funnel_stage{stage="auth_completed",method="magic_link"} 6');
+    expect(body).toContain('samograph_funnel_stage{stage="call_created",method="magic_link"} 5');
+    expect(body).toContain('samograph_funnel_stage{stage="first_line",method="magic_link"} 4');
+    expect(body).toContain('samograph_funnel_stage{stage="streamed_30s",method="magic_link"} 3');
+    expect(body).toContain('samograph_funnel_stage{stage="signup",method="google"} 0');
     expect(body).toContain("samograph_funnel_total 7");
     expect(body).toContain("samograph_funnel_activated 3");
+  });
+});
+
+/**
+ * S5-1 item 7 / issue #222 — the imputation bug, end to end against Postgres.
+ *
+ * On `main` this whole population was invisible to the funnel's stage 2, which
+ * was derived from a consumed `magic_links` row and nothing else: a Google
+ * signup never produces one, so every Google user who reached `call_created`
+ * had `magic_link_clicked` IMPUTED by the cumulative back-fill.
+ *
+ * The seeded set is deliberately three populations, not one, because a fix that
+ * simply added one to stage 2 everywhere would satisfy a single-user test:
+ *   g1 — Google identity + a call        → auth_completed AND call_created
+ *   g2 — Google identity, NO call        → auth_completed, NOT call_created
+ *   x1 — NEITHER a consumed link nor an identity (the #180 provision-before-
+ *        consume state) → signup ONLY, so auth_completed < signup and a blanket
+ *        +1 is ruled out.
+ */
+d("activation funnel — Google signups are not magic-link clicks (#222)", () => {
+  let sql: ReturnType<typeof connect>;
+
+  /** Attach a Google identity to a user (no magic_links row anywhere). */
+  async function seedIdentity(s: SQL, userId: string, subject: string): Promise<void> {
+    await s`
+      INSERT INTO user_identities (user_id, provider, provider_subject, email)
+      VALUES (${userId}, 'google', ${subject}, NULL)`;
+  }
+
+  beforeAll(async () => {
+    sql = connect();
+    await migrate(sql);
+    await sql`TRUNCATE users, magic_links RESTART IDENTITY CASCADE`;
+
+    const g1 = await seedUser(sql, "g1@test.local", "google");
+    await seedIdentity(sql, g1, "google-sub-1");
+    await seedCall(sql, g1);
+
+    const g2 = await seedUser(sql, "g2@test.local", "google");
+    await seedIdentity(sql, g2, "google-sub-2");
+
+    // x1: a `users` row with NO consumed link and NO identity — auth never
+    // completed (the retryable SAMO-AUTH-500 state, issue #180).
+    await seedUser(sql, "x1@test.local", "magic_link");
+  });
+
+  afterAll(async () => {
+    await sql`TRUNCATE users, magic_links RESTART IDENTITY CASCADE`;
+    await sql.close();
+  });
+
+  it("counts a Google signup at auth_completed from its identity row, not a link", async () => {
+    const snap = await computeFunnelSnapshot(sql);
+    expect(snap.stageCounts).toEqual({
+      signup: 3,
+      auth_completed: 2, // g1 + g2 — NOT x1, so this is not a blanket +1
+      call_created: 1, // g1 only — g2 is not dragged forward
+      first_line: 0,
+      streamed_30s: 0,
+    });
+    // Zero magic links exist at all: the old derivation would score stage 2 = 0
+    // and then impute g1's from the back-fill.
+    const links = await sql`SELECT count(*)::int AS c FROM magic_links`;
+    expect(links[0].c).toBe(0);
+  });
+
+  it("splits every stage by users.signup_method", async () => {
+    const snap = await computeFunnelSnapshot(sql);
+    expect(snap.byMethod.google.stageCounts).toEqual({
+      signup: 2,
+      auth_completed: 2,
+      call_created: 1,
+      first_line: 0,
+      streamed_30s: 0,
+    });
+    expect(snap.byMethod.magic_link.stageCounts).toEqual({
+      signup: 1,
+      auth_completed: 0,
+      call_created: 0,
+      first_line: 0,
+      streamed_30s: 0,
+    });
+    expect(snap.byMethod.google.total).toBe(2);
+    expect(snap.byMethod.magic_link.total).toBe(1);
+  });
+});
+
+/**
+ * The `method`-labelled scrape and `samograph_magic_link_status`, both read from
+ * a real database through the composed app (S5-1 item 7 / #222).
+ */
+d("/metrics — per-method funnel + magic-link status from Postgres (#222)", () => {
+  let sql: ReturnType<typeof connect>;
+  let body = "";
+
+  beforeAll(async () => {
+    sql = connect();
+    await migrate(sql);
+    await sql`TRUNCATE users, magic_links RESTART IDENTITY CASCADE`;
+
+    // One magic-link user and one Google user, both at call_created.
+    const m1 = await seedUser(sql, "m1@test.local", "magic_link");
+    await seedConsumedLink(sql, "m1@test.local");
+    await seedCall(sql, m1);
+
+    const g1 = await seedUser(sql, "g1@test.local", "google");
+    await sql`
+      INSERT INTO user_identities (user_id, provider, provider_subject, email)
+      VALUES (${g1}, 'google', 'google-sub-metrics', NULL)`;
+    await seedCall(sql, g1);
+
+    // Magic-link lifecycle fixture: 2 outstanding, 1 consumed (m1's), 3 superseded.
+    for (const [n, status] of [
+      ["o1", "outstanding"],
+      ["o2", "outstanding"],
+      ["s1", "superseded"],
+      ["s2", "superseded"],
+      ["s3", "superseded"],
+    ] as const) {
+      await sql`
+        INSERT INTO magic_links (jti, email, status, kid, iat, exp)
+        VALUES (${`jti-${n}`}, ${`${n}@test.local`}, ${status}, 'test-kid', 0, 0)`;
+    }
+
+    const registry = new MetricsRegistry();
+    const source = createCachedFunnelSource(sql, { registry });
+    await source.refresh();
+    const api = createAppApi({
+      sql,
+      sessionSecret: "s".repeat(32),
+      magicLinkKid: "k",
+      magicLinkSecret: "m".repeat(32),
+      tokenKeyring: { current: { kid: "t", secret: "t".repeat(32) } },
+      emailSender: {
+        async sendMagicLink() {},
+        async sendAccountDeletion() {},
+        async sendIdentityLinked() {},
+      },
+      webOrigin: "http://localhost:3000",
+      enqueue: () => {},
+      registry,
+      funnel: source.thunk,
+    });
+    const res = await api.fetch(new Request("http://app.local/metrics"));
+    expect(res.status).toBe(200);
+    body = await res.text();
+  });
+
+  afterAll(async () => {
+    await sql`TRUNCATE users, magic_links RESTART IDENTITY CASCADE`;
+    await sql.close();
+  });
+
+  it("emits samograph_funnel_stage split by method, and no unlabelled series", () => {
+    expect(body).toContain('samograph_funnel_stage{stage="auth_completed",method="magic_link"} 1');
+    expect(body).toContain('samograph_funnel_stage{stage="auth_completed",method="google"} 1');
+    expect(body).toContain('samograph_funnel_stage{stage="call_created",method="google"} 1');
+    expect(body).not.toContain('samograph_funnel_stage{stage="auth_completed"}');
+  });
+
+  it("emits one samograph_magic_link_status series per MagicLinkStatus, exactly", () => {
+    expect(body).toContain('samograph_magic_link_status{status="outstanding"} 2');
+    expect(body).toContain('samograph_magic_link_status{status="consumed"} 1');
+    expect(body).toContain('samograph_magic_link_status{status="superseded"} 3');
   });
 });

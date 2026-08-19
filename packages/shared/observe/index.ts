@@ -9,17 +9,25 @@
 export {
   MetricsRegistry,
   COUNTER_SPECS,
+  SCALAR_COUNTER_SPECS,
+  GAUGE_SPECS,
   nearestRankPercentiles,
   type CounterName,
+  type ScalarCounterName,
+  type GaugeName,
   type PickupLatencySummary,
 } from "./registry.ts";
 
 export {
   aggregateFunnel,
+  DEFAULT_SIGNUP_METHOD,
   FUNNEL_STAGES,
+  SIGNUP_METHODS,
   type ActivationEvent,
   type FunnelSnapshot,
   type FunnelStage,
+  type MethodFunnel,
+  type SignupMethod,
 } from "./funnel.ts";
 
 export {
