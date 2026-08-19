@@ -444,6 +444,41 @@ function deriveRedirectUri(webOrigin: string): string {
 }
 
 /**
+ * The explicit `GOOGLE_OAUTH_REDIRECT_URI` override, or `undefined` when it is
+ * unset or blank. Shared with the entrypoint tripwire (#209) for the same reason
+ * {@link googleOAuthIsConfigured} is: an operator who pinned the URI has already
+ * asserted the host, and both places must agree on what "pinned" means.
+ */
+export function googleOAuthRedirectUriOverride(
+  env: Record<string, string | undefined>,
+): string | undefined {
+  return present(env.GOOGLE_OAUTH_REDIRECT_URI);
+}
+
+/**
+ * Does this environment claim Google sign-in at all?
+ *
+ * THE single definition of "configured", shared by {@link googleOAuthFromEnv}
+ * (which returns `undefined` exactly when this is `false`) and by the entrypoint
+ * tripwire that refuses to let the hard-coded web-origin fallback silently
+ * become a Google redirect origin (`assertGoogleWebOriginConfigured` in
+ * `apps/app-api/server.ts`, #209). Two separate notions of "configured" that
+ * disagree on a blank string would put the tripwire and the factory out of step,
+ * so there is only one.
+ *
+ * `true` when EITHER credential is present, not both: exactly one set is a
+ * half-configured client, which {@link googleOAuthFromEnv} already throws on —
+ * that state must reach the throw, not slip past the tripwire. Whitespace-only
+ * is absent (see {@link present}).
+ */
+export function googleOAuthIsConfigured(env: Record<string, string | undefined>): boolean {
+  return (
+    present(env.GOOGLE_OAUTH_CLIENT_ID) !== undefined ||
+    present(env.GOOGLE_OAUTH_CLIENT_SECRET) !== undefined
+  );
+}
+
+/**
  * Build the production Google provider from the environment, or `undefined`
  * when Google sign-in is simply OFF.
  *
@@ -467,7 +502,7 @@ export function googleOAuthFromEnv(
   const clientId = present(env.GOOGLE_OAUTH_CLIENT_ID);
   const clientSecret = present(env.GOOGLE_OAUTH_CLIENT_SECRET);
 
-  if (clientId === undefined && clientSecret === undefined) return undefined;
+  if (!googleOAuthIsConfigured(env)) return undefined;
   if (clientSecret === undefined) {
     throw new GoogleOAuthError(
       "GOOGLE_OAUTH_CLIENT_ID is set but GOOGLE_OAUTH_CLIENT_SECRET is missing — " +
@@ -481,7 +516,7 @@ export function googleOAuthFromEnv(
     );
   }
 
-  const override = present(env.GOOGLE_OAUTH_REDIRECT_URI);
+  const override = googleOAuthRedirectUriOverride(env);
   let redirectUri: string;
   if (override !== undefined) {
     assertRedirectUriShape(override, "GOOGLE_OAUTH_REDIRECT_URI");

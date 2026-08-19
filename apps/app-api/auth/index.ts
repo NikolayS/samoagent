@@ -153,6 +153,8 @@ export {
   GoogleOAuthError,
   GoogleOAuthProvider,
   googleOAuthFromEnv,
+  googleOAuthIsConfigured,
+  googleOAuthRedirectUriOverride,
   type GoogleOAuthProviderOptions,
 } from "./google-oauth.ts";
 // The Google sign-in ROUTES + composition (issue #209, PR 5 of 7). Appended at

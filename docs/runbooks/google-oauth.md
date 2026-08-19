@@ -169,7 +169,7 @@ development, and not the owner's own end-to-end test.
 |---|---|---|---|
 | `GOOGLE_OAUTH_CLIENT_ID` | prod `.env` (prod client); `samograph-main` env + local dev (non-prod client). **Never** a branch preview. | No — absent ⇒ Google sign-in is simply OFF | Sent on `/authorize` and at the token exchange, and **pinned as the required `aud`** (and `azp` when present) during ID-token verification. |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | same as above | No — absent ⇒ OFF. Setting **exactly one** of the pair **throws at boot**, naming the missing var and echoing no value | Authenticates the server-to-server token exchange. **See the trap below.** |
-| `GOOGLE_OAUTH_REDIRECT_URI` | optional override, per env | No | **The escape hatch for any host not in the four-origin allowlist above.** Setting it **skips the allowlist entirely** — the operator has asserted the host — but the value still gets the full **shape check**: https (or http for `localhost` only), no embedded credentials, no query, no fragment, path exactly `/auth/google/callback`, and already-canonical (an explicit `:443`, an uppercase host or a `..` segment is rejected at boot, because it could not byte-match what Google has registered). When it is unset, the redirect URI is derived as `<web origin>/auth/google/callback` and the origin must be one of the four. |
+| `GOOGLE_OAUTH_REDIRECT_URI` | optional override, per env | No — unless this env sets neither `BASE_URL` nor `WEB_ORIGIN` and holds a Google credential, in which case **one of the three must be set or the server refuses to boot** (#209) | **The escape hatch for any host not in the four-origin allowlist above.** Setting it **skips the allowlist entirely** — the operator has asserted the host — but the value still gets the full **shape check**: https (or http for `localhost` only), no embedded credentials, no query, no fragment, path exactly `/auth/google/callback`, and already-canonical (an explicit `:443`, an uppercase host or a `..` segment is rejected at boot, because it could not byte-match what Google has registered). When it is unset, the redirect URI is derived as `<web origin>/auth/google/callback` and the origin must be one of the four. |
 | `APP_API_ORIGIN` | already required, per env (`apps/web/next.config.mjs`) | **Yes** (pre-existing) | Proxies `/auth/google/start`, `/auth/google/callback` and `/auth/providers` from the web origin to app-api. The whole `rewrites()` key disappears when it is unset — this already-known trap now takes Google sign-in down with it. **Verify it per env on every deploy.** |
 
 Both Google vars are read in `googleOAuthFromEnv()` from inside the server
@@ -178,18 +178,55 @@ importable under `bun test`.
 
 > **Note on the derived redirect URI — set `WEB_ORIGIN`/`BASE_URL` per env.**
 > `apps/app-api/server.ts` resolves the web origin via
-> `resolveMagicLinkBaseUrl(env, "https://samograph.dev")`, so the hard-coded
-> last-resort default is `https://samograph.dev` — and that host is now itself a
-> registered origin. An environment that loses **both** `WEB_ORIGIN` and
-> `BASE_URL` therefore no longer trips the boot-time allowlist: it silently
-> derives `https://samograph.dev/auth/google/callback` and, if the credentials it
-> holds belong to a client registered for a *different* host, every sign-in dies
-> at Google with `redirect_uri_mismatch` and nothing lands in our logs. **Every
-> environment must set its own `WEB_ORIGIN` (prod) or `BASE_URL` (samohost sets it
-> on previews), or pin `GOOGLE_OAUTH_REDIRECT_URI` outright.** A derived origin
-> outside the four-origin allowlist still throws at boot naming
+> `resolveMagicLinkBaseUrl(env, APP_API_WEB_ORIGIN_FALLBACK)`, so the hard-coded
+> last-resort default is `https://samograph.dev` — and that host is itself a
+> registered origin, so the allowlist alone can no longer catch an environment
+> that has lost **both** `WEB_ORIGIN` and `BASE_URL`. **Every environment must set
+> its own `WEB_ORIGIN` (prod) or `BASE_URL` (samohost sets it on previews), or pin
+> `GOOGLE_OAUTH_REDIRECT_URI` outright** — and since #209 the prod entrypoint
+> *enforces* that whenever Google is configured (see the boot failure below). A
+> derived origin outside the four-origin allowlist still throws at boot naming
 > `GOOGLE_OAUTH_REDIRECT_URI`; an explicit override skips the allowlist but still
 > gets the shape check.
+
+### Boot failure: "sets neither BASE_URL nor WEB_ORIGIN"
+
+`apps/app-api/server.ts` **refuses to boot** with:
+
+```text
+GoogleOAuthError: Google sign-in is configured but this environment sets neither
+BASE_URL nor WEB_ORIGIN, so the Google redirect URI would silently derive from the
+hard-coded https://samograph.dev fallback in apps/app-api/server.ts and every
+sign-in would die at Google with redirect_uri_mismatch — set BASE_URL (or
+WEB_ORIGIN) to THIS environment's own public origin, or set
+GOOGLE_OAUTH_REDIRECT_URI explicitly to the URI registered for this host
+```
+
+**What it means.** This env holds a Google credential, pins no
+`GOOGLE_OAUTH_REDIRECT_URI`, and sets neither `BASE_URL` nor `WEB_ORIGIN` — so its
+redirect URI would come from the hard-coded fallback rather than from config. The
+process dies at startup, in **our** logs, instead of booting and failing later at
+Google in **Google's** logs on every user's click.
+
+**The fix — one of, in preference order:**
+
+1. Set `BASE_URL` to this environment's own public origin (what samohost injects
+   into every preview's `secrets.env`). A missing `BASE_URL` on a preview means
+   provisioning did not run — fix that rather than working around it.
+2. Set `WEB_ORIGIN` (how prod names its own host).
+3. Set `GOOGLE_OAUTH_REDIRECT_URI` to the exact URI registered for this host. Use
+   this only when the host is outside the four-origin allowlist.
+
+**The other fix, if you did not want Google here at all:** unset **both**
+`GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`. The guard fires when
+*either* is set, deliberately — the same "configured" test `googleOAuthFromEnv`
+gates on, so a half-configured client cannot slip past it.
+
+**Scope.** The guard is Google-only. An environment with no Google credentials is
+completely unaffected, magic link keeps its `https://samograph.dev` default
+everywhere, and `apps/app-api/dev-server.ts` does not carry the guard at all — its
+own fallback is `http://localhost:3000`, which is a registered origin, so the trap
+does not exist in local dev.
 
 ## The `.samohost.toml` trap — NEVER put the secret in `secrets`
 
@@ -256,8 +293,12 @@ byte-identical to a registered one. In order of likelihood:
    credentials and `/auth/google/*` returns `SAMO-AUTH-010`. If a branch preview
    *did* reach Google, a credential leaked into a preview env; rotate it.
 6. **The derived default drifted to `samograph.dev`** because that env has neither
-   `WEB_ORIGIN` nor `BASE_URL` set. Set the env's own origin, or set
-   `GOOGLE_OAUTH_REDIRECT_URI` explicitly, and restart.
+   `WEB_ORIGIN` nor `BASE_URL` set. Since #209 this cannot happen silently on
+   `apps/app-api/server.ts` — that env refuses to boot with the
+   ["sets neither BASE_URL nor WEB_ORIGIN"](#boot-failure-sets-neither-base_url-nor-web_origin)
+   error instead. If you are seeing `redirect_uri_mismatch` rather than a boot
+   failure, the env DID set one of them (or pinned `GOOGLE_OAUTH_REDIRECT_URI`) —
+   check its value against the console entry rather than assuming the default.
 
 **"Access blocked: samograph has not completed the Google verification process"**,
 or a sign-in that works for the owner and nobody else. The client is still in
