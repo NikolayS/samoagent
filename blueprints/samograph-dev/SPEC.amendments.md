@@ -1303,6 +1303,14 @@ code** and no new web copy row.
   identity rows too) — the same class of window §5.14's multi-step erasure already
   has, now no wider than it was.
 
+**Status: ABSORBED** — the one edit the Action block below asks for has landed in
+`SPEC.md` §5.14 (issue **#225**, PR **#231**): the erasure list now records the
+`users.email` release to `deleted-<user id>@deleted.invalid` alongside S5-1 item 9's
+`user_identities` entry, and that a previously-erased address may be used to sign up
+again. §5.1's identity note names this as the single exception to "no authentication
+or identity-linking path mutates `users.email`". The Action text is kept verbatim
+below as the record of what was owed — it is no longer a to-do.
+
 **Action:** when §5.14 is folded into the SPEC (issue **#225**), extend the
 erasure list with "the owner's `users.email` is released to
 `deleted-<user id>@deleted.invalid`" alongside S5-1 item 9's `user_identities`
