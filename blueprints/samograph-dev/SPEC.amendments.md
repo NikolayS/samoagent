@@ -1216,6 +1216,14 @@ commit message would be exactly the silent re-introduction §1 forbids.
   10-minute window. A dedicated secret was rejected in part because
   `.samohost.toml`'s `secrets` array is a per-env **generator** — see the runbook.
 
+**Status: ABSORBED** — every edit the Action block below asks for has landed in
+`SPEC.md` (issue **#225**, PR **#231**): §1 non-goals + §2, §5.1, the §5.11 funnel
+rename and `method` label, the §9 re-baselining sentence, the §5.12 "Sign-in" row,
+`user_identities` in the §5.14 erasure list, and the §5.16 rows `005`, `006`–`010`
+and `500`. The gating precondition ("once the implementing PR pins their log
+statuses and copy") was discharged by **#218** (`334cac8`). The Action text is kept
+verbatim below as the record of what was owed — it is no longer a to-do.
+
 **Action:** fold the §5.16 rows above into the SPEC's table (including the two
 `005`/`500` drift rows) once the implementing PR pins their log statuses and copy;
 rename stage 2 in the §5.11 funnel list and add the `method` label; add the §9
@@ -1294,6 +1302,14 @@ code** and no new web copy row.
   over-retained address (and, since both live in that one transaction, the
   identity rows too) — the same class of window §5.14's multi-step erasure already
   has, now no wider than it was.
+
+**Status: ABSORBED** — the one edit the Action block below asks for has landed in
+`SPEC.md` §5.14 (issue **#225**, PR **#231**): the erasure list now records the
+`users.email` release to `deleted-<user id>@deleted.invalid` alongside S5-1 item 9's
+`user_identities` entry, and that a previously-erased address may be used to sign up
+again. §5.1's identity note names this as the single exception to "no authentication
+or identity-linking path mutates `users.email`". The Action text is kept verbatim
+below as the record of what was owed — it is no longer a to-do.
 
 **Action:** when §5.14 is folded into the SPEC (issue **#225**), extend the
 erasure list with "the owner's `users.email` is released to
