@@ -26,6 +26,9 @@ import { createAppApi } from "./app.ts";
 import {
   emailSenderFromEnv,
   googleOAuthFromEnv,
+  googleOAuthIsConfigured,
+  googleOAuthRedirectUriOverride,
+  GoogleOAuthError,
   PostgresMagicLinkStore,
   type EmailSender,
   type MagicLinkEmail,
@@ -35,6 +38,7 @@ import {
 import { connect } from "../../packages/shared/db/index.ts";
 import {
   assertNoDevDefaultSecrets,
+  perEnvBaseUrl,
   resolveMagicLinkBaseUrl,
   APP_API_SIGNING_SECRETS,
   type EnvLike,
@@ -88,6 +92,65 @@ function unconfiguredEmailSender(): EmailSender {
 }
 
 /**
+ * The LAST-RESORT public origin this entrypoint builds URLs against when an
+ * environment sets neither `BASE_URL` (samohost, per-env) nor `WEB_ORIGIN`.
+ *
+ * Pinned as a named constant so {@link assertGoogleWebOriginConfigured} and the
+ * `resolveMagicLinkBaseUrl` call below cannot drift apart, and so a change to it
+ * has to appear as a deliberate line in a diff.
+ */
+export const APP_API_WEB_ORIGIN_FALLBACK = "https://samograph.dev";
+
+/**
+ * Refuse to boot when the Google redirect URI would derive from
+ * {@link APP_API_WEB_ORIGIN_FALLBACK} rather than from real per-env config
+ * (#209; restores the property #236 gave up, per finding 1 of that PR's samorev
+ * review).
+ *
+ * #236 added `https://samograph.dev` to `GOOGLE_REGISTERED_REDIRECT_ORIGINS`
+ * because the owner intends that host as prod. It is also the literal this file
+ * falls back to, so the compiled-in allowlist stopped catching an environment
+ * that has lost BOTH `BASE_URL` and `WEB_ORIGIN`: such an env now boots happily
+ * and every user's Google click dies at Google with `redirect_uri_mismatch` —
+ * later, quieter, and in Google's logs rather than ours.
+ *
+ * Deliberately GOOGLE-SCOPED, all three conditions required:
+ *
+ *  - `perEnvBaseUrl(env) ?? env.WEB_ORIGIN` is `undefined` — the SAME expression
+ *    {@link resolveMagicLinkBaseUrl} evaluates before reaching its default, so
+ *    this fires exactly when the origin comes from the hard-coded fallback;
+ *  - Google is configured ({@link googleOAuthIsConfigured} — one shared notion,
+ *    so a half-configured client still reaches `googleOAuthFromEnv`'s own throw);
+ *  - `GOOGLE_OAUTH_REDIRECT_URI` is unset — an operator who pinned the URI has
+ *    asserted the host, and that override skips derivation entirely.
+ *
+ * Blast radius is ZERO for the magic-link path (its `samograph.dev` default is
+ * untouched), for any env that sets either var, and for any env with no Google
+ * credentials — every branch preview, by design. It asserts nothing about WHICH
+ * hosts are registered, so it survives the prod/staging remap unchanged.
+ *
+ * NOT needed in `dev-server.ts`: its own fallback is `http://localhost:3000`,
+ * which IS a registered origin, so the trap does not exist there.
+ */
+export function assertGoogleWebOriginConfigured(env: EnvLike): void {
+  const configuredWebOrigin = perEnvBaseUrl(env) ?? env.WEB_ORIGIN;
+  if (configuredWebOrigin !== undefined) return;
+  if (!googleOAuthIsConfigured(env)) return;
+  if (googleOAuthRedirectUriOverride(env) !== undefined) return;
+  // Names both fixes, echoes NO credential value (not the client id, not the
+  // secret, not a fragment of either) — same rule as every other throw on this
+  // path in google-oauth.ts.
+  throw new GoogleOAuthError(
+    "Google sign-in is configured but this environment sets neither BASE_URL nor " +
+      "WEB_ORIGIN, so the Google redirect URI would silently derive from the " +
+      `hard-coded ${APP_API_WEB_ORIGIN_FALLBACK} fallback in apps/app-api/server.ts ` +
+      "and every sign-in would die at Google with redirect_uri_mismatch — set " +
+      "BASE_URL (or WEB_ORIGIN) to THIS environment's own public origin, or set " +
+      "GOOGLE_OAUTH_REDIRECT_URI explicitly to the URI registered for this host",
+  );
+}
+
+/**
  * Start the prod app-api server. Fail-closed FIRST, then compose + serve. Only
  * called for real when this module is the entry (`import.meta.main`); tests
  * import it to exercise the fail-closed throw without binding a port.
@@ -101,7 +164,10 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   // #190: build the magic-link callback against THIS env's own public host —
   // BASE_URL when samohost set it (previews), else WEB_ORIGIN (prod). Trusted env
   // value only, never the request Host header.
-  const webOrigin = resolveMagicLinkBaseUrl(env, "https://samograph.dev");
+  const webOrigin = resolveMagicLinkBaseUrl(env, APP_API_WEB_ORIGIN_FALLBACK);
+  // #209: the hard-coded fallback above must never SILENTLY become the Google
+  // redirect origin. Runs before `connect()` and before anything binds a port.
+  assertGoogleWebOriginConfigured(env);
   // Guaranteed non-dev-default + present by the fail-closed assert above.
   const sessionSecret = env.SESSION_SECRET as string;
   const magicLinkSecret = env.MAGIC_LINK_SECRET as string;
