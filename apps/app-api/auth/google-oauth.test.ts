@@ -27,6 +27,7 @@ import {
   GOOGLE_AUTHORIZE_URL,
   GOOGLE_OAUTH_CALLBACK_PATH,
   GOOGLE_OAUTH_SCOPE,
+  GOOGLE_REGISTERED_REDIRECT_ORIGINS,
   GOOGLE_TOKEN_RESPONSE_MAX_BYTES,
   GOOGLE_TOKEN_URL,
   googleOAuthFromEnv,
@@ -645,8 +646,22 @@ function envWith(redirectUri?: string): Record<string, string | undefined> {
 }
 
 describe("googleOAuthFromEnv — redirect URI resolution", () => {
-  it("accepts each of the three REGISTERED derived origins", () => {
+  it("pins the FULL registered-origin list as an exact array", () => {
+    // The WHOLE list, in order, as one exact value — not `toContain`. Every
+    // entry here is a host someone must have registered by hand in the Google
+    // console, so an addition or a removal has to show up as a deliberate line
+    // in this diff rather than sliding in under a membership check.
+    expect([...GOOGLE_REGISTERED_REDIRECT_ORIGINS]).toEqual([
+      "https://samograph.dev",
+      "https://samograph.samo.team",
+      "https://samograph-main.samo.cat",
+      "http://localhost:3000",
+    ]);
+  });
+
+  it("accepts each of the four REGISTERED derived origins", () => {
     for (const [origin, expected] of [
+      ["https://samograph.dev", "https://samograph.dev/auth/google/callback"],
       ["https://samograph.samo.team", "https://samograph.samo.team/auth/google/callback"],
       [
         "https://samograph-main.samo.cat",
@@ -658,13 +673,14 @@ describe("googleOAuthFromEnv — redirect URI resolution", () => {
     }
   });
 
-  it("THROWS naming GOOGLE_OAUTH_REDIRECT_URI on the samograph.dev default trap", () => {
-    // `server.ts` defaults webOrigin to https://samograph.dev while real prod is
-    // samograph.samo.team. Without this throw the misconfiguration is invisible
-    // until every user's click 400s at Google with redirect_uri_mismatch.
-    expect(() => googleOAuthFromEnv(envWith(), "https://samograph.dev")).toThrow(
-      /GOOGLE_OAUTH_REDIRECT_URI/,
-    );
+  it("derives EXACTLY https://samograph.dev/auth/google/callback for samograph.dev", () => {
+    // `server.ts` falls back to https://samograph.dev when neither BASE_URL nor
+    // WEB_ORIGIN is set, and that host is now registered with Google, so the
+    // derivation must produce the callback path — NOT /auth/callback, which is
+    // the magic-link callback and is what a hand-registered client most often
+    // gets wrong.
+    const provider = googleOAuthFromEnv(envWith(), "https://samograph.dev");
+    expect(provider?.redirectUri).toBe("https://samograph.dev/auth/google/callback");
   });
 
   it("THROWS on a derived branch-preview origin — previews get no Google by design", () => {
@@ -675,7 +691,12 @@ describe("googleOAuthFromEnv — redirect URI resolution", () => {
 
   it("lets an EXPLICIT override name a host the derived allowlist would refuse", () => {
     const uri = "https://samograph-somebranch.samo.cat/auth/google/callback";
-    expect(googleOAuthFromEnv(envWith(uri), "https://samograph.dev")?.redirectUri).toBe(uri);
+    // The web origin is one the derivation itself would THROW on, so this also
+    // proves the override short-circuits the allowlist rather than merely
+    // overwriting a value the allowlist already let through.
+    expect(
+      googleOAuthFromEnv(envWith(uri), "https://samograph-otherbranch.samo.cat")?.redirectUri,
+    ).toBe(uri);
   });
 
   it("returns the override BYTE-IDENTICALLY, never a re-serialized URL", () => {

@@ -18,15 +18,51 @@ reversed: scopes are `openid email` only, forever, on this client.
 > baseline credential on every environment and stays enabled everywhere Google is
 > enabled — **Google is never the only way into an account.**
 
+## ⛔ READ FIRST — the redirect URI path is `/auth/google/callback`
+
+> **The path is `/auth/google/callback`. It is NOT `/auth/callback`.**
+>
+> `/auth/callback` is the **magic-link** callback — a different route, on a
+> different credential path. Registering it as the Google redirect URI produces
+> `Error 400: redirect_uri_mismatch` on every single sign-in, with nothing in our
+> logs. **This has already been hit once on real, freshly-created clients — both
+> were registered against `/auth/callback`.** If you created the clients before
+> reading this, go back and check the URIs character by character before doing
+> anything else.
+
+Google **exact-matches** `redirect_uri` — scheme, host, port and path must be
+byte-identical — and allows **no wildcards**. Paste these strings; do not retype
+them, and do not add a trailing slash:
+
+| Environment / host | Exact redirect URI to register |
+|---|---|
+| `samograph.dev` | `https://samograph.dev/auth/google/callback` |
+| `samograph.samo.team` | `https://samograph.samo.team/auth/google/callback` |
+| `samograph-main` preview | `https://samograph-main.samo.cat/auth/google/callback` |
+| local dev | `http://localhost:3000/auth/google/callback` |
+
+Those four origins are exactly the compiled-in allowlist
+`GOOGLE_REGISTERED_REDIRECT_ORIGINS` in
+[`apps/app-api/auth/google-oauth.ts`](../../apps/app-api/auth/google-oauth.ts) —
+an environment whose derived origin is not one of them **refuses to boot**
+naming `GOOGLE_OAUTH_REDIRECT_URI`, rather than failing at every user's click.
+The list is pinned by an exact-array test, so adding a host is a reviewed code
+change, never a silent one.
+
+**Register the URI on the client whose credentials that environment holds.** Which
+host is production and which is staging is the owner's call and is *not* settled
+here — `samograph.dev` and `samograph.samo.team` are both accepted, and each must
+be registered on whichever client serves it. A client may carry more than one
+redirect URI; what it must never do is carry a URI for a host it does not serve.
+
 ## Why there are TWO OAuth clients
 
 | Client | Registered redirect URIs | Given to |
 |---|---|---|
-| `samograph-prod` | `https://samograph.samo.team/auth/google/callback` | prod only |
+| `samograph-prod` | `https://samograph.dev/auth/google/callback` and/or `https://samograph.samo.team/auth/google/callback` — whichever host(s) that credential's environment actually serves | that environment only |
 | `samograph-nonprod` | `https://samograph-main.samo.cat/auth/google/callback`, `http://localhost:3000/auth/google/callback` | the `samograph-main` preview + local dev machines |
 
-Google **exact-matches** `redirect_uri` — scheme, host, port and path must be
-byte-identical — and allows **no wildcards**. Three registrable URIs, two clients.
+Four registrable URIs, two clients.
 
 Two clients rather than one is deliberate: a preview `.env` on a shared VM is a
 lower-trust store than prod's, and the ID-token verifier **pins `aud` to the
@@ -57,9 +93,10 @@ renamed some screens; both names are given.
    - App domain → Application home page: `https://samograph.samo.team`;
      Privacy policy link: `https://samograph.samo.team/privacy`;
      Terms of service link: `https://samograph.samo.team/terms`.
-   - **Authorized domains: add BOTH `samo.team` AND `samo.cat`.** These are two
-     distinct registrable domains; omitting `samo.cat` makes the non-prod client
-     unusable.
+   - **Authorized domains: add ALL of `samograph.dev`, `samo.team` AND
+     `samo.cat`.** These are three distinct registrable domains; omitting
+     `samo.cat` makes the non-prod client unusable, and omitting `samograph.dev`
+     makes the `samograph.dev` redirect URI unregistrable.
    - Set the **developer contact email**. Save.
 3. **Scopes.** Open **Data access** (older: the **Scopes** step) → *Add or remove
    scopes* → tick **only** `openid` and `.../auth/userinfo.email`.
@@ -75,9 +112,12 @@ renamed some screens; both names are given.
 5. **Credentials.** **Credentials → Create credentials → OAuth client ID →
    Application type `Web application`.** Name it `samograph-prod`.
    - Leave **Authorized JavaScript origins EMPTY** — we never use the Google JS SDK.
-   - Under **Authorized redirect URIs**, click *ADD URI* and enter exactly
-     `https://samograph.samo.team/auth/google/callback` — one entry, **no trailing
-     slash, no wildcard**.
+   - Under **Authorized redirect URIs**, click *ADD URI* and paste the exact URI
+     for the host this credential's environment serves — from the table in
+     [READ FIRST](#-read-first--the-redirect-uri-path-is-authgooglecallback):
+     `https://samograph.dev/auth/google/callback` and/or
+     `https://samograph.samo.team/auth/google/callback`. **No trailing slash, no
+     wildcard, and the path is `/auth/google/callback` — NOT `/auth/callback`.**
    - Click **Create**.
 6. **Copy the pair.** The dialog shows the **Client ID** and **Client secret**
    once, with a *Download JSON* button. Copy both now — the secret can be
@@ -100,7 +140,8 @@ consent screen):
 1. **Credentials → Create credentials → OAuth client ID → `Web application`.**
    Name it `samograph-nonprod`.
 2. Leave **Authorized JavaScript origins** empty.
-3. Under **Authorized redirect URIs** add exactly **two** entries:
+3. Under **Authorized redirect URIs** add exactly **two** entries — again the
+   path is `/auth/google/callback`, **not** `/auth/callback`:
    - `https://samograph-main.samo.cat/auth/google/callback`
    - `http://localhost:3000/auth/google/callback` — `http` is permitted for
      `localhost` **only**.
@@ -128,22 +169,27 @@ development, and not the owner's own end-to-end test.
 |---|---|---|---|
 | `GOOGLE_OAUTH_CLIENT_ID` | prod `.env` (prod client); `samograph-main` env + local dev (non-prod client). **Never** a branch preview. | No — absent ⇒ Google sign-in is simply OFF | Sent on `/authorize` and at the token exchange, and **pinned as the required `aud`** (and `azp` when present) during ID-token verification. |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | same as above | No — absent ⇒ OFF. Setting **exactly one** of the pair **throws at boot**, naming the missing var and echoing no value | Authenticates the server-to-server token exchange. **See the trap below.** |
-| `GOOGLE_OAUTH_REDIRECT_URI` | optional override, per env | No | Escape hatch for a host the derived default cannot produce. Derived default is `<base>/auth/google/callback`. Any value is shape-checked (https, or http for `localhost` only; no query; no fragment; path exactly `/auth/google/callback`). |
+| `GOOGLE_OAUTH_REDIRECT_URI` | optional override, per env | No | **The escape hatch for any host not in the four-origin allowlist above.** Setting it **skips the allowlist entirely** — the operator has asserted the host — but the value still gets the full **shape check**: https (or http for `localhost` only), no embedded credentials, no query, no fragment, path exactly `/auth/google/callback`, and already-canonical (an explicit `:443`, an uppercase host or a `..` segment is rejected at boot, because it could not byte-match what Google has registered). When it is unset, the redirect URI is derived as `<web origin>/auth/google/callback` and the origin must be one of the four. |
 | `APP_API_ORIGIN` | already required, per env (`apps/web/next.config.mjs`) | **Yes** (pre-existing) | Proxies `/auth/google/start`, `/auth/google/callback` and `/auth/providers` from the web origin to app-api. The whole `rewrites()` key disappears when it is unset — this already-known trap now takes Google sign-in down with it. **Verify it per env on every deploy.** |
 
 Both Google vars are read in `googleOAuthFromEnv()` from inside the server
 entrypoint, never at module top level — so a repo with no Google config stays
 importable under `bun test`.
 
-> **Note on the derived redirect URI.** `apps/app-api/server.ts` resolves the web
-> origin via `resolveMagicLinkBaseUrl(env, "https://samograph.dev")` — the
-> hard-coded last-resort default is `https://samograph.dev`, while real prod is
-> `samograph.samo.team`. Prod is only correct because it sets `WEB_ORIGIN` (and
-> previews get `BASE_URL` from samohost). If both are ever missing, the **derived**
-> redirect URI is validated against a compiled-in host allowlist and **throws at
-> boot naming `GOOGLE_OAUTH_REDIRECT_URI`**, instead of letting every user click
-> 400 at Google. An explicit override skips the host allowlist (the operator has
-> asserted it) but still gets the shape check.
+> **Note on the derived redirect URI — set `WEB_ORIGIN`/`BASE_URL` per env.**
+> `apps/app-api/server.ts` resolves the web origin via
+> `resolveMagicLinkBaseUrl(env, "https://samograph.dev")`, so the hard-coded
+> last-resort default is `https://samograph.dev` — and that host is now itself a
+> registered origin. An environment that loses **both** `WEB_ORIGIN` and
+> `BASE_URL` therefore no longer trips the boot-time allowlist: it silently
+> derives `https://samograph.dev/auth/google/callback` and, if the credentials it
+> holds belong to a client registered for a *different* host, every sign-in dies
+> at Google with `redirect_uri_mismatch` and nothing lands in our logs. **Every
+> environment must set its own `WEB_ORIGIN` (prod) or `BASE_URL` (samohost sets it
+> on previews), or pin `GOOGLE_OAUTH_REDIRECT_URI` outright.** A derived origin
+> outside the four-origin allowlist still throws at boot naming
+> `GOOGLE_OAUTH_REDIRECT_URI`; an explicit override skips the allowlist but still
+> gets the shape check.
 
 ## The `.samohost.toml` trap — NEVER put the secret in `secrets`
 
@@ -194,19 +240,24 @@ client **id** is not a secret; the client **secret** is.
 **`Error 400: redirect_uri_mismatch`.** The `redirect_uri` the server sent is not
 byte-identical to a registered one. In order of likelihood:
 
-1. **You just edited the redirect URI in the console.** Propagation takes from
+1. **The registered path is `/auth/callback` instead of `/auth/google/callback`.**
+   Check this FIRST — it has already happened on real clients. `/auth/callback` is
+   the magic-link callback; the Google redirect URI must end in
+   `/auth/google/callback`. Fix the entry in the console and wait for propagation.
+2. **You just edited the redirect URI in the console.** Propagation takes from
    **five minutes to a few hours**. Wait before changing anything else — this is
    the single most common cause of a false "the code is broken" diagnosis.
-2. **Wrong host for the env** — a `samograph-main` request reaching the `-prod`
+3. **Wrong host for the env** — a `samograph-main` request reaching the `-prod`
    client, or vice versa. Check which `GOOGLE_OAUTH_CLIENT_ID` that env holds.
-3. **Trailing slash, `http` vs `https`, or a port.** Google compares the full
+4. **Trailing slash, `http` vs `https`, or a port.** Google compares the full
    string. `https://samograph.samo.team/auth/google/callback/` ≠
    `…/callback`.
-4. **A branch preview.** It should never reach Google at all — it has no
+5. **A branch preview.** It should never reach Google at all — it has no
    credentials and `/auth/google/*` returns `SAMO-AUTH-010`. If a branch preview
    *did* reach Google, a credential leaked into a preview env; rotate it.
-5. **The derived default drifted.** Set `GOOGLE_OAUTH_REDIRECT_URI` explicitly for
-   that env and restart.
+6. **The derived default drifted to `samograph.dev`** because that env has neither
+   `WEB_ORIGIN` nor `BASE_URL` set. Set the env's own origin, or set
+   `GOOGLE_OAUTH_REDIRECT_URI` explicitly, and restart.
 
 **"Access blocked: samograph has not completed the Google verification process"**,
 or a sign-in that works for the owner and nobody else. The client is still in
