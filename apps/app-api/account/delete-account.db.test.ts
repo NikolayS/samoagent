@@ -23,8 +23,9 @@ import { connect } from "../../../packages/shared/db/client.ts";
 import { migrate } from "../../../packages/shared/db/migrate.ts";
 import { signSession, SESSION_COOKIE_NAME } from "../auth/session.ts";
 import { InMemoryEmailSender } from "../auth/email.ts";
-import { createAccountHandler } from "./http.ts";
+import { createAccountHandler, erasedAccountEmail } from "./http.ts";
 import { createCallsHandler } from "../calls/http.ts";
+import { tenantActive } from "../auth/owner-session.ts";
 
 const HAVE_DB = !!process.env.DATABASE_URL;
 const d = HAVE_DB ? describe : describe.skip;
@@ -287,5 +288,49 @@ d("DELETE /account — full account GDPR erasure (§5.14, RLS-enforced §5.10)",
     expect(await count("calls", "id", callId)).toBe(1);
     expect(deleteRecording).toEqual([]);
     expect(email.sentAccountDeletions.length).toBe(0);
+  });
+
+  // ── (e) The tombstone RELEASES the owner's address (§5.14, #220) ──────────────
+  it("anonymizes the retained users row to deleted-<id>@deleted.invalid and frees the address", async () => {
+    const owner = await freshOwner();
+    await seedIdentity(owner.userId);
+    const email = new InMemoryEmailSender();
+    const handler = createAccountHandler({ sql, sessionSecret: SESSION_SECRET, emailSender: email });
+
+    const before = (await sql`SELECT email FROM users WHERE id = ${owner.userId}`) as unknown as Array<{ email: string }>;
+    expect(before[0].email).toBe(owner.email);
+
+    expect((await handler(req("DELETE", "/account", { cookie: owner.cookie }))).status).toBe(200);
+
+    // The confirmation went to the REAL address — read BEFORE the release.
+    expect(email.sentAccountDeletions.map((m) => m.to)).toEqual([owner.email]);
+
+    // The retained row survives (the tombstone contract) but carries no address.
+    const after = (await sql`SELECT email FROM users WHERE id = ${owner.userId}`) as unknown as Array<{ email: string }>;
+    expect(after.length).toBe(1);
+    expect(after[0].email).toBe(erasedAccountEmail(owner.userId));
+    expect(erasedAccountEmail(owner.userId)).toBe(`deleted-${owner.userId}@deleted.invalid`);
+
+    // The person's own address is FREE again — nothing in `users` matches it, so a
+    // later sign-in on ANY path provisions a fresh account instead of the corpse.
+    expect(await count("users", "email", owner.email)).toBe(0);
+
+    // …and the tombstone still revokes the erased tenant's sessions.
+    expect(await count("tenants", "id", owner.tenantId)).toBe(1);
+    expect(await tenantActive(sql, owner.tenantId)).toBe(false);
+  });
+
+  // ── (f) The release is confined to the erased owner ───────────────────────────
+  it("leaves every other user's address byte-identical", async () => {
+    const a = await freshOwner();
+    const b = await freshOwner();
+    const email = new InMemoryEmailSender();
+    const handler = createAccountHandler({ sql, sessionSecret: SESSION_SECRET, emailSender: email });
+
+    expect((await handler(req("DELETE", "/account", { cookie: a.cookie }))).status).toBe(200);
+
+    const bRow = (await sql`SELECT email FROM users WHERE id = ${b.userId}`) as unknown as Array<{ email: string }>;
+    expect(bRow[0].email).toBe(b.email);
+    expect(await tenantActive(sql, b.tenantId)).toBe(true);
   });
 });
