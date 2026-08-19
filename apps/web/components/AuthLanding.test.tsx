@@ -123,6 +123,10 @@ describe("AuthLanding — ?error= copy from the Google callback (#209)", () => {
     ["SAMO-AUTH-008", "Google couldn't sign you in right now."],
     ["SAMO-AUTH-009", "Your Google account's email isn't verified."],
     ["SAMO-AUTH-010", "Google sign-in isn't available here."],
+    // #219: Google's token endpoint answered 5xx, or identity provisioning
+    // failed. Our fault and retryable — it must NOT tell the user their link
+    // was bad, and it must stay in the `role="alert"` branch.
+    ["SAMO-AUTH-500", "Something went wrong on our end — please try again."],
   ];
 
   for (const [code, copy] of cases) {

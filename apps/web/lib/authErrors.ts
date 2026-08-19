@@ -7,38 +7,86 @@
  * `?error=<CODE>` to `/auth` and the sign-in page renders the same string.
  * Codes are stable and safe to switch on.
  *
- * Pure, DOM-free — typechecked by the repo-wide `tsc --noEmit`.
+ * ONE union, derived — not a second copy of the list (#219). This map used to
+ * declare its own `AuthErrorCode` union alongside the app-api's in
+ * `apps/app-api/auth/types.ts`, with no link between them. Nothing failed
+ * when they drifted: `tsc --noEmit` stayed green while `/auth/google/callback`
+ * redirected to `?error=SAMO-AUTH-500`, a code this map had no row for, so a
+ * retryable failure that was entirely OUR fault told the user their *link* was
+ * bad and to request a new one — when they had clicked "Continue with Google"
+ * and never used a link at all.
+ *
+ * So the union is now DERIVED from the app-api's declaration, minus an explicit
+ * {@link SERVER_INTERNAL_AUTH_ERROR_CODES} list. `AUTH_ERROR_MESSAGES` is a
+ * `Record` over that derived union, which makes the invariant a BUILD error:
+ * add a code in `apps/app-api/auth/types.ts` and `tsc --noEmit` fails here until
+ * it has copy (or is explicitly declared server-internal). `authErrors.test.ts`
+ * pins the same invariant at test time against `AUTH_ERRORS`, the app-api's own
+ * §5.16 table, including that the strings are byte-identical on both sides.
+ *
+ * Pure, DOM-free — typechecked by the repo-wide `tsc --noEmit`. The import below
+ * is `import type`, so it is erased at build time and no app-api code, and no
+ * server dependency of any kind, reaches the browser bundle.
  */
-export const AUTH_ERROR_CODES = [
-  "SAMO-AUTH-001",
-  "SAMO-AUTH-002",
-  "SAMO-AUTH-003",
-  "SAMO-AUTH-004",
-  // Google sign-in (issue #209 / SPEC.amendments S5-1). These never arrive in a
-  // JSON body: the Google callback is a browser redirect, so it hands the code
-  // back as `/auth?error=<CODE>` and the sign-in page renders it from this same
-  // map. `SAMO-AUTH-005` is deliberately NOT here — it is a server-side
-  // session-outlived-its-tenant 401 that clears the cookie, never a `?error=`.
-  "SAMO-AUTH-006",
-  "SAMO-AUTH-007",
-  "SAMO-AUTH-008",
-  "SAMO-AUTH-009",
-  "SAMO-AUTH-010",
-] as const;
+import type { AuthErrorCode as AppApiAuthErrorCode } from "../../app-api/auth/types.ts";
 
-export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
+/**
+ * Codes the app-api NEVER hands the browser as a renderable code, and which
+ * therefore need no copy row here. The invariant is not "the two unions are
+ * equal" — it is "every code that can reach the browser has copy".
+ *
+ * `SAMO-AUTH-005` is the only one: a stateless session cookie that outlived its
+ * tenant (#114, §5.14) is answered with a 401 + clear-cookie, after which the
+ * web simply redirects to sign-in. The code rides no `?error=` and no rendered
+ * envelope, so mapping it would be inventing a screen that cannot happen.
+ *
+ * Adding to this list is how you say "this code is server-internal". It is
+ * asserted literally in `authErrors.test.ts`, so it cannot be quietly grown to
+ * silence a missing-copy failure.
+ */
+export const SERVER_INTERNAL_AUTH_ERROR_CODES = ["SAMO-AUTH-005"] as const;
 
+type ServerInternalAuthErrorCode = (typeof SERVER_INTERNAL_AUTH_ERROR_CODES)[number];
+
+/** Every §5.16 code that can reach the browser — the app-api union, minus the above. */
+export type AuthErrorCode = Exclude<AppApiAuthErrorCode, ServerInternalAuthErrorCode>;
+
+/**
+ * The copy, keyed by the derived union — so this object IS the exhaustiveness
+ * check. A new app-api code with no row here is a compile error, not a user
+ * staring at the wrong sentence.
+ *
+ * Strings are byte-identical to `AUTH_ERRORS[code].message` in
+ * `apps/app-api/auth/errors.ts` and asserted verbatim on both sides: they are a
+ * contract, not decoration.
+ */
 const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
   "SAMO-AUTH-001": "This sign-in link isn't valid.",
   "SAMO-AUTH-002": "This sign-in link has expired.",
   "SAMO-AUTH-003": "This link was already used.",
   "SAMO-AUTH-004": "Too many sign-in attempts — try again shortly.",
+  // Google sign-in (issue #209 / SPEC.amendments S5-1). These never arrive in a
+  // JSON body: the Google callback is a browser redirect, so it hands the code
+  // back as `/auth?error=<CODE>` and the sign-in page renders it from this same
+  // map.
   "SAMO-AUTH-006": "Sign-in cancelled. Choose a way to sign in below.",
   "SAMO-AUTH-007": "That sign-in attempt expired — please try again.",
   "SAMO-AUTH-008": "Google couldn't sign you in right now.",
   "SAMO-AUTH-009": "Your Google account's email isn't verified.",
   "SAMO-AUTH-010": "Google sign-in isn't available here.",
+  // Our fault, and retryable: Google's token endpoint answered 5xx, or identity
+  // provisioning failed after a valid sign-in (#180, #219). Delivered BOTH as a
+  // 500 + JSON body on the magic-link leg and as `?error=SAMO-AUTH-500` on the
+  // Google leg — on the latter the status is 302 whatever happened, so this row
+  // is the only thing that keeps the message honest.
+  "SAMO-AUTH-500": "Something went wrong on our end — please try again.",
 };
+
+/**
+ * The mapped codes, derived from the copy map so the list and the map cannot
+ * disagree. (They used to be written out twice.)
+ */
+export const AUTH_ERROR_CODES = Object.keys(AUTH_ERROR_MESSAGES) as readonly AuthErrorCode[];
 
 /**
  * Codes that report a normal outcome rather than a failure. §5.16 (S5-1) marks

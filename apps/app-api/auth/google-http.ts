@@ -49,8 +49,13 @@ export const AUTH_ERROR_REDIRECT_PATH = "/auth";
  * still travels, in the query string, and the sign-in page renders it.
  *
  * The `code` argument is typed {@link AuthErrorCode} — the union `AUTH_ERRORS` is
- * keyed by — so an invented code cannot reach the redirect and the web's
- * code→copy map always has a row for whatever arrives.
+ * keyed by — so an invented code cannot reach the redirect. That type alone does
+ * NOT guarantee the web can render what arrives: `apps/web/lib/authErrors.ts`
+ * declared its own union, and `SAMO-AUTH-500` reached this redirect for a
+ * release with no copy row on the other side (#219). The web's union is now
+ * DERIVED from {@link AuthErrorCode} minus an explicit server-internal list, so
+ * a code added here without copy is a compile error in `apps/web` — but the
+ * guarantee lives in that derivation, not in this signature.
  */
 function errorRedirect(code: AuthErrorCode, extraCookies: string[] = []): Response {
   const headers = new Headers({
