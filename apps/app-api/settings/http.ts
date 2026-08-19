@@ -2,10 +2,24 @@
  * HTTP adapter for the `/settings` surface (SPEC §5.12).
  *
  * `GET /settings` returns the caller's per-tenant settings (the §5.12 defaults
- * when none are saved yet) plus the option catalog the UI renders its selects
- * from. `PUT /settings` validates + upserts a full settings document. Both routes
- * are OWNER-ONLY (magic-link session cookie) and RLS-scoped to the caller's
- * tenant via the store's `SET LOCAL ROLE samograph_app` transactions (§5.10).
+ * when none are saved yet), the option catalog the UI renders its selects from,
+ * and the read-only `signin` block (S5-1 item 8, #223). `PUT /settings` validates
+ * + upserts a full settings document. Both routes are OWNER-ONLY (magic-link
+ * session cookie) and RLS-scoped to the caller's tenant via the store's `SET
+ * LOCAL ROLE samograph_app` transactions (§5.10).
+ *
+ * TWO CONNECTIONS, ON PURPOSE. The settings document is tenant data and is read
+ * and written under RLS. The `signin` block reads `users`/`user_identities`,
+ * which are PRE-TENANT: ungranted to `samograph_app` and carrying no RLS, so the
+ * same statements issued inside the RLS transaction would `42501`. It therefore
+ * runs on the privileged connection, scoped by `user_id` from the verified
+ * session claims — the identical split the §5.14 erasure already makes, and the
+ * one `tenantExists` below has always made. See `settings/signin.ts`.
+ *
+ * `signin` rides on `GET /settings` rather than a sibling endpoint because it has
+ * exactly the same auth posture, the same caller, and the same lifetime as the
+ * page: a second endpoint would be a second thing to get the 401 path right on,
+ * and a second round-trip for one page load.
  */
 import type { SQL } from "bun";
 import { verifySession, SESSION_COOKIE_NAME } from "../auth/session.ts";
@@ -15,6 +29,7 @@ import {
   toWire,
 } from "../../../packages/shared/settings/index.ts";
 import { readTenantSettings, writeTenantSettings } from "./store.ts";
+import { readSignIn } from "./signin.ts";
 
 /** §5.16-style code for a rejected settings document. */
 export const SETTINGS_INVALID_CODE = "SAMO-SETTINGS-INVALID" as const;
@@ -70,8 +85,10 @@ export function createSettingsHandler(
 
     if (req.method === "GET") {
       const settings = await readTenantSettings(sql, claims.tenantId);
+      // Privileged, NOT tenant-scoped — see the module header and signin.ts.
+      const signin = await readSignIn(sql, claims.userId);
       return Response.json(
-        { settings: toWire(settings), options: settingsOptions() },
+        { settings: toWire(settings), options: settingsOptions(), signin },
         { status: 200 },
       );
     }
