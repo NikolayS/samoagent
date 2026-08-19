@@ -1216,6 +1216,14 @@ commit message would be exactly the silent re-introduction §1 forbids.
   10-minute window. A dedicated secret was rejected in part because
   `.samohost.toml`'s `secrets` array is a per-env **generator** — see the runbook.
 
+**Status: ABSORBED** — every edit the Action block below asks for has landed in
+`SPEC.md` (issue **#225**, PR **#231**): §1 non-goals + §2, §5.1, the §5.11 funnel
+rename and `method` label, the §9 re-baselining sentence, the §5.12 "Sign-in" row,
+`user_identities` in the §5.14 erasure list, and the §5.16 rows `005`, `006`–`010`
+and `500`. The gating precondition ("once the implementing PR pins their log
+statuses and copy") was discharged by **#218** (`334cac8`). The Action text is kept
+verbatim below as the record of what was owed — it is no longer a to-do.
+
 **Action:** fold the §5.16 rows above into the SPEC's table (including the two
 `005`/`500` drift rows) once the implementing PR pins their log statuses and copy;
 rename stage 2 in the §5.11 funnel list and add the `method` label; add the §9
