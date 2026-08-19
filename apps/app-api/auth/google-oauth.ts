@@ -78,15 +78,23 @@ export const GOOGLE_TOKEN_RESPONSE_MAX_BYTES = 16 * 1024;
  * Google credentials and keep working on magic link.
  *
  * Checked only against a DERIVED redirect URI, and it fails at BOOT rather than
- * at every user's click. `apps/app-api/server.ts` defaults its base URL to
- * `https://samograph.dev` while real prod is `samograph.samo.team`; if both
- * `BASE_URL` and `WEB_ORIGIN` were ever missing there, that default would sail
- * through and every sign-in would die at Google with `redirect_uri_mismatch` and
- * nothing in our logs. An operator who genuinely needs another host sets
- * `GOOGLE_OAUTH_REDIRECT_URI`, which skips this list (they have asserted the
- * host) but still gets the shape check below.
+ * at every user's click. An operator who genuinely needs a host that is not on
+ * this list sets `GOOGLE_OAUTH_REDIRECT_URI`, which skips the list (they have
+ * asserted the host) but still gets the shape check below.
+ *
+ * NOTE on `https://samograph.dev`: it is here because it is a real registered
+ * host, but it is ALSO the hard-coded last-resort default in
+ * `apps/app-api/server.ts` — `resolveMagicLinkBaseUrl(env, "https://samograph.dev")`.
+ * So this list no longer catches an environment that loses both `BASE_URL` and
+ * `WEB_ORIGIN`: such an environment silently falls back to `samograph.dev`,
+ * sails through here, and — if the credentials it holds belong to a client
+ * registered for a DIFFERENT host — dies at Google with `redirect_uri_mismatch`
+ * on every user's click, with nothing in our logs. The guard against that is
+ * per-env config, not this list: every environment must set its own
+ * `BASE_URL`/`WEB_ORIGIN`, or pin `GOOGLE_OAUTH_REDIRECT_URI` outright.
  */
 export const GOOGLE_REGISTERED_REDIRECT_ORIGINS = [
+  "https://samograph.dev",
   "https://samograph.samo.team",
   "https://samograph-main.samo.cat",
   "http://localhost:3000",
