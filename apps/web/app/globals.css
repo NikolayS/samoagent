@@ -903,6 +903,44 @@ button:hover {
 }
 
 /* =============================================================================
+ * Account identity — "Signed in as <email>" (#238)
+ *
+ * Deliberately quiet: it answers "whose dashboard is this?" for anyone who asks,
+ * without competing with the page's actual work. Muted + small, and on the
+ * dashboard it sits at the far end of the header from "Log out".
+ *
+ * `[data-loading]` is the pre-answer state (the address arrives on its own
+ * request). It keeps its box — same font-size, a non-breaking space inside — so
+ * the header does not resize when the address lands; `visibility: hidden` rather
+ * than `display: none` for the same reason.
+ * ========================================================================== */
+
+.samograph-app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.samograph-account-email {
+  color: var(--muted);
+  font-size: 0.9rem;
+  /* An address is data, not prose — never let it be re-flowed or re-wrapped
+     mid-token into something that reads as a different address. */
+  overflow-wrap: anywhere;
+}
+
+.samograph-account-email[data-loading] {
+  visibility: hidden;
+}
+
+.samograph-settings > .samograph-account-email {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+/* =============================================================================
  * Presence pills — forward-looking hook for a per-participant / bot presence
  * indicator. Not yet mounted in apps/web (the bot-camera presence page is
  * `src/presence.ts`, out of scope for #178); tokenized here so it lands styled.
