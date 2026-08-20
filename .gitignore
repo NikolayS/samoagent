@@ -21,3 +21,6 @@ demo/*.gif
 
 # Local dev stack runtime (scripts/dev-local.sh) — logs + pids, never committed
 .dev-local/
+
+# samospec local scratch state (spec rounds, reviews, config) — never committed
+.samo/
