@@ -1315,3 +1315,33 @@ below as the record of what was owed — it is no longer a to-do.
 erasure list with "the owner's `users.email` is released to
 `deleted-<user id>@deleted.invalid`" alongside S5-1 item 9's `user_identities`
 entry, and record that a previously-erased address may be used to sign up again.
+
+---
+
+### S5-3. §1 / §5.12 / §5.14 / §5.16 — incremental Google Calendar connection and upcoming-meetings cache — *Extension*
+
+**Amends:** §1 (calendar non-goal), §5.12 (Calendar), §5.14 (account erasure), and §5.16 (stable errors). Issue **#240**.
+
+**What differs:** The remaining calendar non-goal is partially reversed. A signed-in owner may connect Google Calendar from Settings and see a cached list of upcoming meetings in the app. This is a separate, incremental OAuth grant: Google sign-in remains exactly `openid email`, requests no Calendar access, stores no Google sign-in token, and remains usable without Calendar. The Calendar flow requests `https://www.googleapis.com/auth/calendar.events.readonly` only when the owner presses “Connect Google Calendar” in Settings, with PKCE, `access_type=offline`, `include_granted_scopes=true`, and `prompt=consent`.
+
+The Calendar refresh token is encrypted at rest with AES-256-GCM under a versioned environment key. A Calendar connection belongs to the consenting `user_id` and is held in a privileged, non-RLS credential table; normalized cached events belong to the tenant and are protected by forced tenant RLS. The cache stores only the event identity, title, organizer address, time range, the current user’s response status, recurrence identity, and a validated Google Meet or Zoom URL. Raw descriptions, locations, attendee lists, access tokens, and Google API payloads are not retained.
+
+A background poller refreshes access tokens in memory and reconciles the next 30 days of the primary calendar into the cache. A revoked or scope-deficient grant is marked broken and surfaced as “Google Calendar needs to be reconnected”; it is not retried until reconnection. Disconnect deletes the local connection and event cache and makes a best-effort call to Google’s token-revocation endpoint.
+
+§5.14 account erasure additionally purges `calendar_events` and the owner’s privileged `calendar_connections` row, including the encrypted refresh token and all connection metadata. Erasure makes a best-effort Google token-revocation request before deleting the local credential; Google unavailability never prevents local erasure.
+
+This amendment does **not** ship calendar auto-join. §5.12’s organizer/internal/external/declined and per-event opt-out rules remain deferred to a follow-up issue. The cached event model and the manual `POST /calls` application-service seam must permit that follow-up to schedule an event without bypassing URL validation, Recall cost controls, tenant settings resolution, audit logging, or enqueue behavior.
+
+The stable Calendar errors added to §5.16 are:
+
+| Code | HTTP / delivery | Meaning | User-facing copy |
+|---|---:|---|---|
+| `SAMO-CALENDAR-001` | 503 JSON | Calendar OAuth is unavailable on this deployment | “Google Calendar isn’t available here.” |
+| `SAMO-CALENDAR-002` | 302 query | Calendar consent was cancelled or denied | “Google Calendar wasn’t connected.” |
+| `SAMO-CALENDAR-003` | 302 query | Calendar OAuth state is invalid, expired, mismatched, or belongs to another session | “That Google Calendar connection expired. Please try again.” |
+| `SAMO-CALENDAR-004` | 302 query | Calendar code exchange failed or supplied no refresh token | “Google Calendar couldn’t be connected. Please try again.” |
+| `SAMO-CALENDAR-005` | 409 JSON/status | The stored Calendar grant is revoked, broken, or missing its required scope | “Google Calendar needs to be reconnected.” |
+| `SAMO-CALENDAR-006` | 502 JSON | Calendar synchronization failed and no usable cache is available | “Upcoming meetings couldn’t be refreshed. Please try again.” |
+| `SAMO-CALENDAR-500` | 500 JSON or 302 query | Unexpected internal Calendar failure | “Something went wrong connecting Google Calendar.” |
+
+**Why:** Upcoming meetings are useful before auto-join is enabled and provide a smaller, reviewable first slice of the §5.12 Calendar feature. Keeping consent incremental preserves the S5-1 security and verification boundary around ordinary sign-in; choosing the narrower event-only scope and minimizing the cache reduces retained personal data. Auto-join remains separate because it introduces independent scheduling, cost, eligibility, idempotency, and per-event-control requirements.
