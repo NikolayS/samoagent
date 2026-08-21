@@ -11,10 +11,16 @@
 -- in a transaction, so future provider expansion must not require
 -- `ALTER TYPE ... ADD VALUE`.
 
+-- Calendar connections belong to the consenting tenant owner. The composite
+-- key lets the connection FK enforce that user_id owns tenant_id, rather than
+-- merely checking that each value exists independently.
+ALTER TABLE tenants
+  ADD CONSTRAINT tenants_id_owner_user_id_key UNIQUE (id, owner_user_id);
+
 CREATE TABLE calendar_connections (
   id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                 uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  tenant_id               uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id               uuid NOT NULL,
   provider                text NOT NULL DEFAULT 'google'
                           CHECK (provider IN ('google')),
   provider_account_id     text,
@@ -30,12 +36,23 @@ CREATE TABLE calendar_connections (
   broken_reason           text
                           CHECK (
                             (status = 'connected' AND broken_reason IS NULL)
-                            OR status = 'broken'
+                            OR (
+                              status = 'broken'
+                              AND broken_reason IS NOT NULL
+                              AND broken_reason IN (
+                                'invalid_grant',
+                                'revoked',
+                                'scope_missing',
+                                'refresh_failed'
+                              )
+                            )
                           ),
   connected_at            timestamptz NOT NULL DEFAULT now(),
   updated_at              timestamptz NOT NULL DEFAULT now(),
   last_sync_at            timestamptz,
   last_sync_error_at      timestamptz,
+  FOREIGN KEY (tenant_id, user_id)
+    REFERENCES tenants (id, owner_user_id) ON DELETE CASCADE,
   UNIQUE (user_id, provider),
   UNIQUE (id, tenant_id)
 );
