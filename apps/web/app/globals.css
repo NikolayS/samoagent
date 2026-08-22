@@ -940,6 +940,41 @@ button:hover {
   margin-bottom: 1rem;
 }
 
+.samograph-calendar-card,
+.samograph-upcoming-meetings {
+  margin-block: 1.5rem;
+}
+
+.samograph-meeting-list {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0;
+  list-style: none;
+}
+
+.samograph-meeting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 1rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.samograph-meeting-title {
+  font-weight: 650;
+}
+
+.samograph-meeting-item > span:not(.samograph-meeting-title) {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.samograph-meeting-item[data-declined="true"] {
+  opacity: 0.65;
+}
+
 /* =============================================================================
  * Presence pills — forward-looking hook for a per-participant / bot presence
  * indicator. Not yet mounted in apps/web (the bot-camera presence page is

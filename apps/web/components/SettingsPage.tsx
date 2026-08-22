@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AccountEmail } from "./AccountEmail.tsx";
+import { CalendarConnectionCard } from "./CalendarConnectionCard.tsx";
 import {
   AppApiError,
   type AppApiClient,
@@ -48,11 +49,16 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
   // `true` renders the google row, so the row can never flash into existence on
   // an environment that has no Google (S5-1 item 8's omit branch).
   const [googleAvailable, setGoogleAvailable] = useState<boolean | null>(null);
+  const [calendarAvailable, setCalendarAvailable] = useState(false);
 
   const presetId = useId();
   const keytermsId = useId();
   const languageId = useId();
   const chimeId = useId();
+  const calendarAuthFailure = useCallback(() => {
+    setPhase("redirecting");
+    redirect("/auth");
+  }, [redirect]);
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +97,7 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
       .authProviders()
       .then((providers) => {
         if (active) setGoogleAvailable(providers.google === true);
+        if (active) setCalendarAvailable(providers.googleCalendar === true);
       })
       .catch(() => {
         if (active) setGoogleAvailable(false);
@@ -212,6 +219,7 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
       {/* OUTSIDE the form on purpose — it has no inputs and must never be
           submitted or saved (S5-1 item 8). */}
       {signin ? <SignInBlock signin={signin} googleAvailable={googleAvailable === true} /> : null}
+      {calendarAvailable ? <CalendarConnectionCard client={client} onAuthFailure={calendarAuthFailure} /> : null}
     </section>
   );
 }

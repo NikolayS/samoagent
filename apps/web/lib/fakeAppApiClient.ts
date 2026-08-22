@@ -11,6 +11,9 @@ import {
   type AppApiClient,
   type AuthProviders,
   type Call,
+  type CalendarMeeting,
+  type CalendarMeetingsSnapshot,
+  type CalendarStatus,
   type CreateCallInput,
   type HostedSettings,
   type LinkedSignInMethod,
@@ -80,6 +83,14 @@ export interface FakeAppApiClientOptions {
    * give, so a test must opt IN to the button existing.
    */
   googleEnabled?: boolean;
+  googleCalendarEnabled?: boolean;
+  seedCalendarStatus?: CalendarStatus;
+  seedCalendarMeetings?: CalendarMeetingsSnapshot;
+  calendarAuthorizationUrl?: string;
+  failGetCalendarStatusWith?: FailSpec & { status?: number };
+  failStartCalendarConnectWith?: FailSpec & { status?: number };
+  failDisconnectCalendarWith?: FailSpec & { status?: number };
+  failListCalendarMeetingsWith?: FailSpec & { status?: number };
   /** Seed `listCalls` with pre-existing tenant calls (e.g. to test reload). */
   seedCalls?: Call[];
   /** DEV-link returned by `lastDevMagicLink` (simulates the `__dev` endpoint). */
@@ -140,11 +151,15 @@ export class FakeAppApiClient implements AppApiClient {
   private readonly calls: Call[] = [];
   private readonly options: FakeAppApiClientOptions;
   private settings: HostedSettings;
+  private calendarStatus: CalendarStatus;
+  private calendarMeetings: CalendarMeeting[];
 
   constructor(options: FakeAppApiClientOptions = {}) {
     this.options = options;
     if (options.seedCalls) this.calls.push(...options.seedCalls);
     this.settings = { ...(options.seedSettings ?? DEFAULT_FAKE_SETTINGS) };
+    this.calendarStatus = options.seedCalendarStatus ?? { provider: "google", state: "not_connected", connectedAt: null, lastSyncAt: null, lastSyncErrorAt: null };
+    this.calendarMeetings = (options.seedCalendarMeetings?.meetings ?? []).map((m) => ({ ...m }));
   }
 
   async requestMagicLink(input: RequestMagicLinkInput): Promise<void> {
@@ -159,7 +174,37 @@ export class FakeAppApiClient implements AppApiClient {
     this.requests.push({ path: "/auth/providers", method: "GET", body: {} });
     // Mirrors the real client's contract exactly: this never rejects, so the
     // fake grows no `failAuthProvidersWith` — a "failed probe" IS `{google:false}`.
-    return { google: this.options.googleEnabled === true };
+    return { google: this.options.googleEnabled === true, ...(this.options.googleCalendarEnabled === true ? { googleCalendar: true } : {}) };
+  }
+
+  async getCalendarStatus(): Promise<CalendarStatus> {
+    this.requests.push({ path: "/calendar/status", method: "GET", body: {} });
+    this.fail(this.options.failGetCalendarStatusWith);
+    return { ...this.calendarStatus };
+  }
+
+  async startCalendarConnect(): Promise<{ authorizationUrl: string }> {
+    this.requests.push({ path: "/calendar/connect/start", method: "POST", body: {} });
+    this.fail(this.options.failStartCalendarConnectWith);
+    return { authorizationUrl: this.options.calendarAuthorizationUrl ?? "https://accounts.google.test/calendar" };
+  }
+
+  async disconnectCalendar(): Promise<void> {
+    this.requests.push({ path: "/calendar/connection", method: "DELETE", body: {} });
+    this.fail(this.options.failDisconnectCalendarWith);
+    this.calendarStatus = { provider: "google", state: "not_connected", connectedAt: null, lastSyncAt: null, lastSyncErrorAt: null };
+    this.calendarMeetings = [];
+  }
+
+  async listCalendarMeetings(limit?: number): Promise<CalendarMeetingsSnapshot> {
+    this.requests.push({ path: limit === undefined ? "/calendar/meetings" : `/calendar/meetings?limit=${limit}`, method: "GET", body: {} });
+    this.fail(this.options.failListCalendarMeetingsWith);
+    const seeded = this.options.seedCalendarMeetings;
+    return { connectionState: seeded?.connectionState ?? this.calendarStatus.state, meetings: limit === undefined ? this.calendarMeetings.map((m) => ({ ...m })) : this.calendarMeetings.slice(0, limit).map((m) => ({ ...m })), lastSyncAt: seeded?.lastSyncAt ?? this.calendarStatus.lastSyncAt, ...(seeded?.errorCode ? { errorCode: seeded.errorCode } : {}) };
+  }
+
+  private fail(spec?: FailSpec & { status?: number }): void {
+    if (spec) throw new AppApiError(spec.code, spec.message, spec.retryable ?? false, spec.status);
   }
 
   async verifyMagicLink(token: string): Promise<void> {

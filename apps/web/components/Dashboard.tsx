@@ -5,6 +5,7 @@ import { AccountEmail } from "./AccountEmail.tsx";
 import { AddToCallForm } from "./AddToCallForm.tsx";
 import { LogoutButton } from "./LogoutButton.tsx";
 import { AccountDangerZone } from "./AccountDangerZone.tsx";
+import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { AppApiError, type AppApiClient, type Call } from "../lib/appApiClient.ts";
 import { statusView, type StatusView } from "../lib/callStatusView.ts";
 
@@ -110,6 +111,10 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
   // `null` = not known yet (or never answered). The header renders regardless —
   // see AccountEmail for why the unknown state still occupies its line.
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const calendarAuthFailure = useCallback(() => {
+    setStatus("redirecting");
+    redirect("/auth");
+  }, [redirect]);
 
   const load = useCallback(async () => {
     try {
@@ -182,6 +187,7 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
         <LogoutButton client={client} redirect={redirect} />
       </header>
       <AddToCallForm client={client} initialUrl={initialUrl} onCreated={() => void load()} />
+      <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} />
       {calls.length === 0 ? (
         <section aria-label="Your calls" className="samograph-empty-state">
           <h2>Your calls</h2>
