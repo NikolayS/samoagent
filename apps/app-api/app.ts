@@ -46,6 +46,7 @@ import type { GoogleCalendarOAuthPort } from "./calendar/google-calendar-oauth.t
 import { CalendarService } from "./calendar/service.ts";
 import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
 import { createCalendarHandler } from "./calendar/http.ts";
+import { CalendarSyncService } from "./calendar/sync.ts";
 
 /** LOCAL-ONLY affordances injected by the dev wrapper (never in prod). */
 export interface DevShortcuts {
@@ -180,11 +181,14 @@ export function createAppApi(config: AppApiConfig): AppApi {
   // Unconfigured deployments still expose status/disconnect as fail-closed
   // routes; this unreachable placeholder is never used to encrypt a token.
   const calendarKeys = config.calendarTokenEncryption ?? { activeKey: Buffer.alloc(32), activeKeyVersion: 1, decryptionKeys: new Map([[1, Buffer.alloc(32)]]) };
+  const calendarStore = new PostgresCalendarConnectionStore(config.sql);
+  const calendarSync = config.googleCalendarOAuth?.apiClient ? new CalendarSyncService({ store: calendarStore, client: config.googleCalendarOAuth.apiClient, decryptionKeys: calendarKeys.decryptionKeys, clock }) : undefined;
   const calendarService = new CalendarService({
     provider: config.googleCalendarOAuth,
-    store: new PostgresCalendarConnectionStore(config.sql),
+    store: calendarStore,
     rateLimiter: new InMemoryRateLimiter(), sessionSecret: config.sessionSecret, clock,
     ...calendarKeys,
+    immediateSync: calendarSync ? (connectionId) => calendarSync.sync(connectionId) : undefined,
   });
   const calendarHandler = createCalendarHandler(calendarService, config.sessionSecret, clock);
   const googleHandler = createGoogleAuthHandler(

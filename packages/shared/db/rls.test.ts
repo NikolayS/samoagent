@@ -26,6 +26,7 @@ const d = HAVE_DB ? describe : describe.skip;
 // `audit_log`.
 const TENANT_SCOPED = [
   "audit_log",
+  "calendar_events",
   "calls",
   "deleted_calls",
   "settings",

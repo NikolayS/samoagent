@@ -13,7 +13,8 @@
     "apps/bot-orchestrator",
     "packages/shared",
     "packages/test-fakes/recall",
-    "packages/test-fakes/google-oauth"
+    "packages/test-fakes/google-oauth",
+    "packages/test-fakes/google-calendar"
   ],
   "bin": {
     "samograph": "dist/cli.js"
