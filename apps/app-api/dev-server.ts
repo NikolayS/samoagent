@@ -56,8 +56,7 @@ import {
 } from "../bot-orchestrator/statusPoller.ts";
 import { PgListenNotifyPublisher } from "../../packages/shared/transcript/publisher.ts";
 import { MetricsRegistry } from "../../packages/shared/observe/index.ts";
-import { googleCalendarOAuthFromEnv } from "./calendar/google-calendar-oauth.ts";
-import { calendarTokenEncryptionFromEnv } from "./calendar/encryption-config.ts";
+import { resolveCalendarConfig } from "./calendar/resolve-config.ts";
 import { startCalendarSyncPoller } from "./calendar/poller.ts";
 import { CalendarSyncService } from "./calendar/sync.ts";
 import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
@@ -187,10 +186,10 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
   // Secure cookies on http://localhost, and stripping it would make the browser
   // DISCARD the cookie outright (see `devCookieFix`).
   const GOOGLE_OAUTH = googleOAuthFromEnv(env, WEB_ORIGIN);
-  const GOOGLE_CALENDAR_OAUTH = googleCalendarOAuthFromEnv(env, WEB_ORIGIN);
-  const CALENDAR_TOKEN_ENCRYPTION = GOOGLE_CALENDAR_OAUTH
-    ? calendarTokenEncryptionFromEnv(env)
-    : undefined;
+  const {
+    googleCalendarOAuth: GOOGLE_CALENDAR_OAUTH,
+    calendarTokenEncryption: CALENDAR_TOKEN_ENCRYPTION,
+  } = resolveCalendarConfig(env, WEB_ORIGIN);
   const calendarPoller = GOOGLE_CALENDAR_OAUTH && CALENDAR_TOKEN_ENCRYPTION && GOOGLE_CALENDAR_OAUTH.apiClient
     ? startCalendarSyncPoller({
         sql,

@@ -179,14 +179,20 @@ development, and not the owner's own end-to-end test.
 | `GOOGLE_OAUTH_CLIENT_SECRET` | same as above | No — absent ⇒ OFF. Setting **exactly one** of the pair **throws at boot**, naming the missing var and echoing no value | Authenticates the server-to-server token exchange. **See the trap below.** |
 | `GOOGLE_OAUTH_REDIRECT_URI` | optional override, per env | No — unless this env sets neither `BASE_URL` nor `WEB_ORIGIN` and holds a Google credential, in which case **one of the three must be set or the server refuses to boot** (#209) | **The escape hatch for any host not in the four-origin allowlist above.** Setting it **skips the allowlist entirely** — the operator has asserted the host — but the value still gets the full **shape check**: https (or http for `localhost` only), no embedded credentials, no query, no fragment, path exactly `/auth/google/callback`, and already-canonical (an explicit `:443`, an uppercase host or a `..` segment is rejected at boot, because it could not byte-match what Google has registered). When it is unset, the redirect URI is derived as `<web origin>/auth/google/callback` and the origin must be one of the four. |
 | `GOOGLE_CALENDAR_REDIRECT_URI` | optional override, per env | No | Calendar equivalent of `GOOGLE_OAUTH_REDIRECT_URI`; path must be exactly `/calendar/connect/callback`. Otherwise derived from the configured web origin and checked against the same registered-origin allowlist. |
-| `CALENDAR_TOKEN_ENCRYPTION_KEY_VERSION` | app-api secret env | Yes when Google Calendar is enabled | Positive integer version used for newly encrypted refresh tokens. |
-| `CALENDAR_TOKEN_ENCRYPTION_KEY` | app-api secret env | Yes when Google Calendar is enabled | Base64 encoding of exactly 32 random bytes; the active AES-256-GCM key. |
-| `CALENDAR_TOKEN_DECRYPTION_KEYS` | app-api secret env | Yes when Google Calendar is enabled | JSON map of key versions to base64 keys, including the active version, e.g. `{"1":"<base64>"}`. Keep old versions during rotation. |
+| `CALENDAR_TOKEN_ENCRYPTION_KEY_VERSION` | app-api secret env | Yes when Google Calendar is enabled | Together with the other two `CALENDAR_TOKEN_*` vars, explicitly opts the deployment into Calendar. Positive integer version used for newly encrypted refresh tokens. |
+| `CALENDAR_TOKEN_ENCRYPTION_KEY` | app-api secret env | Yes when Google Calendar is enabled | Together with the other two `CALENDAR_TOKEN_*` vars, explicitly opts the deployment into Calendar. Base64 encoding of exactly 32 random bytes; the active AES-256-GCM key. |
+| `CALENDAR_TOKEN_DECRYPTION_KEYS` | app-api secret env | Yes when Google Calendar is enabled | Together with the other two `CALENDAR_TOKEN_*` vars, explicitly opts the deployment into Calendar. JSON map of key versions to base64 keys, including the active version, e.g. `{"1":"<base64>"}`. Keep old versions during rotation. |
 | `APP_API_ORIGIN` | already required, per env (`apps/web/next.config.mjs`) | **Yes** (pre-existing) | Proxies `/auth/google/start`, `/auth/google/callback` and `/auth/providers` from the web origin to app-api. The whole `rewrites()` key disappears when it is unset — this already-known trap now takes Google sign-in down with it. **Verify it per env on every deploy.** |
 
 Both Google vars are read in `googleOAuthFromEnv()` from inside the server
 entrypoint, never at module top level — so a repo with no Google config stays
 importable under `bun test`.
+
+Google Calendar is separately and explicitly opted in only when all three
+`CALENDAR_TOKEN_*` variables above are present alongside the Google sign-in
+credentials. If all three are absent, Calendar is disabled and Google sign-in
+continues normally. A partial or malformed Calendar configuration refuses to
+boot with the existing token-encryption configuration error.
 
 > **Note on the derived redirect URI — set `WEB_ORIGIN`/`BASE_URL` per env.**
 > `apps/app-api/server.ts` resolves the web origin via

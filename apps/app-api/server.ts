@@ -65,8 +65,7 @@ import {
 import { PgListenNotifyPublisher } from "../../packages/shared/transcript/publisher.ts";
 import { MetricsRegistry } from "../../packages/shared/observe/index.ts";
 import { createCachedFunnelSource } from "./metrics/funnelSource.ts";
-import { googleCalendarOAuthFromEnv } from "./calendar/google-calendar-oauth.ts";
-import { calendarTokenEncryptionFromEnv } from "./calendar/encryption-config.ts";
+import { resolveCalendarConfig } from "./calendar/resolve-config.ts";
 import { startCalendarSyncPoller } from "./calendar/poller.ts";
 import { CalendarSyncService } from "./calendar/sync.ts";
 import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
@@ -208,10 +207,7 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   // redirect URI cannot be derived, rather than letting every user's click die
   // at Google with `redirect_uri_mismatch`. See docs/runbooks/google-oauth.md.
   const googleOAuth = googleOAuthFromEnv(env, webOrigin);
-  const googleCalendarOAuth = googleCalendarOAuthFromEnv(env, webOrigin);
-  const calendarTokenEncryption = googleCalendarOAuth
-    ? calendarTokenEncryptionFromEnv(env)
-    : undefined;
+  const { googleCalendarOAuth, calendarTokenEncryption } = resolveCalendarConfig(env, webOrigin);
   const calendarPoller = googleCalendarOAuth && calendarTokenEncryption && googleCalendarOAuth.apiClient
     ? startCalendarSyncPoller({
         sql,
