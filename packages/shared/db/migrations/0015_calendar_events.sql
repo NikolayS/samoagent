@@ -19,6 +19,7 @@ CREATE TABLE calendar_events (
   meeting_url text,
   meeting_provider text CHECK (meeting_provider IS NULL OR meeting_provider IN ('google_meet','zoom')),
   source_updated_at timestamptz,
+  sync_id uuid NOT NULL DEFAULT gen_random_uuid(),
   synced_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -27,7 +28,7 @@ CREATE TABLE calendar_events (
   CHECK (ends_at >= starts_at)
 );
 CREATE INDEX calendar_events_upcoming_idx ON calendar_events (tenant_id, starts_at, id);
-CREATE INDEX calendar_events_connection_sync_idx ON calendar_events (connection_id, synced_at);
+CREATE INDEX calendar_events_connection_sync_idx ON calendar_events (connection_id, sync_id);
 ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calendar_events FORCE ROW LEVEL SECURITY;
 CREATE POLICY calendar_events_tenant_isolation ON calendar_events FOR ALL TO samograph_app

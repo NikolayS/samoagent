@@ -33,6 +33,34 @@ describe("CalendarSyncService", () => {
     ]);
   });
 
+  it("normalizes all-day midnight in the event or calendar time zone", async () => {
+    const x = fixture();
+    x.fake.seedEvents([{ id: "day", start: { date: "2026-08-23" }, end: { date: "2026-08-24" } }]);
+    x.fake.setCalendarTimeZone("America/Los_Angeles");
+    await x.service.sync(base.id);
+    expect(x.reconciles[0]?.[0]).toMatchObject({
+      startsAt: new Date("2026-08-23T07:00:00.000Z"),
+      endsAt: new Date("2026-08-24T07:00:00.000Z"),
+      allDay: true,
+    });
+  });
+
+  it("checks every video entry point and rejects fallback credentials/fragments", async () => {
+    const x = fixture();
+    x.fake.seedEvents([
+      { id: "conference", start: { dateTime: "2026-08-22T10:00:00Z" }, end: { dateTime: "2026-08-22T11:00:00Z" }, conferenceData: { entryPoints: [
+        { entryPointType: "video", uri: "https://example.test/nope" },
+        { entryPointType: "video", uri: "https://zoom.us/j/222" },
+      ] }, hangoutLink: "https://meet.google.com/abc-defg-hij" },
+      { id: "strict", start: { dateTime: "2026-08-22T12:00:00Z" }, end: { dateTime: "2026-08-22T13:00:00Z" }, location: "https://user@meet.google.com/abc-defg-hij", description: "https://meet.google.com/abc-defg-hij#fragment" },
+    ]);
+    await x.service.sync(base.id);
+    expect(x.reconciles[0]?.map((event: any) => [event.providerEventId, event.meetingUrl])).toEqual([
+      ["conference", "https://zoom.us/j/222"],
+      ["strict", null],
+    ]);
+  });
+
   it("preserves cache on partial failure and marks invalid_grant broken once", async () => {
     const transient = fixture(); transient.fake.seedEvents([
       { id: "one", status: "confirmed", start: { dateTime: "2026-08-22T10:00:00Z" }, end: { dateTime: "2026-08-22T11:00:00Z" } },

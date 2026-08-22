@@ -18,24 +18,34 @@ function tokens(value: unknown): string[] {
 }
 function meeting(raw: unknown): Pick<NormalizedCalendarEvent, "meetingUrl" | "meetingProvider"> | null {
   for (const token of typeof raw === "string" ? [raw, ...tokens(raw)] : []) {
+    let parsed: URL; try { parsed = new URL(token); } catch { continue; }
+    if (parsed.username || parsed.password || parsed.hash) continue;
     const result = validateMeetingUrl(token); if (result.ok) return { meetingUrl: result.url, meetingProvider: result.provider === "meet" ? "google_meet" : "zoom" };
   }
   return null;
 }
-export function normalizeGoogleEvent(raw: GoogleCalendarEvent): NormalizedCalendarEvent | null {
+function zonedMidnight(value: unknown, timeZone: unknown): Date | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || typeof timeZone !== "string") return null;
+  const [year, month, day] = value.split("-").map(Number); let instant = Date.UTC(year, month - 1, day);
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+    for (let i = 0; i < 3; i++) { const parts = Object.fromEntries(formatter.formatToParts(new Date(instant)).map((p) => [p.type, p.value])); const represented = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second)); instant += Date.UTC(year, month - 1, day) - represented; }
+    return new Date(instant);
+  } catch { return null; }
+}
+export function normalizeGoogleEvent(raw: GoogleCalendarEvent, calendarTimeZone: string | null = null): NormalizedCalendarEvent | null {
   if (raw.status === "cancelled" || typeof raw.id !== "string" || !raw.id) return null;
   const start = raw.start as Record<string, unknown> | undefined, end = raw.end as Record<string, unknown> | undefined;
   const allDay = typeof start?.date === "string";
-  const startsAt = date(allDay ? `${start?.date}T00:00:00.000Z` : start?.dateTime);
-  const endsAt = date(allDay ? `${end?.date}T00:00:00.000Z` : end?.dateTime);
+  const startsAt = allDay ? zonedMidnight(start?.date, start?.timeZone ?? calendarTimeZone) : date(start?.dateTime);
+  const endsAt = allDay ? zonedMidnight(end?.date, end?.timeZone ?? calendarTimeZone) : date(end?.dateTime);
   if (!startsAt || !endsAt || endsAt < startsAt) return null;
   const attendees = Array.isArray(raw.attendees) ? raw.attendees : [];
   const self = attendees.find((item) => item && typeof item === "object" && (item as Record<string, unknown>).self === true) as Record<string, unknown> | undefined;
   const attendeeResponse = typeof self?.responseStatus === "string" && responses.has(self.responseStatus) ? self.responseStatus as NormalizedCalendarEvent["attendeeResponse"] : null;
   const conference = raw.conferenceData as Record<string, unknown> | undefined;
   const points = Array.isArray(conference?.entryPoints) ? conference.entryPoints : [];
-  const video = points.find((item) => item && typeof item === "object" && (item as Record<string, unknown>).entryPointType === "video") as Record<string, unknown> | undefined;
-  const selected = meeting(video?.uri) ?? meeting(raw.hangoutLink) ?? meeting(raw.location) ?? meeting(raw.description) ?? { meetingUrl: null, meetingProvider: null };
+  const selected = points.filter((item) => item && typeof item === "object" && (item as Record<string, unknown>).entryPointType === "video").map((item) => meeting((item as Record<string, unknown>).uri)).find(Boolean) ?? meeting(raw.hangoutLink) ?? meeting(raw.location) ?? meeting(raw.description) ?? { meetingUrl: null, meetingProvider: null };
   return { providerEventId: raw.id, recurringEventId: typeof raw.recurringEventId === "string" ? raw.recurringEventId : null, title: typeof raw.summary === "string" ? raw.summary : "", organizerEmail: typeof (raw.organizer as Record<string, unknown> | undefined)?.email === "string" ? (raw.organizer as Record<string, string>).email : null, startsAt, endsAt, allDay, attendeeResponse, ...selected, sourceUpdatedAt: date(raw.updated) };
 }
 export class CalendarSyncService {
@@ -51,7 +61,7 @@ export class CalendarSyncService {
       let access: string;
       try { access = await this.deps.client.refreshAccessToken(refresh); }
       catch (error) { if (error instanceof GoogleCalendarFailure && ["invalid_grant", "rate_limited", "transient"].includes(error.kind)) throw error; throw new GoogleCalendarFailure("refresh_failed"); }
-      let raw: GoogleCalendarEvent[];
+      let raw: Awaited<ReturnType<GoogleCalendarClient["listEvents"]>>;
       try { raw = await this.deps.client.listEvents(access, syncStartedAt, windowEnd); }
       catch (error) {
         if (!(error instanceof GoogleCalendarFailure) || (error.kind !== "unauthorized" && error.kind !== "forbidden")) throw error;
@@ -64,7 +74,7 @@ export class CalendarSyncService {
           throw second;
         }
       }
-      await this.deps.store.reconcile(connection, raw.map(normalizeGoogleEvent).filter((event): event is NormalizedCalendarEvent => event !== null), { windowStart: syncStartedAt, windowEnd, syncStartedAt });
+      await this.deps.store.reconcile(connection, raw.events.map((event) => normalizeGoogleEvent(event, raw.timeZone)).filter((event): event is NormalizedCalendarEvent => event !== null), { windowStart: syncStartedAt, windowEnd, syncStartedAt });
     } catch (error) {
       const failure = error instanceof GoogleCalendarFailure ? error : new GoogleCalendarFailure("transient");
       const brokenReason: BrokenReason | null = failure.kind === "invalid_grant" ? "invalid_grant" : failure.kind === "forbidden" ? "scope_missing" : failure.kind === "unauthorized" ? "revoked" : failure.kind === "refresh_failed" ? "refresh_failed" : null;

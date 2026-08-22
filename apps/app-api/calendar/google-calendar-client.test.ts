@@ -9,11 +9,11 @@ describe("GoogleCalendarClient", () => {
     const client = new GoogleCalendarClient({ clientId: "client-id", clientSecret: "client-secret", fetchImpl: fake.fetchImpl });
     const access = await client.refreshAccessToken("refresh-secret");
     const result = await client.listEvents(access, new Date("2026-08-21T00:00:00.000Z"), new Date("2026-09-20T00:00:00.000Z"));
-    expect(result.map((event) => event.id)).toEqual(["event-0", "event-1", "event-2"]);
+    expect(result.events.map((event) => event.id)).toEqual(["event-0", "event-1", "event-2"]);
     expect(fake.refreshRequests).toEqual([{ grant_type: "refresh_token", refresh_token: "refresh-secret", client_id: "client-id", client_secret: "client-secret" }]);
     expect(fake.listRequests.map((r) => r.query)).toEqual([
-      { timeMin: "2026-08-21T00:00:00.000Z", timeMax: "2026-09-20T00:00:00.000Z", singleEvents: "true", orderBy: "startTime", showDeleted: "false", maxResults: "2500", fields: "nextPageToken,items(id,status,summary,organizer(email),attendees(self,responseStatus),start(date,dateTime),end(date,dateTime),updated,recurringEventId,hangoutLink,conferenceData(entryPoints(entryPointType,uri)),location,description)" },
-      { timeMin: "2026-08-21T00:00:00.000Z", timeMax: "2026-09-20T00:00:00.000Z", singleEvents: "true", orderBy: "startTime", showDeleted: "false", maxResults: "2500", fields: "nextPageToken,items(id,status,summary,organizer(email),attendees(self,responseStatus),start(date,dateTime),end(date,dateTime),updated,recurringEventId,hangoutLink,conferenceData(entryPoints(entryPointType,uri)),location,description)", pageToken: "page-2" },
+      { timeMin: "2026-08-21T00:00:00.000Z", timeMax: "2026-09-20T00:00:00.000Z", singleEvents: "true", orderBy: "startTime", showDeleted: "false", maxResults: "2500", fields: "nextPageToken,timeZone,items(id,status,summary,organizer(email),attendees(self,responseStatus),start(date,dateTime,timeZone),end(date,dateTime,timeZone),updated,recurringEventId,hangoutLink,conferenceData(entryPoints(entryPointType,uri)),location,description)" },
+      { timeMin: "2026-08-21T00:00:00.000Z", timeMax: "2026-09-20T00:00:00.000Z", singleEvents: "true", orderBy: "startTime", showDeleted: "false", maxResults: "2500", fields: "nextPageToken,timeZone,items(id,status,summary,organizer(email),attendees(self,responseStatus),start(date,dateTime,timeZone),end(date,dateTime,timeZone),updated,recurringEventId,hangoutLink,conferenceData(entryPoints(entryPointType,uri)),location,description)", pageToken: "page-2" },
     ]);
   });
 
@@ -21,11 +21,31 @@ describe("GoogleCalendarClient", () => {
     const fake = new FakeGoogleCalendar();
     fake.failNextList({ status: 429, retryAfter: "17", body: "secret google payload" });
     const client = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: fake.fetchImpl });
-    try { await client.listEvents("access", new Date(0), new Date(1)); throw new Error("expected failure"); }
+    try { await client.listEvents("access-token", new Date(0), new Date(1)); throw new Error("expected failure"); }
     catch (error) {
       expect(error).toBeInstanceOf(GoogleCalendarFailure);
       expect(error).toMatchObject({ kind: "rate_limited", retryAfterMs: 17_000 });
       expect(String(error)).not.toContain("secret google payload");
     }
+  });
+
+  it("classifies retryable HTTP status before parsing any response body", async () => {
+    for (const [status, body, kind] of [[429, "<html>busy</html>", "rate_limited"], [503, "", "transient"]] as const) {
+      const client = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => new Response(body, { status })) as unknown as typeof fetch });
+      await expect(client.listEvents("access", new Date(0), new Date(1))).rejects.toMatchObject({ kind });
+    }
+  });
+
+  it("treats malformed 2xx payloads as transient and accepts realistic large pages", async () => {
+    const malformed = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => new Response("{")) as unknown as typeof fetch });
+    await expect(malformed.listEvents("access", new Date(0), new Date(1))).rejects.toMatchObject({ kind: "transient" });
+    const items = Array.from({ length: 400 }, (_, i) => ({ id: `event-${i}`, summary: "x".repeat(300), start: { dateTime: "2026-08-22T10:00:00Z" }, end: { dateTime: "2026-08-22T11:00:00Z" } }));
+    const large = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => Response.json({ items, timeZone: "UTC" })) as unknown as typeof fetch });
+    expect((await large.listEvents("access", new Date(0), new Date(1))).events).toHaveLength(400);
+  });
+
+  it("clamps Retry-After to one hour", async () => {
+    const client = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => new Response("", { status: 429, headers: { "retry-after": "999999" } })) as unknown as typeof fetch });
+    await expect(client.listEvents("access", new Date(0), new Date(1))).rejects.toMatchObject({ kind: "rate_limited", retryAfterMs: 3_600_000 });
   });
 });

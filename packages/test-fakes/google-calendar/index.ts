@@ -13,15 +13,20 @@ export class FakeGoogleCalendar {
   #pageFailures = new Map<string, Failure>();
   #expired = new Set<string>();
   #revoked = new Set<string>();
+  #timeZone = "UTC";
 
   seedEvents(events: FakeCalendarEvent[], pageSize = 2500): void { this.#events = structuredClone(events); this.#pageSize = pageSize; }
+  setCalendarTimeZone(timeZone: string): void { this.#timeZone = timeZone; }
   failNextList(failure: Failure): void { this.#nextFailure = failure; }
   failListPage(token: string, failure: Failure): void { this.#pageFailures.set(token, failure); }
   expireAccessToken(token: string): void { this.#expired.add(token); }
   revokeGrant(token: string): void { this.#revoked.add(token); }
 
-  #failure(value: Failure): Promise<Response> | Response {
-    if (value.timeout) return new Promise(() => {});
+  #failure(value: Failure, signal?: AbortSignal | null): Promise<Response> | Response {
+    if (value.timeout) return new Promise((_resolve, reject) => {
+      const abort = () => reject(new DOMException("The operation was aborted", "AbortError"));
+      if (signal?.aborted) abort(); else signal?.addEventListener("abort", abort, { once: true });
+    });
     const headers = value.retryAfter ? { "retry-after": value.retryAfter } : undefined;
     const body = value.oversized ? "x".repeat(70_000) : value.malformed ? "{" : value.body ?? JSON.stringify({ error: "fake" });
     return new Response(body, { status: value.status ?? 500, headers });
@@ -40,17 +45,25 @@ export class FakeGoogleCalendar {
     const query = Object.fromEntries(url.searchParams);
     const token = init?.headers instanceof Headers ? init.headers.get("authorization") : new Headers(init?.headers).get("authorization");
     this.listRequests.push({ token, query });
+    if ((init?.method ?? "GET").toUpperCase() !== "GET") return new Response("method not allowed", { status: 405 });
+    if (token !== "Bearer access-token") return new Response("unauthorized", { status: 401 });
+    const timeMin = Date.parse(query.timeMin ?? ""), timeMax = Date.parse(query.timeMax ?? ""), maxResults = Number(query.maxResults);
+    if (!Number.isFinite(timeMin) || !Number.isFinite(timeMax) || timeMax <= timeMin || query.singleEvents !== "true" || query.orderBy !== "startTime" || query.showDeleted !== "false" || !Number.isInteger(maxResults) || maxResults < 1 || maxResults > 2500 || query.fields !== GOOGLE_CALENDAR_FIELDS) return new Response("bad query", { status: 400 });
     const pageToken = query.pageToken;
     const failure = (pageToken && this.#pageFailures.get(pageToken)) || this.#nextFailure;
     if (pageToken) this.#pageFailures.delete(pageToken); else this.#nextFailure = undefined;
-    if (failure) return this.#failure(failure);
+    if (failure) return this.#failure(failure, init?.signal);
     const access = token?.replace(/^Bearer /, "") ?? "";
     if (this.#expired.delete(access)) return Response.json({ error: { status: "UNAUTHENTICATED" } }, { status: 401 });
     if (this.#revoked.has(access)) return Response.json({ error: { status: "PERMISSION_DENIED" } }, { status: 403 });
-    if (query.fields !== GOOGLE_CALENDAR_FIELDS) return new Response("bad fields", { status: 400 });
+    const windowEvents = this.#events.filter((event) => {
+      const start = event.start as Record<string, unknown> | undefined; const value = start?.dateTime ?? start?.date;
+      if (typeof value !== "string") return false; const instant = Date.parse(typeof start?.date === "string" ? `${value}T00:00:00Z` : value);
+      return Number.isFinite(instant) && instant >= timeMin && instant < timeMax;
+    });
     const offset = pageToken ? (Number(pageToken.replace("page-", "")) - 1) * this.#pageSize : 0;
-    const items = this.#events.slice(offset, offset + this.#pageSize);
-    const next = offset + this.#pageSize < this.#events.length ? `page-${offset / this.#pageSize + 2}` : undefined;
-    return Response.json({ items, ...(next ? { nextPageToken: next } : {}) });
+    const items = windowEvents.slice(offset, offset + this.#pageSize);
+    const next = offset + this.#pageSize < windowEvents.length ? `page-${offset / this.#pageSize + 2}` : undefined;
+    return Response.json({ items, timeZone: this.#timeZone, ...(next ? { nextPageToken: next } : {}) });
   }) as typeof fetch;
 }
