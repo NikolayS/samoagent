@@ -6,6 +6,7 @@ const TIMEOUT_MS = 10_000;
 const MAX_BODY = 8 * 1024 * 1024;
 const MAX_ERROR_BODY = 64 * 1024;
 const MAX_EVENTS = 10_000;
+const DEFINITIVE_PERMISSION_REASONS = new Set(["insufficientpermissions", "accessnotconfigured", "forbidden", "autherror", "domainpolicy"]);
 export type GoogleCalendarFailureKind = "invalid_grant" | "unauthorized" | "forbidden" | "refresh_failed" | "rate_limited" | "transient" | "malformed" | "oversized";
 export class GoogleCalendarFailure extends Error {
   constructor(readonly kind: GoogleCalendarFailureKind, readonly retryAfterMs?: number) { super(`Google Calendar request failed: ${kind}`); this.name = "GoogleCalendarFailure"; }
@@ -54,7 +55,7 @@ async function statusFailure(res: Response): Promise<GoogleCalendarFailure | nul
     const limited = normalized.some((reason) => reason.includes("quota") || reason.endsWith("limitexceeded")) || status === "RESOURCE_EXHAUSTED";
     if (limited) return new GoogleCalendarFailure("transient", retryAfter(res.headers.get("retry-after")));
     if (res.status === 401) return new GoogleCalendarFailure("unauthorized");
-    if (res.status === 403 && normalized.some((reason) => ["insufficientpermissions", "accessnotconfigured", "forbidden", "autherror"].includes(reason))) return new GoogleCalendarFailure("forbidden");
+    if (res.status === 403 && normalized.some((reason) => DEFINITIVE_PERMISSION_REASONS.has(reason))) return new GoogleCalendarFailure("forbidden");
     // Unknown 403s stay retryable: retrying is safer than permanently breaking a healthy grant.
     return new GoogleCalendarFailure(res.status === 403 ? "transient" : "unauthorized", retryAfter(res.headers.get("retry-after")));
   }

@@ -148,6 +148,17 @@ describe("CalendarSyncService", () => {
     expect(x.state).toEqual({ status: "broken", brokenReason: "scope_missing", lastSyncErrorAt: now });
   });
 
+  it("marks domainPolicy after refresh as scope_missing", async () => {
+    const x = stateFixture();
+    x.fake.forbidAccessToken("access-token", "DoMaInPoLiCy");
+
+    expect(await failureValue(x.service.sync(base.id))).toEqual({ kind: "forbidden" });
+
+    expect(x.fake.listRequests).toHaveLength(2);
+    expect(x.state.status).toBe("broken");
+    expect(x.state.brokenReason).toBe("scope_missing");
+  });
+
   it("treats a malformed 403 body as transient", async () => {
     const x = stateFixture();
     x.fake.failNextList({ status: 403, malformed: true });
