@@ -32,6 +32,8 @@ import {
 import type { EmailSender } from "../auth/email.ts";
 import type { CallRecordingControl } from "../../bot-orchestrator/recallClient.ts";
 import { eraseCallRecording, purgeCallRows } from "../calls/erase.ts";
+import { decryptSecret } from "../../../packages/shared/crypto.ts";
+import type { GoogleCalendarOAuthPort } from "../calendar/google-calendar-oauth.ts";
 
 /**
  * The address a §5.14-erased account's RETAINED `users` row is left holding
@@ -75,6 +77,10 @@ export interface AccountHandlerDeps {
    * side effects are skipped (real wiring: `getCallRecordingControl`).
    */
   recall?: CallRecordingControl;
+  /** Calendar grant revocation is best effort; local privileged deletion is mandatory. */
+  calendarOAuth?: GoogleCalendarOAuthPort;
+  /** Versioned keys used to decrypt any retained Calendar refresh token. */
+  calendarTokenDecryptionKeys?: Map<number, Buffer>;
   /** Epoch-ms clock; defaults to the wall clock. */
   now?: () => number;
 }
@@ -130,6 +136,38 @@ export function createAccountHandler(
       WHERE t.id = ${tenantId}`) as unknown as Array<{ id: string; email: string }>;
     const ownerEmail = ownerRows.length ? ownerRows[0].email : null;
     const ownerUserId = ownerRows.length ? ownerRows[0].id : null;
+
+    // Load and decrypt credentials on the privileged connection before their
+    // local rows are removed. Revocation is an external best-effort side effect;
+    // no provider response or credential value is logged or allowed to block
+    // the privacy boundary below.
+    const calendarRows = ownerUserId === null ? [] : (await sql`
+      SELECT id, user_id, tenant_id, encrypted_refresh_token, refresh_token_iv,
+             refresh_token_tag, encryption_key_version
+      FROM calendar_connections
+      WHERE user_id = ${ownerUserId}`) as unknown as Array<{
+        id: string; user_id: string; tenant_id: string;
+        encrypted_refresh_token: Buffer; refresh_token_iv: Buffer;
+        refresh_token_tag: Buffer; encryption_key_version: number;
+      }>;
+    for (const row of calendarRows) {
+      let result: "ok" | "failed" | "skipped" = "skipped";
+      try {
+        const key = deps.calendarTokenDecryptionKeys?.get(row.encryption_key_version);
+        if (deps.calendarOAuth && key) {
+          const token = decryptSecret({
+            ciphertext: row.encrypted_refresh_token,
+            iv: row.refresh_token_iv,
+            tag: row.refresh_token_tag,
+            keyVersion: row.encryption_key_version,
+          }, key, `samo.calendar.refresh.v1|${row.id}|${row.user_id}|${row.tenant_id}`);
+          result = await deps.calendarOAuth.revoke(token) ? "ok" : "failed";
+        }
+      } catch {
+        result = "failed";
+      }
+      console.info(`[calendar/account-erasure] revocation=${result}`);
+    }
 
     // 1) Gather every call in the tenant (id + bot + status), RLS-scoped.
     const calls = (await sql.begin(async (tx) => {
@@ -194,6 +232,9 @@ export function createAccountHandler(
     await sql.begin(async (tx) => {
       await tx`
         DELETE FROM user_identities
+        WHERE user_id IN (SELECT owner_user_id FROM tenants WHERE id = ${tenantId})`;
+      await tx`
+        DELETE FROM calendar_connections
         WHERE user_id IN (SELECT owner_user_id FROM tenants WHERE id = ${tenantId})`;
       if (ownerUserId !== null) {
         await tx`

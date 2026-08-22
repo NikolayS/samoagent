@@ -70,6 +70,7 @@ function errorRedirect(code: AuthErrorCode, extraCookies: string[] = []): Respon
 /** Build the Request→Response handler for the three Google sign-in routes. */
 export function createGoogleAuthHandler(
   service: GoogleAuthService,
+  googleCalendarConfigured?: boolean,
 ): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
@@ -82,7 +83,9 @@ export function createGoogleAuthHandler(
     // working one).
     if (req.method === "GET" && url.pathname === "/auth/providers") {
       return Response.json(
-        { google: service.configured },
+        googleCalendarConfigured === undefined
+          ? { google: service.configured }
+          : { google: service.configured, google_calendar: googleCalendarConfigured },
         { status: 200, headers: { "cache-control": "no-store" } },
       );
     }

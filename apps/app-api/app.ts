@@ -42,6 +42,10 @@ import type { CallRecordingControl } from "../bot-orchestrator/recallClient.ts";
 import { metricsHttpHandler } from "../../packages/shared/observe/metrics-http.ts";
 import type { MetricsRegistry } from "../../packages/shared/observe/registry.ts";
 import type { FunnelSnapshot } from "../../packages/shared/observe/funnel.ts";
+import type { GoogleCalendarOAuthPort } from "./calendar/google-calendar-oauth.ts";
+import { CalendarService } from "./calendar/service.ts";
+import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
+import { createCalendarHandler } from "./calendar/http.ts";
 
 /** LOCAL-ONLY affordances injected by the dev wrapper (never in prod). */
 export interface DevShortcuts {
@@ -80,6 +84,8 @@ export interface AppApiConfig {
    * stays enabled everywhere Google is enabled.
    */
   googleOAuth?: OAuthProvider;
+  googleCalendarOAuth?: GoogleCalendarOAuthPort;
+  calendarTokenEncryption?: { activeKey: Buffer; activeKeyVersion: number; decryptionKeys: Map<number, Buffer> };
   /** The bot-orchestrator seam: enqueue a join job for a new call (§5.2). */
   enqueue: (job: OrchestratorJob) => void | Promise<void>;
   /**
@@ -150,6 +156,8 @@ export function createAppApi(config: AppApiConfig): AppApi {
     sessionSecret: config.sessionSecret,
     emailSender: config.emailSender,
     recall: config.recall,
+    calendarOAuth: config.googleCalendarOAuth,
+    calendarTokenDecryptionKeys: config.calendarTokenEncryption?.decryptionKeys,
     now: clock,
   });
 
@@ -166,6 +174,19 @@ export function createAppApi(config: AppApiConfig): AppApi {
   // SAMO-AUTH-010 stub, rather than 404-ing and looking like a broken deploy.
   // `user_identities` is privileged and un-RLS'd (migration 0011), so it rides
   // the same privileged connection the user store does.
+  if (config.googleCalendarOAuth && !config.calendarTokenEncryption) {
+    throw new Error("Calendar OAuth requires token-encryption configuration");
+  }
+  // Unconfigured deployments still expose status/disconnect as fail-closed
+  // routes; this unreachable placeholder is never used to encrypt a token.
+  const calendarKeys = config.calendarTokenEncryption ?? { activeKey: Buffer.alloc(32), activeKeyVersion: 1, decryptionKeys: new Map([[1, Buffer.alloc(32)]]) };
+  const calendarService = new CalendarService({
+    provider: config.googleCalendarOAuth,
+    store: new PostgresCalendarConnectionStore(config.sql),
+    rateLimiter: new InMemoryRateLimiter(), sessionSecret: config.sessionSecret, clock,
+    ...calendarKeys,
+  });
+  const calendarHandler = createCalendarHandler(calendarService, config.sessionSecret, clock);
   const googleHandler = createGoogleAuthHandler(
     new GoogleAuthService({
       provider: config.googleOAuth,
@@ -182,7 +203,7 @@ export function createAppApi(config: AppApiConfig): AppApi {
       // auth_google_start_total / auth_google_callback_total{result} /
       // auth_identity_linked_total are scrapeable from the composed app.
       metrics: config.registry,
-    }),
+    }), calendarService.configured,
   );
 
   const dev = config.devShortcuts;
@@ -209,6 +230,8 @@ export function createAppApi(config: AppApiConfig): AppApi {
         res = await authHandler(req);
       } else if (path === "/auth/providers" || path.startsWith("/auth/google/")) {
         res = await googleHandler(req);
+      } else if (path.startsWith("/calendar/")) {
+        res = await calendarHandler(req);
       } else if (path === "/calls" || path.startsWith("/calls/")) {
         res = await callsHandler(req);
       } else if (path === "/account") {

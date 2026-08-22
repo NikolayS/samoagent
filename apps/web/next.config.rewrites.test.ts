@@ -126,3 +126,27 @@ describe("next.config.mjs — Google sign-in dev-proxy rewrites (#209)", () => {
     });
   });
 });
+
+describe("next.config.mjs — Calendar OAuth rewrites (#240)", () => {
+  it("gates fetch routes and leaves the document callback ungated", () => {
+    expect(ruleFor("/calendar/connect/start")).toEqual({
+      source: "/calendar/connect/start", has: SEC_FETCH_DEST_EMPTY,
+      destination: `${ORIGIN}/calendar/connect/start`,
+    });
+    expect(ruleFor("/calendar/status")).toEqual({
+      source: "/calendar/status", has: SEC_FETCH_DEST_EMPTY,
+      destination: `${ORIGIN}/calendar/status`,
+    });
+    expect(ruleFor("/calendar/connection")).toEqual({
+      source: "/calendar/connection", has: SEC_FETCH_DEST_EMPTY,
+      destination: `${ORIGIN}/calendar/connection`,
+    });
+    expect(ruleFor("/calendar/connect/callback")).toEqual({
+      source: "/calendar/connect/callback",
+      destination: `${ORIGIN}/calendar/connect/callback`,
+    });
+    expect(Object.keys(ruleFor("/calendar/connect/callback") ?? {}).sort()).toEqual([
+      "destination", "source",
+    ]);
+  });
+});

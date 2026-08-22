@@ -26,6 +26,9 @@ import { InMemoryEmailSender } from "../auth/email.ts";
 import { createAccountHandler, erasedAccountEmail } from "./http.ts";
 import { createCallsHandler } from "../calls/http.ts";
 import { tenantActive } from "../auth/owner-session.ts";
+import { encryptSecret } from "../../../packages/shared/crypto.ts";
+import { FakeGoogleIdp } from "../../../packages/test-fakes/google-oauth/index.ts";
+import { GoogleCalendarOAuth, GOOGLE_CALENDAR_SCOPE } from "../calendar/google-calendar-oauth.ts";
 
 const HAVE_DB = !!process.env.DATABASE_URL;
 const d = HAVE_DB ? describe : describe.skip;
@@ -117,6 +120,21 @@ d("DELETE /account — full account GDPR erasure (§5.14, RLS-enforced §5.10)",
     return rows[0].c;
   }
 
+  const calendarKey = Buffer.alloc(32, 9);
+  async function seedCalendarConnection(userId: string, tenantId: string, refreshToken: string): Promise<void> {
+    const id = randomUUID();
+    const encrypted = encryptSecret(refreshToken, calendarKey, 1, `samo.calendar.refresh.v1|${id}|${userId}|${tenantId}`);
+    await sql`INSERT INTO calendar_connections (id, user_id, tenant_id, provider, encrypted_refresh_token, refresh_token_iv, refresh_token_tag, encryption_key_version, granted_scopes)
+      VALUES (${id}, ${userId}, ${tenantId}, 'google', ${encrypted.ciphertext}, ${encrypted.iv}, ${encrypted.tag}, ${encrypted.keyVersion}, ARRAY[${GOOGLE_CALENDAR_SCOPE}])`;
+  }
+
+  function calendarErasureDeps(idp?: FakeGoogleIdp) {
+    return {
+      calendarOAuth: idp ? new GoogleCalendarOAuth({ clientId: idp.clientId, clientSecret: "secret", redirectUri: "http://localhost:3000/calendar/connect/callback", fetchImpl: idp.fetchImpl }) : undefined,
+      calendarTokenDecryptionKeys: new Map([[1, calendarKey]]),
+    };
+  }
+
   beforeAll(async () => {
     sql = connect();
     await migrate(sql);
@@ -127,6 +145,37 @@ d("DELETE /account — full account GDPR erasure (§5.14, RLS-enforced §5.10)",
       await sql`DELETE FROM users WHERE id = ${userId}`;
     }
     await sql.close();
+  });
+
+  it("revokes the owner's Calendar token and deletes the connection during erasure", async () => {
+    const owner = await freshOwner();
+    const idp = new FakeGoogleIdp();
+    const refreshToken = "account-erasure-refresh-token";
+    await seedCalendarConnection(owner.userId, owner.tenantId, refreshToken);
+    const deps = { sql, sessionSecret: SESSION_SECRET, emailSender: new InMemoryEmailSender(), ...calendarErasureDeps(idp) };
+    const res = await createAccountHandler(deps)(req("DELETE", "/account", { cookie: owner.cookie }));
+    expect(res.status).toBe(200);
+    expect(await count("calendar_connections", "user_id", owner.userId)).toBe(0);
+    expect(idp.revokedTokens).toEqual([refreshToken]);
+  });
+
+  it("still erases the Calendar connection when Google revocation returns 500", async () => {
+    const owner = await freshOwner();
+    const idp = new FakeGoogleIdp({ revocationStatus: 500 });
+    await seedCalendarConnection(owner.userId, owner.tenantId, "failed-revocation-refresh-token");
+    const deps = { sql, sessionSecret: SESSION_SECRET, emailSender: new InMemoryEmailSender(), ...calendarErasureDeps(idp) };
+    const res = await createAccountHandler(deps)(req("DELETE", "/account", { cookie: owner.cookie }));
+    expect(res.status).toBe(200);
+    expect(await count("calendar_connections", "user_id", owner.userId)).toBe(0);
+  });
+
+  it("erases an orphaned Calendar connection when Calendar OAuth is unconfigured", async () => {
+    const owner = await freshOwner();
+    await seedCalendarConnection(owner.userId, owner.tenantId, "unconfigured-refresh-token");
+    const deps = { sql, sessionSecret: SESSION_SECRET, emailSender: new InMemoryEmailSender(), ...calendarErasureDeps() };
+    const res = await createAccountHandler(deps)(req("DELETE", "/account", { cookie: owner.cookie }));
+    expect(res.status).toBe(200);
+    expect(await count("calendar_connections", "user_id", owner.userId)).toBe(0);
   });
 
   // ── (a) Owner erases the account → ALL data purged + Recall-delete per call +

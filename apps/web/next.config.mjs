@@ -62,6 +62,25 @@ const nextConfig = {
                 source: "/auth/google/callback",
                 destination: `${apiOrigin}/auth/google/callback`,
               },
+              {
+                source: "/calendar/connect/start",
+                has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
+                destination: `${apiOrigin}/calendar/connect/start`,
+              },
+              {
+                source: "/calendar/connect/callback",
+                destination: `${apiOrigin}/calendar/connect/callback`,
+              },
+              {
+                source: "/calendar/status",
+                has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
+                destination: `${apiOrigin}/calendar/status`,
+              },
+              {
+                source: "/calendar/connection",
+                has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
+                destination: `${apiOrigin}/calendar/connection`,
+              },
               { source: "/calls", destination: `${apiOrigin}/calls` },
               {
                 // ShareModal's mint/get/revoke fetches (§5.7, Story 2). Client

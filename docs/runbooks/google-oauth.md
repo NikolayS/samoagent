@@ -9,8 +9,8 @@ mode — the button *renders* and every sign-in dies at Google's token endpoint.
 **SPEC provenance:** amendment **S5-1** in
 [`SPEC.amendments.md`](../../blueprints/samograph-dev/SPEC.amendments.md) —
 Google sign-in deliberately reverses the §1 v1 non-goal "no Google OAuth"
-(post-v1, with owner sign-off). Issue **#209**. The calendar non-goal is **not**
-reversed: scopes are `openid email` only, forever, on this client.
+(post-v1, with owner sign-off). Issue **#209**. Calendar access is a separate,
+incremental grant under amendment S5-3; ordinary sign-in remains `openid email`.
 
 > **Nothing here is required for the app to run.** With no Google credentials set,
 > `bun test` and `bunx tsc --noEmit` are green, the app boots, `GET /auth/providers`
@@ -40,6 +40,14 @@ them, and do not add a trailing slash:
 | `samograph.samo.team` | `https://samograph.samo.team/auth/google/callback` |
 | `samograph-main` preview | `https://samograph-main.samo.cat/auth/google/callback` |
 | local dev | `http://localhost:3000/auth/google/callback` |
+
+Register a second URI for Calendar on every enabled host by replacing the path
+above with `/calendar/connect/callback` (for example,
+`https://samograph.dev/calendar/connect/callback` and
+`http://localhost:3000/calendar/connect/callback`). Both paths must be registered
+on the same OAuth client. Calendar requests only
+`https://www.googleapis.com/auth/calendar.events.readonly` and requires Google
+sensitive-scope verification before production launch.
 
 Those four origins are exactly the compiled-in allowlist
 `GOOGLE_REGISTERED_REDIRECT_ORIGINS` in
@@ -170,6 +178,10 @@ development, and not the owner's own end-to-end test.
 | `GOOGLE_OAUTH_CLIENT_ID` | prod `.env` (prod client); `samograph-main` env + local dev (non-prod client). **Never** a branch preview. | No — absent ⇒ Google sign-in is simply OFF | Sent on `/authorize` and at the token exchange, and **pinned as the required `aud`** (and `azp` when present) during ID-token verification. |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | same as above | No — absent ⇒ OFF. Setting **exactly one** of the pair **throws at boot**, naming the missing var and echoing no value | Authenticates the server-to-server token exchange. **See the trap below.** |
 | `GOOGLE_OAUTH_REDIRECT_URI` | optional override, per env | No — unless this env sets neither `BASE_URL` nor `WEB_ORIGIN` and holds a Google credential, in which case **one of the three must be set or the server refuses to boot** (#209) | **The escape hatch for any host not in the four-origin allowlist above.** Setting it **skips the allowlist entirely** — the operator has asserted the host — but the value still gets the full **shape check**: https (or http for `localhost` only), no embedded credentials, no query, no fragment, path exactly `/auth/google/callback`, and already-canonical (an explicit `:443`, an uppercase host or a `..` segment is rejected at boot, because it could not byte-match what Google has registered). When it is unset, the redirect URI is derived as `<web origin>/auth/google/callback` and the origin must be one of the four. |
+| `GOOGLE_CALENDAR_REDIRECT_URI` | optional override, per env | No | Calendar equivalent of `GOOGLE_OAUTH_REDIRECT_URI`; path must be exactly `/calendar/connect/callback`. Otherwise derived from the configured web origin and checked against the same registered-origin allowlist. |
+| `CALENDAR_TOKEN_ENCRYPTION_KEY_VERSION` | app-api secret env | Yes when Google Calendar is enabled | Positive integer version used for newly encrypted refresh tokens. |
+| `CALENDAR_TOKEN_ENCRYPTION_KEY` | app-api secret env | Yes when Google Calendar is enabled | Base64 encoding of exactly 32 random bytes; the active AES-256-GCM key. |
+| `CALENDAR_TOKEN_DECRYPTION_KEYS` | app-api secret env | Yes when Google Calendar is enabled | JSON map of key versions to base64 keys, including the active version, e.g. `{"1":"<base64>"}`. Keep old versions during rotation. |
 | `APP_API_ORIGIN` | already required, per env (`apps/web/next.config.mjs`) | **Yes** (pre-existing) | Proxies `/auth/google/start`, `/auth/google/callback` and `/auth/providers` from the web origin to app-api. The whole `rewrites()` key disappears when it is unset — this already-known trap now takes Google sign-in down with it. **Verify it per env on every deploy.** |
 
 Both Google vars are read in `googleOAuthFromEnv()` from inside the server

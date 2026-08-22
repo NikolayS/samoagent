@@ -28,7 +28,8 @@
  */
 import { createHash } from "node:crypto";
 import type { Clock } from "./types.ts";
-import { base64url, fromBase64url, hmacSha256, constantTimeEqual } from "./crypto.ts";
+import { base64url } from "./crypto.ts";
+import { createSealedState } from "./sealed-state.ts";
 
 /**
  * The state cookie name. The `__Host-` prefix is enforced by the browser, not by
@@ -75,11 +76,22 @@ export interface OAuthStateClaims {
 /** The exact field set a state payload may carry — nothing more, nothing less. */
 const STATE_FIELDS = ["v", "state", "nonce", "codeVerifier", "returnTo", "iat"] as const;
 
+const sealedOAuthState = createSealedState<OAuthStateClaims>({
+  cookieName: OAUTH_STATE_COOKIE_NAME,
+  purpose: OAUTH_STATE_PURPOSE,
+  ttlMs: OAUTH_STATE_TTL_MS,
+  fields: STATE_FIELDS,
+  parseClaims(c) {
+    if (typeof c.v !== "number" || typeof c.state !== "string" ||
+      typeof c.nonce !== "string" || typeof c.codeVerifier !== "string" ||
+      typeof c.returnTo !== "string" || typeof c.iat !== "number") return null;
+    return c as unknown as OAuthStateClaims;
+  },
+});
+
 /** Sign state claims into an opaque, tamper-evident cookie value. */
 export function signOAuthState(claims: OAuthStateClaims, secret: string): string {
-  const payloadB64 = base64url(JSON.stringify(claims));
-  const sig = hmacSha256(secret, OAUTH_STATE_PURPOSE + payloadB64);
-  return `${payloadB64}.${base64url(sig)}`;
+  return sealedOAuthState.sign(claims, secret);
 }
 
 /**
@@ -106,51 +118,7 @@ export function verifyOAuthState(
   secret: string,
   now: number = Date.now(),
 ): OAuthStateClaims | null {
-  const parts = value.split(".");
-  if (parts.length !== 2) return null;
-  const [payloadB64, sigB64] = parts;
-
-  const expected = hmacSha256(secret, OAUTH_STATE_PURPOSE + payloadB64);
-  const actual = fromBase64url(sigB64);
-  if (!constantTimeEqual(expected, actual)) return null;
-
-  // ── authenticated from here down ───────────────────────────────────────────
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fromBase64url(payloadB64).toString("utf8"));
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
-  const c = parsed as Record<string, unknown>;
-
-  // Strict whitelist: no extra keys, no missing keys, exact types.
-  const keys = Object.keys(c);
-  if (keys.length !== STATE_FIELDS.length) return null;
-  for (const field of STATE_FIELDS) {
-    if (!Object.hasOwn(c, field)) return null;
-  }
-  if (
-    typeof c.v !== "number" ||
-    typeof c.state !== "string" ||
-    typeof c.nonce !== "string" ||
-    typeof c.codeVerifier !== "string" ||
-    typeof c.returnTo !== "string" ||
-    typeof c.iat !== "number"
-  ) {
-    return null;
-  }
-  if (c.v !== 1) return null;
-  if (now - c.iat > OAUTH_STATE_TTL_MS) return null;
-
-  return {
-    v: c.v,
-    state: c.state,
-    nonce: c.nonce,
-    codeVerifier: c.codeVerifier,
-    returnTo: c.returnTo,
-    iat: c.iat,
-  };
+  return sealedOAuthState.verify(value, secret, now);
 }
 
 /**
@@ -169,13 +137,7 @@ export function verifyOAuthStateForCallback(
   stateParam: string | null | undefined,
   now: number = Date.now(),
 ): OAuthStateClaims | null {
-  const claims = verifyOAuthState(value, secret, now);
-  if (claims === null) return null;
-  if (typeof stateParam !== "string" || stateParam.length === 0) return null;
-  const a = Buffer.from(claims.state, "utf8");
-  const b = Buffer.from(stateParam, "utf8");
-  if (!constantTimeEqual(a, b)) return null;
-  return claims;
+  return sealedOAuthState.verifyCallback(value, secret, stateParam, now);
 }
 
 /**
@@ -188,8 +150,7 @@ export function verifyOAuthStateForCallback(
  * withhold the cookie on exactly that navigation, breaking 100% of sign-ins.
  */
 export function buildOAuthStateCookie(value: string): string {
-  const maxAgeSec = Math.floor(OAUTH_STATE_TTL_MS / 1000);
-  return `${OAUTH_STATE_COOKIE_NAME}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSec}`;
+  return sealedOAuthState.buildCookie(value);
 }
 
 /**
@@ -200,7 +161,7 @@ export function buildOAuthStateCookie(value: string): string {
  * live verifier behind.
  */
 export function buildClearedOAuthStateCookie(): string {
-  return `${OAUTH_STATE_COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+  return sealedOAuthState.buildClearedCookie();
 }
 
 /** Convenience: sign `v:1` claims dated by `clock` and return the Set-Cookie header. */
@@ -209,21 +170,12 @@ export function issueOAuthStateCookie(
   secret: string,
   clock: Clock,
 ): string {
-  return buildOAuthStateCookie(
-    signOAuthState({ v: 1, ...claims, iat: clock() }, secret),
-  );
+  return sealedOAuthState.issueCookie(claims, secret, clock);
 }
 
 /** Read the state cookie value off a request's `Cookie` header, or null. */
 export function readOAuthStateCookie(req: Request): string | null {
-  const header = req.headers.get("cookie");
-  if (!header) return null;
-  for (const part of header.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    if (part.slice(0, idx).trim() === OAUTH_STATE_COOKIE_NAME) return part.slice(idx + 1).trim();
-  }
-  return null;
+  return sealedOAuthState.readCookie(req);
 }
 
 /**

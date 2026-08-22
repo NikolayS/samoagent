@@ -119,7 +119,7 @@ describe("createAppApi — Google sign-in routes (#209)", () => {
     const api = createAppApi(baseConfig());
     const res = await api.fetch(new Request("http://api.test/auth/providers"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ google: false });
+    expect(await res.json()).toEqual({ google: false, google_calendar: false });
   });
 
   it("GET /auth/providers reports {\"google\":true} once a provider is composed", async () => {
@@ -129,7 +129,24 @@ describe("createAppApi — Google sign-in routes (#209)", () => {
     });
     const res = await api.fetch(new Request("http://api.test/auth/providers"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ google: true });
+    expect(await res.json()).toEqual({ google: true, google_calendar: false });
+  });
+
+  it("reports Google Calendar independently and fail-closed", async () => {
+    const api = createAppApi({
+      ...baseConfig(),
+      googleCalendarOAuth: {
+        authorizeUrl: () => "https://google.test",
+        async exchangeCode() { return { ok: false }; },
+        async revoke() { return true; },
+      },
+      calendarTokenEncryption: {
+        activeKey: Buffer.alloc(32, 1), activeKeyVersion: 1,
+        decryptionKeys: new Map([[1, Buffer.alloc(32, 1)]]),
+      },
+    });
+    const res = await api.fetch(new Request("http://api.test/auth/providers"));
+    expect(await res.json()).toEqual({ google: false, google_calendar: true });
   });
 
   it("GET /auth/google/start 302s to SAMO-AUTH-010 on an env with no provider", async () => {
