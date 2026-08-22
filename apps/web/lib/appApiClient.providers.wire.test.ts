@@ -72,6 +72,13 @@ describe("authProviders — GET /auth/providers over the wire (#209)", () => {
     expect(await client.authProviders()).toEqual({ google: false });
   });
 
+  it("maps google_calendar only when it is boolean true", async () => {
+    mode = { kind: "json", status: 200, body: { google: false, google_calendar: true } };
+    expect(await client.authProviders()).toEqual({ google: false, googleCalendar: true });
+    mode = { kind: "json", status: 200, body: { google: false, google_calendar: "true" } };
+    expect(await client.authProviders()).toEqual({ google: false });
+  });
+
   it("resolves {google:false} on HTTP 500 (never rejects)", async () => {
     mode = { kind: "json", status: 500, body: { error: "boom" } };
     expect(await client.authProviders()).toEqual({ google: false });
