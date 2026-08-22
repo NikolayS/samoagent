@@ -331,12 +331,13 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
       if (!res.ok) await throwTyped(res, "SAMO-CALENDAR-500");
       const d = (await res.json()) as Record<string, unknown>;
       const state: CalendarConnectionState = d.state === "connected" || d.state === "broken" ? d.state : "not_connected";
+      const error = typeof d.error === "object" && d.error !== null ? d.error as Record<string, unknown> : null;
       return {
         provider: "google", state,
         connectedAt: typeof d.connected_at === "string" ? d.connected_at : null,
         lastSyncAt: typeof d.last_sync_at === "string" ? d.last_sync_at : null,
         lastSyncErrorAt: typeof d.last_sync_error_at === "string" ? d.last_sync_error_at : null,
-        ...(state === "broken" ? { errorCode: "SAMO-CALENDAR-005" as const } : {}),
+        ...(error?.code === "SAMO-CALENDAR-005" ? { errorCode: error.code } : {}),
       };
     },
     async startCalendarConnect() {
@@ -356,13 +357,14 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
       if (!res.ok) await throwTyped(res, "SAMO-CALENDAR-006");
       const d = (await res.json()) as Record<string, unknown>;
       const state: CalendarConnectionState = d.connection_state === "connected" || d.connection_state === "broken" ? d.connection_state : "not_connected";
+      const error = typeof d.error === "object" && d.error !== null ? d.error as Record<string, unknown> : null;
       const responses = ["needsAction", "declined", "tentative", "accepted"];
       const rows = Array.isArray(d.meetings) ? d.meetings : [];
       const meetings = rows.filter((raw): raw is Record<string, unknown> => {
         const r = raw as Record<string, unknown>;
         return typeof r?.id === "string" && typeof r.title === "string" && typeof r.starts_at === "string" && typeof r.ends_at === "string" && typeof r.all_day === "boolean" && (r.meeting_url === null || typeof r.meeting_url === "string") && (r.meeting_provider === null || r.meeting_provider === "google_meet" || r.meeting_provider === "zoom") && (r.organizer_email === null || typeof r.organizer_email === "string") && (r.attendee_response === null || responses.includes(String(r.attendee_response)));
       }).map((r) => ({ id: r.id as string, title: r.title as string, startsAt: r.starts_at as string, endsAt: r.ends_at as string, allDay: r.all_day as boolean, meetingUrl: r.meeting_url as string | null, meetingProvider: r.meeting_provider as MeetingProvider | null, organizerEmail: r.organizer_email as string | null, attendeeResponse: r.attendee_response as CalendarMeeting["attendeeResponse"] }));
-      return { connectionState: state, meetings, lastSyncAt: typeof d.last_sync_at === "string" ? d.last_sync_at : null, ...(state === "broken" ? { errorCode: "SAMO-CALENDAR-005" as const } : {}) };
+      return { connectionState: state, meetings, lastSyncAt: typeof d.last_sync_at === "string" ? d.last_sync_at : null, ...(error?.code === "SAMO-CALENDAR-005" ? { errorCode: error.code } : {}) };
     },
     async verifyMagicLink(token) {
       const res = await fetch(

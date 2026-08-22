@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppApiError, type AppApiClient, type CalendarStatus } from "../lib/appApiClient.ts";
 import { authErrorMessage, isAuthErrorCode } from "../lib/authErrors.ts";
+import { formatDateTime, type DateTimeFormatOptions } from "../lib/formatDateTime.ts";
 
-export function CalendarConnectionCard({ client, onAuthFailure }: { client: AppApiClient; onAuthFailure: () => void }) {
+type CalendarConnectionCardProps = DateTimeFormatOptions & { client: AppApiClient; onAuthFailure: () => void };
+
+export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone }: CalendarConnectionCardProps) {
   const [status, setStatus] = useState<CalendarStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -34,7 +37,16 @@ export function CalendarConnectionCard({ client, onAuthFailure }: { client: AppA
 
   async function connect() {
     setBusy(true); setMessage(null);
-    try { const result = await client.startCalendarConnect(); window.location.assign(result.authorizationUrl); }
+    try {
+      const result = await client.startCalendarConnect();
+      let authorizationUrl: URL;
+      try { authorizationUrl = new URL(result.authorizationUrl); }
+      catch { setMessage(authErrorMessage("SAMO-CALENDAR-500")); setBusy(false); return; }
+      if (authorizationUrl.protocol !== "https:" || authorizationUrl.hostname !== "accounts.google.com") {
+        setMessage(authErrorMessage("SAMO-CALENDAR-500")); setBusy(false); return;
+      }
+      window.location.assign(result.authorizationUrl);
+    }
     catch (error) { handleError(error, "Google Calendar couldn’t be connected. Please try again."); setBusy(false); }
   }
   async function disconnect() {
@@ -57,7 +69,7 @@ export function CalendarConnectionCard({ client, onAuthFailure }: { client: AppA
       <button type="button" disabled={busy} onClick={() => void disconnect()}>Disconnect</button>
     </> : <>
       <p><strong>Connected</strong></p>
-      {status.lastSyncAt ? <p className="samograph-field-hint">Last synced {new Date(status.lastSyncAt).toLocaleString()}</p> : null}
+      {status.lastSyncAt ? <p className="samograph-field-hint">Last synced {formatDateTime(status.lastSyncAt, { locale, timeZone })}</p> : null}
       <button type="button" disabled={busy} onClick={() => void disconnect()}>Disconnect</button>
     </>}
   </section>;
