@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { MetricsRegistry } from "../../../packages/shared/observe/registry.ts";
 import { GoogleCalendarFailure } from "./google-calendar-client.ts";
 import { CALENDAR_SYNC_INTERVAL_MS, startCalendarSyncPoller } from "./poller.ts";
 
@@ -99,5 +100,120 @@ describe("calendar sync poller", () => {
     now = 5_999; await poller.tick();
     now = 6_000; await poller.tick();
     expect(attempts).toEqual(["limited", "healthy", "healthy", "limited", "healthy"]);
+  });
+
+  it("contains a rejected selection sweep and clears the in-flight guard", async () => {
+    let selections = 0;
+    const synced: string[] = [], warnings: string[] = [];
+    const metrics = new MetricsRegistry();
+    const sql = (() => {
+      selections++;
+      if (selections === 1) return Promise.reject(new Error("database secret"));
+      return Promise.resolve([{ id: "recovered" }]);
+    }) as any;
+    const poller = startCalendarSyncPoller({
+      sql, metrics,
+      syncConnection: async (id) => { synced.push(id); },
+      logger: { warn: (message) => warnings.push(message) },
+      schedule: () => ({ stop() {} }),
+    });
+
+    await expect(poller.tick()).resolves.toBeUndefined();
+    await expect(poller.tick()).resolves.toBeUndefined();
+    expect(selections).toBe(3);
+    expect(synced).toEqual(["recovered"]);
+    expect(warnings).toEqual(["[calendar-poller] sweep failed: sweep_failed"]);
+    expect(metrics.renderPrometheus()).toContain('calendar_sync_total{result="sweep_failed"} 1');
+  });
+
+  it("the scheduled callback does not emit an unhandled rejection", async () => {
+    let scheduled!: () => void;
+    const unhandled: unknown[] = [];
+    const listener = (error: unknown) => unhandled.push(error);
+    process.on("unhandledRejection", listener);
+    try {
+      startCalendarSyncPoller({
+        sql: (() => Promise.reject(new Error("database secret"))) as any,
+        syncConnection: async () => {},
+        schedule: (fn) => { scheduled = fn; return { stop() {} }; },
+      });
+      scheduled();
+      await Bun.sleep(0);
+      await Bun.sleep(0);
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
+  });
+
+  it("contains a rejecting gauge refresh and the next tick runs normally", async () => {
+    let calls = 0;
+    const warnings: string[] = [];
+    const metrics = new MetricsRegistry();
+    const sql = (() => {
+      calls++;
+      if (calls === 1) return Promise.resolve([]);
+      if (calls === 2) return Promise.reject(new Error("database secret"));
+      return Promise.resolve([]);
+    }) as any;
+    const poller = startCalendarSyncPoller({
+      sql, metrics, syncConnection: async () => {},
+      logger: { warn: (message) => warnings.push(message) },
+      schedule: () => ({ stop() {} }),
+    });
+
+    await expect(poller.tick()).resolves.toBeUndefined();
+    await expect(poller.tick()).resolves.toBeUndefined();
+    expect(calls).toBe(4);
+    expect(warnings).toEqual(["[calendar-poller] sweep failed: sweep_failed"]);
+    expect(metrics.renderPrometheus()).toContain('calendar_sync_total{result="sweep_failed"} 1');
+  });
+
+  it("reports 21600 seconds for syncs at six hours and one minute", async () => {
+    let calls = 0;
+    const queries: string[] = [];
+    const metrics = new MetricsRegistry();
+    const sql = ((strings: TemplateStringsArray) => {
+      queries.push(strings.join("?"));
+      return ++calls === 1
+        ? Promise.resolve([])
+        : Promise.resolve([{ status: "connected", count: 2, sync_age_seconds: 21_600 }]);
+    }) as any;
+    const poller = startCalendarSyncPoller({ sql, metrics, syncConnection: async () => {}, schedule: () => ({ stop() {} }) });
+    await poller.tick();
+    expect(metrics.renderPrometheus()).toContain("calendar_sync_age_seconds 21600");
+    expect(queries[1]).toContain("min(COALESCE(last_sync_at, connected_at))");
+  });
+
+  it("uses connected_at as the age reference for a connected row never synced", async () => {
+    let calls = 0;
+    const metrics = new MetricsRegistry();
+    const sql = (() => ++calls === 1
+      ? Promise.resolve([])
+      : Promise.resolve([{ status: "connected", count: 1, sync_age_seconds: 43_200 }])) as any;
+    const poller = startCalendarSyncPoller({ sql, metrics, syncConnection: async () => {}, schedule: () => ({ stop() {} }) });
+    await poller.tick();
+    expect(metrics.renderPrometheus()).toContain("calendar_sync_age_seconds 43200");
+    expect(metrics.renderPrometheus()).toContain("connected_at for never-synced connections; 0 when none are connected");
+  });
+
+  it("evicts retry state for removed connections and keeps it bounded under churn", async () => {
+    let selected: Row[] = [{ id: "limited" }];
+    let now = 1_000;
+    const attempts: string[] = [];
+    const poller = startCalendarSyncPoller({
+      sql: (() => Promise.resolve(selected)) as any, clock: () => now,
+      syncConnection: async (id) => { attempts.push(id); throw new GoogleCalendarFailure("rate_limited", 60_000); },
+      schedule: () => ({ stop() {} }),
+    });
+    await poller.tick();
+    selected = Array.from({ length: 100 }, (_, i) => ({ id: `churn-${i}` }));
+    await poller.tick();
+    selected = [];
+    await poller.tick();
+    selected = [{ id: "limited" }];
+    now = 2_000;
+    await poller.tick();
+    expect(attempts.filter((id) => id === "limited")).toEqual(["limited", "limited"]);
   });
 });

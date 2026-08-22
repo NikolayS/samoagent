@@ -93,7 +93,7 @@ export const GAUGE_SPECS = {
 export type GaugeName = keyof typeof GAUGE_SPECS;
 
 export const SCALAR_GAUGE_SPECS = {
-  calendar_sync_age_seconds: { help: "Age of the oldest Calendar synchronization." },
+  calendar_sync_age_seconds: { help: "Age of the oldest connected Calendar synchronization, using connected_at for never-synced connections; 0 when none are connected." },
 } as const;
 export type ScalarGaugeName = keyof typeof SCALAR_GAUGE_SPECS;
 

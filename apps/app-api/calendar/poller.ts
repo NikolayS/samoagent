@@ -39,7 +39,9 @@ export function startCalendarSyncPoller(deps: CalendarSyncPollerDeps): CalendarS
     if (!deps.metrics) return;
     const rows = await deps.sql`
       SELECT status, count(*)::int AS count,
-             EXTRACT(EPOCH FROM (now() - max(last_sync_at)))::double precision AS sync_age_seconds
+             CASE WHEN status = 'connected' THEN
+               EXTRACT(EPOCH FROM (now() - min(COALESCE(last_sync_at, connected_at))))::double precision
+             ELSE NULL END AS sync_age_seconds
         FROM calendar_connections
        GROUP BY status` as unknown as Array<{ status: "connected" | "broken"; count: number; sync_age_seconds: number | null }>;
     const counts = new Map(rows.map((row) => [row.status, Number(row.count)]));
@@ -72,6 +74,11 @@ export function startCalendarSyncPoller(deps: CalendarSyncPollerDeps): CalendarS
     try {
       const rows = await deps.sql`
         SELECT id FROM calendar_connections WHERE status = 'connected' ORDER BY id` as unknown as Array<{ id: string }>;
+      const selectedIds = new Set(rows.map((row) => row.id));
+      const now = clock();
+      for (const [id, deadline] of retryUntil) {
+        if (!selectedIds.has(id) || deadline <= now) retryUntil.delete(id);
+      }
       let next = 0;
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, async () => {
         while (next < rows.length) {
@@ -80,6 +87,9 @@ export function startCalendarSyncPoller(deps: CalendarSyncPollerDeps): CalendarS
         }
       }));
       await refreshGauges();
+    } catch {
+      deps.metrics?.incCalendarSync("sweep_failed");
+      deps.logger?.warn("[calendar-poller] sweep failed: sweep_failed");
     } finally {
       inFlight = false;
     }

@@ -216,5 +216,6 @@ describe("Calendar observability — #240 Slice 4", () => {
     expect(out).toContain('calendar_connections{state="connected"} 3');
     expect(out).toContain('calendar_connections{state="broken"} 1');
     expect(out).toContain("calendar_sync_age_seconds 42");
+    expect(out).toContain("connected_at for never-synced connections; 0 when none are connected");
   });
 });

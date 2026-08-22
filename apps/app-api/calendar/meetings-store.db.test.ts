@@ -19,7 +19,7 @@ d("calendar meetings cache query", () => {
     await sql`INSERT INTO tenants(id,owner_user_id) VALUES (${tenant},${user}),(${otherTenant},${otherUser})`;
     const connection = randomUUID(), otherConnection = randomUUID(), now = new Date("2026-08-21T12:00:00.000Z");
     const bytes = Buffer.alloc(32), iv = Buffer.alloc(12), tag = Buffer.alloc(16);
-    await sql`INSERT INTO calendar_connections(id,user_id,tenant_id,encrypted_refresh_token,refresh_token_iv,refresh_token_tag,encryption_key_version,granted_scopes) VALUES (${connection},${user},${tenant},${bytes},${iv},${tag},1,${["scope"]}),(${otherConnection},${otherUser},${otherTenant},${bytes},${iv},${tag},1,${["scope"]})`;
+    await sql`INSERT INTO calendar_connections(id,user_id,tenant_id,encrypted_refresh_token,refresh_token_iv,refresh_token_tag,encryption_key_version,granted_scopes) VALUES (${connection},${user},${tenant},${bytes},${iv},${tag},1,ARRAY['scope']),(${otherConnection},${otherUser},${otherTenant},${bytes},${iv},${tag},1,ARRAY['scope'])`;
     const first = "00000000-0000-4000-8000-000000000001", second = "00000000-0000-4000-8000-000000000002";
     await sql`INSERT INTO calendar_events(id,tenant_id,connection_id,provider_event_id,title,starts_at,ends_at) VALUES
       (${second},${tenant},${connection},'second','second',${new Date("2026-08-21T13:00:00Z")},${new Date("2026-08-21T14:00:00Z")}),
