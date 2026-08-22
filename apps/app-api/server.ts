@@ -308,7 +308,7 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
       `          POST /auth/logout | GET /auth/providers | GET /auth/google/start |\n` +
       `          GET /auth/google/callback | POST/GET /calls | share routes\n` +
       `  Google sign-in: ${googleOAuth ? `ON → redirect_uri ${googleOAuth.redirectUri}` : "OFF (no credentials — magic link only)"}\n` +
-      formatCalendarStartupLine(calendarTokenEncryption) +
+      formatCalendarStartupLine({ googleCalendarOAuth, calendarTokenEncryption }) +
       `  magic-link callbacks point at ${webOrigin}\n` +
       `  Recall: ${isRecallLive() ? `REAL → webhook base ${webhookBase ?? "(regional default)"}` : "FAKE"}\n` +
       `  Email:  ${env.RESEND_API_KEY ? `REAL via Resend from ${env.MAGIC_LINK_FROM}` : "UNCONFIGURED (magic-link send will error)"}\n` +

@@ -10,11 +10,14 @@ export interface ResolvedCalendarConfig {
 }
 
 export function formatCalendarStartupLine(
-  config: CalendarTokenEncryptionConfig | undefined,
+  config: ResolvedCalendarConfig,
 ): string {
-  return config
+  if (!config.calendarTokenEncryption) {
+    return "  Google Calendar: disabled (no CALENDAR_TOKEN_* configured)\n";
+  }
+  return config.googleCalendarOAuth
     ? "  Google Calendar: enabled\n"
-    : "  Google Calendar: disabled (no CALENDAR_TOKEN_* configured)\n";
+    : "  Google Calendar: disabled (Google sign-in not configured)\n";
 }
 
 const CALENDAR_TOKEN_ENV_KEYS = [

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { googleCalendarOAuthFromEnv } from "./google-calendar-oauth.ts";
 import { calendarTokenEncryptionFromEnv } from "./encryption-config.ts";
-import { resolveCalendarConfig } from "./resolve-config.ts";
+import { formatCalendarStartupLine, resolveCalendarConfig } from "./resolve-config.ts";
 
 const credentials = { GOOGLE_OAUTH_CLIENT_ID: "id", GOOGLE_OAUTH_CLIENT_SECRET: "secret" };
 describe("Calendar production configuration", () => {
@@ -75,6 +75,14 @@ describe("resolveCalendarConfig — Calendar is explicitly opt-in (#240)", () =>
     const config = resolveCalendarConfig({ ...credentials, ...calendarKeys }, "https://samograph.dev");
     expect(config.googleCalendarOAuth).toBeDefined();
     expect(config.calendarTokenEncryption?.activeKeyVersion).toBe(1);
+  });
+
+  it("Calendar keys without Google sign-in credentials report Calendar disabled", () => {
+    const config = resolveCalendarConfig(calendarKeys, "https://samograph.dev");
+    expect(config.googleCalendarOAuth).toBeUndefined();
+    expect(formatCalendarStartupLine(config)).toBe(
+      "  Google Calendar: disabled (Google sign-in not configured)\n",
+    );
   });
 
   it("Google sign-in credentials plus only CALENDAR_TOKEN_ENCRYPTION_KEY fail closed", () => {

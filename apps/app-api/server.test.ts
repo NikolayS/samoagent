@@ -19,6 +19,7 @@ import {
   resolveMagicLinkBaseUrl,
 } from "../../packages/shared/config/env.ts";
 import { GoogleOAuthError, googleOAuthFromEnv } from "./auth/index.ts";
+import { resolveCalendarConfig } from "./calendar/resolve-config.ts";
 
 const goodProdEnv = (): Record<string, string | undefined> => ({
   SAMO_ENV: "prod",
@@ -31,14 +32,21 @@ const SIGNING_KEYS = ["SESSION_SECRET", "MAGIC_LINK_SECRET", "TOKEN_SECRET"] as 
 
 describe("server.ts startup banner — Google Calendar", () => {
   it("reports enabled without exposing encryption key material", () => {
-    const keyMaterial = "never-print-this-key";
-    const line = formatCalendarStartupLine({ activeKeyVersion: 7, activeKey: Buffer.from(keyMaterial), decryptionKeys: new Map() });
+    const keyMaterial = Buffer.alloc(32, 7).toString("base64");
+    const config = resolveCalendarConfig({
+      GOOGLE_OAUTH_CLIENT_ID: "id",
+      GOOGLE_OAUTH_CLIENT_SECRET: "secret",
+      CALENDAR_TOKEN_ENCRYPTION_KEY_VERSION: "7",
+      CALENDAR_TOKEN_ENCRYPTION_KEY: keyMaterial,
+      CALENDAR_TOKEN_DECRYPTION_KEYS: JSON.stringify({ 7: keyMaterial }),
+    }, "https://samograph.dev");
+    const line = formatCalendarStartupLine(config);
     expect(line).toBe("  Google Calendar: enabled\n");
     expect(line).not.toContain(keyMaterial);
   });
 
   it("reports the explicit opt-in reason when disabled", () => {
-    expect(formatCalendarStartupLine(undefined)).toBe(
+    expect(formatCalendarStartupLine({ googleCalendarOAuth: undefined, calendarTokenEncryption: undefined })).toBe(
       "  Google Calendar: disabled (no CALENDAR_TOKEN_* configured)\n",
     );
   });

@@ -305,7 +305,10 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
       `          GET /auth/google/callback | POST/GET /calls | GET /calls/:id |\n` +
       `          GET /__dev/last-magic-link\n` +
       `  Google sign-in: ${GOOGLE_OAUTH ? `ON → redirect_uri ${GOOGLE_OAUTH.redirectUri}` : "OFF (no credentials — magic link only)"}\n` +
-      formatCalendarStartupLine(CALENDAR_TOKEN_ENCRYPTION) +
+      formatCalendarStartupLine({
+        googleCalendarOAuth: GOOGLE_CALENDAR_OAUTH,
+        calendarTokenEncryption: CALENDAR_TOKEN_ENCRYPTION,
+      }) +
       `  magic-link callbacks point at ${WEB_ORIGIN} (the web app)\n` +
       `  Recall: ${recallMode}\n` +
       `  Email:  ${
