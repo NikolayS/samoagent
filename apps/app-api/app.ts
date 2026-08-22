@@ -156,6 +156,8 @@ export function createAppApi(config: AppApiConfig): AppApi {
     sessionSecret: config.sessionSecret,
     emailSender: config.emailSender,
     recall: config.recall,
+    calendarOAuth: config.googleCalendarOAuth,
+    calendarTokenDecryptionKeys: config.calendarTokenEncryption?.decryptionKeys,
     now: clock,
   });
 

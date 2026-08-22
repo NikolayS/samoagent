@@ -73,6 +73,8 @@ export interface FakeGoogleIdpOptions {
   omitRefreshToken?: boolean;
   /** Configurable revocation response; local disconnect must ignore failures. */
   revocationStatus?: number;
+  /** Override the scope list returned by the next authorization-code exchange. */
+  tokenResponseScopes?: string[];
 }
 
 export interface FakeAuthorizationRecord {
@@ -141,6 +143,7 @@ export class FakeGoogleIdp {
   readonly #invalidRefreshTokens = new Set<string>();
   #omitRefreshToken: boolean;
   #revocationStatus: number;
+  #tokenResponseScopes: string[] | undefined;
 
   constructor(opts: FakeGoogleIdpOptions = {}) {
     this.clientId = opts.clientId ?? "fake-client-id.apps.googleusercontent.com";
@@ -156,6 +159,7 @@ export class FakeGoogleIdp {
     this.#rawBody = opts.rawBody;
     this.#omitRefreshToken = opts.omitRefreshToken ?? false;
     this.#revocationStatus = opts.revocationStatus ?? 200;
+    this.#tokenResponseScopes = opts.tokenResponseScopes;
 
     const { publicKey, privateKey } = generateKeyPairSync("rsa", {
       modulusLength: opts.modulusLength ?? 2048,
@@ -201,6 +205,7 @@ export class FakeGoogleIdp {
   omitNextRefreshToken(value = true): void { this.#omitRefreshToken = value; }
   invalidateRefreshToken(token: string): void { this.#invalidRefreshTokens.add(token); }
   setRevocationStatus(status: number): void { this.#revocationStatus = status; }
+  setTokenResponseScopes(scopes: string[]): void { this.#tokenResponseScopes = scopes; }
 
   /** Accept an authorization URL and issue a code carrying offline consent state. */
   authorize(input: string | URL): { code: string; state: string | null; refreshToken?: string } {
@@ -244,7 +249,7 @@ export class FakeGoogleIdp {
         const grant = this.#codes.get(params.get("code") ?? "");
         if (!grant || grant.redirectUri !== params.get("redirect_uri") || (grant.codeChallenge && grant.codeChallenge !== codeChallengeS256(params.get("code_verifier") ?? ""))) return Response.json({ error: "invalid_grant" }, { status: 400 });
         this.#codes.delete(params.get("code") ?? "");
-        return Response.json({ access_token: "fake-access", token_type: "Bearer", expires_in: 3600, scope: this.authorizationRequests.at(-1)?.scope.join(" "), ...(grant.refreshToken ? { refresh_token: grant.refreshToken } : {}) });
+        return Response.json({ access_token: "fake-access", token_type: "Bearer", expires_in: 3600, scope: (this.#tokenResponseScopes ?? this.authorizationRequests.at(-1)?.scope)?.join(" "), ...(grant.refreshToken ? { refresh_token: grant.refreshToken } : {}) });
       }
       if (params.get("grant_type") === "refresh_token") {
         const token = params.get("refresh_token") ?? "";

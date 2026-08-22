@@ -4,7 +4,7 @@ import { RATE_WINDOW_MS } from "../auth/service.ts";
 import { randomToken } from "../auth/crypto.ts";
 import { codeChallengeS256 } from "../auth/oauth-state.ts";
 import { decryptSecret, encryptSecret } from "../../../packages/shared/crypto.ts";
-import type { GoogleCalendarOAuthPort } from "./google-calendar-oauth.ts";
+import { GOOGLE_CALENDAR_SCOPE, type GoogleCalendarOAuthPort } from "./google-calendar-oauth.ts";
 import { issueCalendarOAuthStateCookie, verifyCalendarOAuthStateForCallback } from "./oauth-state.ts";
 
 export type CalendarErrorCode = "SAMO-CALENDAR-001" | "SAMO-CALENDAR-002" | "SAMO-CALENDAR-003" | "SAMO-CALENDAR-004" | "SAMO-CALENDAR-005" | "SAMO-CALENDAR-006" | "SAMO-CALENDAR-500";
@@ -56,6 +56,10 @@ export class CalendarService {
     if (!decision.allowed) return { ok: false as const, code: "SAMO-CALENDAR-500" as const };
     const exchanged = await this.#deps.provider.exchangeCode({ code, codeVerifier: claims.codeVerifier });
     if (!exchanged.ok) return { ok: false as const, code: "SAMO-CALENDAR-004" as const };
+    if (!exchanged.scopes.includes(GOOGLE_CALENDAR_SCOPE)) {
+      await this.#deps.provider.revoke(exchanged.refreshToken).catch(() => false);
+      return { ok: false as const, code: "SAMO-CALENDAR-004" as const };
+    }
     try {
       const existing = await this.#deps.store.get(input.userId, input.tenantId);
       const rowBase = { id: existing?.id ?? randomUUID(), userId: input.userId, tenantId: input.tenantId };

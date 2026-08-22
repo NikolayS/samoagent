@@ -3,6 +3,8 @@ import { createCalendarHandler } from "./http.ts";
 import { CalendarService, type CalendarConnection, type CalendarConnectionStore } from "./service.ts";
 import { InMemoryRateLimiter } from "../auth/rate-limit.ts";
 import { signSession } from "../auth/session.ts";
+import { GoogleCalendarOAuth } from "./google-calendar-oauth.ts";
+import { FakeGoogleIdp } from "../../../packages/test-fakes/google-oauth/index.ts";
 
 const now = 50_000, secret = "session-secret";
 class Store implements CalendarConnectionStore {
@@ -22,6 +24,23 @@ function handler() {
 const session = () => `samo_session=${signSession({ userId: "user", tenantId: "tenant", iat: now }, secret)}`;
 
 describe("calendar HTTP adapter", () => {
+  it("redirects a scope-deficient Google grant to SAMO-CALENDAR-004 without persisting it", async () => {
+    const idp = new FakeGoogleIdp({ tokenResponseScopes: ["https://www.googleapis.com/auth/userinfo.email"] });
+    const store = new Store();
+    const provider = new GoogleCalendarOAuth({ clientId: idp.clientId, clientSecret: "secret", redirectUri: "http://localhost:3000/calendar/connect/callback", fetchImpl: idp.fetchImpl });
+    const service = new CalendarService({ provider, store, rateLimiter: new InMemoryRateLimiter(), sessionSecret: secret, clock: () => now, activeKey: Buffer.alloc(32), activeKeyVersion: 1, decryptionKeys: new Map([[1, Buffer.alloc(32)]]) });
+    const h = createCalendarHandler(service, secret, () => now);
+    const start = await h(new Request("http://api.test/calendar/connect/start", { method: "POST", headers: { cookie: session() } }));
+    const grant = idp.authorize((await start.json() as { authorization_url: string }).authorization_url);
+    if (!grant.refreshToken) throw new Error("fake did not issue refresh token");
+    const stateCookie = start.headers.get("set-cookie")?.split(";")[0] ?? "";
+    const callback = await h(new Request(`http://api.test/calendar/connect/callback?code=${grant.code}&state=${grant.state}`, { headers: { cookie: `${session()}; ${stateCookie}` } }));
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get("location")).toBe("/settings?calendar_error=SAMO-CALENDAR-004");
+    expect(store.row).toBeNull();
+    expect(idp.revokedTokens).toEqual([grant.refreshToken]);
+  });
+
   it("rejects unauthenticated start/status/delete and callback clears state", async () => {
     const h = handler();
     for (const [method, path] of [["POST", "/calendar/connect/start"], ["GET", "/calendar/status"], ["DELETE", "/calendar/connection"]]) {

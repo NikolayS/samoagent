@@ -3,6 +3,8 @@ import { CalendarService, type CalendarConnection, type CalendarConnectionStore 
 import { InMemoryRateLimiter } from "../auth/rate-limit.ts";
 import { decryptSecret } from "../../../packages/shared/crypto.ts";
 import type { GoogleCalendarOAuthPort } from "./google-calendar-oauth.ts";
+import { GoogleCalendarOAuth } from "./google-calendar-oauth.ts";
+import { FakeGoogleIdp } from "../../../packages/test-fakes/google-oauth/index.ts";
 
 const key = Buffer.alloc(32, 7);
 class Store implements CalendarConnectionStore {
@@ -26,6 +28,22 @@ function setup(opts: { exchangeOk?: boolean; revoke?: () => Promise<boolean> } =
 }
 
 describe("CalendarService", () => {
+  it("rejects and revokes a refresh token when Google omits the required Calendar scope", async () => {
+    const idp = new FakeGoogleIdp({ tokenResponseScopes: ["https://www.googleapis.com/auth/userinfo.email"] });
+    const provider = new GoogleCalendarOAuth({ clientId: idp.clientId, clientSecret: "secret", redirectUri: "http://localhost:3000/calendar/connect/callback", fetchImpl: idp.fetchImpl });
+    const store = new Store();
+    const service = new CalendarService({ provider, store, rateLimiter: new InMemoryRateLimiter(), sessionSecret: "secret", clock: () => 10_000, randomValue: (() => { let n = 0; return () => `random-${++n}`; })(), activeKey: key, activeKeyVersion: 1, decryptionKeys: new Map([[1, key]]) });
+    const started = await service.start({ userId: "user", tenantId: "tenant", ip: "ip" });
+    if (!started.ok) throw new Error("start failed");
+    const grant = idp.authorize(started.authorizationUrl);
+    if (!grant.refreshToken) throw new Error("fake did not issue refresh token");
+    const cookie = started.setCookie.match(/^[^=]+=([^;]+)/)?.[1] ?? "";
+    const result = await service.callback({ userId: "user", tenantId: "tenant", ip: "ip", stateCookie: cookie, params: new URLSearchParams({ code: grant.code, state: grant.state ?? "" }) });
+    expect(result).toEqual({ ok: false, code: "SAMO-CALENDAR-004" });
+    expect(store.row).toBeNull();
+    expect(idp.revokedTokens).toEqual([grant.refreshToken]);
+  });
+
   it("starts with state bound to the current user and tenant", async () => {
     const { service } = setup();
     const result = await service.start({ userId: "user", tenantId: "tenant", ip: "ip" });
