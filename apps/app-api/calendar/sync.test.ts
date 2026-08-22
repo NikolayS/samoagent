@@ -17,6 +17,27 @@ function fixture() {
   return { service, fake, reconciles, failures };
 }
 
+function stateFixture() {
+  const x = fixture();
+  const state: { status: "connected" | "broken"; brokenReason: string | null; lastSyncErrorAt: Date | null; retryAfterMs?: number } = { status: "connected", brokenReason: null, lastSyncErrorAt: null };
+  x.service.deps.store.markFailure = async (_id, failure) => {
+    state.lastSyncErrorAt = failure.at;
+    state.brokenReason = failure.brokenReason;
+    if (failure.retryAfterMs !== undefined) state.retryAfterMs = failure.retryAfterMs;
+    if (failure.brokenReason !== null) state.status = "broken";
+  };
+  return { ...x, state };
+}
+
+async function failureValue(operation: Promise<void>): Promise<{ kind: string; retryAfterMs?: number }> {
+  try { await operation; throw new Error("expected failure"); }
+  catch (error) {
+    if (error instanceof Error && error.message === "expected failure") throw error;
+    const failure = error as { kind: string; retryAfterMs?: number };
+    return { kind: failure.kind, ...(failure.retryAfterMs === undefined ? {} : { retryAfterMs: failure.retryAfterMs }) };
+  }
+}
+
 describe("CalendarSyncService", () => {
   it("normalizes timed/all-day events and applies meeting URL priority safely", async () => {
     const x = fixture();
@@ -104,5 +125,36 @@ describe("CalendarSyncService", () => {
 
     await expect(service.sync(base.id)).rejects.toMatchObject({ kind: "malformed" });
     expect(state).toEqual({ status: "connected", lastSyncErrorAt: now, brokenReason: null });
+  });
+
+  it("keeps two consecutive quota 403s connected and honors Retry-After", async () => {
+    const x = stateFixture();
+    x.fake.forbidAccessToken("access-token", "userRateLimitExceeded", "17");
+
+    expect(await failureValue(x.service.sync(base.id))).toEqual({ kind: "transient", retryAfterMs: 17_000 });
+    expect(await failureValue(x.service.sync(base.id))).toEqual({ kind: "transient", retryAfterMs: 17_000 });
+
+    expect(x.fake.listRequests).toHaveLength(2);
+    expect(x.state).toEqual({ status: "connected", brokenReason: null, lastSyncErrorAt: now, retryAfterMs: 17_000 });
+  });
+
+  it("marks insufficientPermissions after refresh as scope_missing", async () => {
+    const x = stateFixture();
+    x.fake.forbidAccessToken("access-token", "insufficientPermissions");
+
+    expect(await failureValue(x.service.sync(base.id))).toEqual({ kind: "forbidden" });
+
+    expect(x.fake.listRequests).toHaveLength(2);
+    expect(x.state).toEqual({ status: "broken", brokenReason: "scope_missing", lastSyncErrorAt: now });
+  });
+
+  it("treats a malformed 403 body as transient", async () => {
+    const x = stateFixture();
+    x.fake.failNextList({ status: 403, malformed: true });
+
+    expect(await failureValue(x.service.sync(base.id))).toEqual({ kind: "transient" });
+
+    expect(x.fake.listRequests).toHaveLength(1);
+    expect(x.state).toEqual({ status: "connected", brokenReason: null, lastSyncErrorAt: now });
   });
 });

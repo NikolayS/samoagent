@@ -13,6 +13,7 @@ export class FakeGoogleCalendar {
   #pageFailures = new Map<string, Failure>();
   #expired = new Set<string>();
   #revoked = new Set<string>();
+  #forbidden = new Map<string, { reason: string; retryAfter?: string }>();
   #timeZone = "UTC";
 
   seedEvents(events: FakeCalendarEvent[], pageSize = 2500): void { this.#events = structuredClone(events); this.#pageSize = pageSize; }
@@ -21,6 +22,7 @@ export class FakeGoogleCalendar {
   failListPage(token: string, failure: Failure): void { this.#pageFailures.set(token, failure); }
   expireAccessToken(token: string): void { this.#expired.add(token); }
   revokeGrant(token: string): void { this.#revoked.add(token); }
+  forbidAccessToken(token: string, reason: string, retryAfter?: string): void { this.#forbidden.set(token, { reason, retryAfter }); }
 
   #failure(value: Failure, signal?: AbortSignal | null): Promise<Response> | Response {
     if (value.timeout) return new Promise((_resolve, reject) => {
@@ -55,6 +57,8 @@ export class FakeGoogleCalendar {
     if (failure) return this.#failure(failure, init?.signal);
     const access = token?.replace(/^Bearer /, "") ?? "";
     if (this.#expired.delete(access)) return Response.json({ error: { status: "UNAUTHENTICATED" } }, { status: 401 });
+    const forbidden = this.#forbidden.get(access);
+    if (forbidden) return Response.json({ error: { errors: [{ reason: forbidden.reason }], status: "PERMISSION_DENIED" } }, { status: 403, headers: forbidden.retryAfter ? { "retry-after": forbidden.retryAfter } : undefined });
     if (this.#revoked.has(access)) return Response.json({ error: { status: "PERMISSION_DENIED" } }, { status: 403 });
     const windowEvents = this.#events.filter((event) => {
       const start = event.start as Record<string, unknown> | undefined; const end = event.end as Record<string, unknown> | undefined;
