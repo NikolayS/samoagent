@@ -1,4 +1,5 @@
 import { GOOGLE_AUTHORIZE_URL, GOOGLE_REGISTERED_REDIRECT_ORIGINS, GOOGLE_TOKEN_URL } from "../auth/google-oauth.ts";
+import { GoogleCalendarClient } from "./google-calendar-client.ts";
 
 export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly";
 export const GOOGLE_CALENDAR_CALLBACK_PATH = "/calendar/connect/callback";
@@ -10,9 +11,11 @@ export interface GoogleCalendarOAuthPort {
   authorizeUrl(input: { state: string; codeChallenge: string }): string;
   exchangeCode(input: { code: string; codeVerifier: string }): Promise<{ ok: true; refreshToken: string; scopes: string[] } | { ok: false }>;
   revoke(token: string): Promise<boolean>;
+  readonly apiClient?: GoogleCalendarClient;
 }
 
 export class GoogleCalendarOAuth implements GoogleCalendarOAuthPort {
+  readonly apiClient: GoogleCalendarClient;
   readonly redirectUri: string;
   readonly #clientId: string;
   readonly #clientSecret: string;
@@ -20,6 +23,7 @@ export class GoogleCalendarOAuth implements GoogleCalendarOAuthPort {
   constructor(opts: { clientId: string; clientSecret: string; redirectUri: string; fetchImpl?: typeof fetch }) {
     this.#clientId = opts.clientId; this.#clientSecret = opts.clientSecret;
     this.redirectUri = opts.redirectUri; this.#fetch = opts.fetchImpl ?? fetch;
+    this.apiClient = new GoogleCalendarClient({ clientId: opts.clientId, clientSecret: opts.clientSecret, fetchImpl: this.#fetch });
   }
   authorizeUrl(input: { state: string; codeChallenge: string }): string {
     if (!input.state || !input.codeChallenge) throw new Error("Calendar OAuth state or challenge is empty");

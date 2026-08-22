@@ -55,6 +55,10 @@
       "name": "@samograph/test-fakes-google-oauth",
       "version": "0.0.0",
     },
+    "packages/test-fakes/google-calendar": {
+      "name": "@samograph/test-fakes-google-calendar",
+      "version": "0.0.0",
+    },
     "packages/test-fakes/recall": {
       "name": "@samograph/test-fakes-recall",
       "version": "0.0.0",
@@ -150,6 +154,8 @@
     "@samograph/shared": ["@samograph/shared@workspace:packages/shared"],
 
     "@samograph/test-fakes-google-oauth": ["@samograph/test-fakes-google-oauth@workspace:packages/test-fakes/google-oauth"],
+
+    "@samograph/test-fakes-google-calendar": ["@samograph/test-fakes-google-calendar@workspace:packages/test-fakes/google-calendar"],
 
     "@samograph/test-fakes-recall": ["@samograph/test-fakes-recall@workspace:packages/test-fakes/recall"],
 
