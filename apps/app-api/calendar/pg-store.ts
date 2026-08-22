@@ -1,4 +1,5 @@
 import type { SQL } from "bun";
+import { tenantActive } from "../auth/owner-session.ts";
 import type { CalendarConnection, CalendarConnectionStore } from "./service.ts";
 
 type Row = Record<string, unknown>;
@@ -10,7 +11,7 @@ function map(row: Row): CalendarConnection {
 }
 export class PostgresCalendarConnectionStore implements CalendarConnectionStore {
   constructor(readonly sql: SQL) {}
-  async tenantExists(tenantId: string) { return ((await this.sql`SELECT 1 FROM tenants WHERE id=${tenantId}`) as unknown[]).length > 0; }
+  async tenantExists(tenantId: string) { return tenantActive(this.sql, tenantId); }
   async get(userId: string, tenantId: string) {
     const rows = await this.sql`SELECT * FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'` as unknown as Row[];
     return rows[0] ? map(rows[0]) : null;

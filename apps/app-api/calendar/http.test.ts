@@ -9,7 +9,8 @@ import { FakeGoogleIdp } from "../../../packages/test-fakes/google-oauth/index.t
 const now = 50_000, secret = "session-secret";
 class Store implements CalendarConnectionStore {
   row: CalendarConnection | null = null;
-  async tenantExists() { return true; }
+  active = true;
+  async tenantExists() { return this.active; }
   async get() { return this.row; }
   async save(row: CalendarConnection) { this.row = row; }
   async delete() { this.row = null; }
@@ -24,6 +25,25 @@ function handler() {
 const session = () => `samo_session=${signSession({ userId: "user", tenantId: "tenant", iat: now }, secret)}`;
 
 describe("calendar HTTP adapter", () => {
+  it("uses the dead-session convention on all routes when owner resolution marks the tenant erased", async () => {
+    const store = new Store();
+    store.active = false;
+    const service = new CalendarService({ provider: undefined, store,
+      rateLimiter: new InMemoryRateLimiter(), sessionSecret: secret, clock: () => now,
+      activeKey: Buffer.alloc(32), activeKeyVersion: 1, decryptionKeys: new Map([[1, Buffer.alloc(32)]]) });
+    const h = createCalendarHandler(service, secret, () => now);
+    for (const [method, path] of [["POST", "/calendar/connect/start"], ["GET", "/calendar/connect/callback"], ["GET", "/calendar/status"], ["DELETE", "/calendar/connection"]]) {
+      const response = await h(new Request(`http://api.test${path}`, { method, headers: { cookie: session() } }));
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        code: "SAMO-AUTH-005",
+        message: "You've been signed out. Please sign in again.",
+        retryable: false,
+      });
+      expect(response.headers.get("set-cookie") ?? "").toContain("samo_session=;");
+    }
+  });
+
   it("redirects a scope-deficient Google grant to SAMO-CALENDAR-004 without persisting it", async () => {
     const idp = new FakeGoogleIdp({ tokenResponseScopes: ["https://www.googleapis.com/auth/userinfo.email"] });
     const store = new Store();

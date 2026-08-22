@@ -1,4 +1,5 @@
 import { clientIp } from "../auth/http.ts";
+import { sessionInvalidResponse } from "../auth/owner-session.ts";
 import { SESSION_COOKIE_NAME, verifySession } from "../auth/session.ts";
 import { buildClearedCalendarOAuthStateCookie, readCalendarOAuthStateCookie } from "./oauth-state.ts";
 import type { CalendarErrorCode, CalendarService } from "./service.ts";
@@ -16,7 +17,7 @@ export function createCalendarHandler(service: CalendarService, sessionSecret: s
     const url = new URL(req.url), isCallback = req.method === "GET" && url.pathname === "/calendar/connect/callback";
     const raw = cookie(req, SESSION_COOKIE_NAME), claims = raw ? verifySession(raw, sessionSecret, now()) : null;
     if (!claims) return isCallback ? redirect("SAMO-CALENDAR-003") : new Response(null, { status: 401 });
-    if (!(await service.tenantExists(claims.tenantId).catch(() => false))) return isCallback ? redirect("SAMO-CALENDAR-003") : new Response(null, { status: 401 });
+    if (!(await service.tenantExists(claims.tenantId).catch(() => false))) return sessionInvalidResponse();
     if (req.method === "POST" && url.pathname === "/calendar/connect/start") {
       const result = await service.start({ userId: claims.userId, tenantId: claims.tenantId, ip: clientIp(req) });
       return result.ok ? Response.json({ authorization_url: result.authorizationUrl }, { headers: { "set-cookie": result.setCookie, "cache-control": "no-store" } }) : jsonError(result.code, result.code === "SAMO-CALENDAR-001" ? 503 : 500);
