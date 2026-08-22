@@ -17,6 +17,8 @@ import {
   FakeGoogleIdp,
   GOOGLE_JWKS_URL,
 } from "./index.ts";
+import { GoogleCalendarOAuth, GOOGLE_CALENDAR_SCOPE } from "../../../apps/app-api/calendar/google-calendar-oauth.ts";
+import { codeChallengeS256 } from "../../../apps/app-api/auth/oauth-state.ts";
 
 const T0 = 1_770_000_000_000;
 
@@ -107,6 +109,40 @@ describe("FakeGoogleIdp mints REAL RS256 tokens", () => {
   test("a 1024-bit IdP publishes a 128-byte modulus", () => {
     const idp = new FakeGoogleIdp({ modulusLength: 1024 });
     expect(idp.publicModulusBytes().length).toBe(128);
+  });
+});
+
+describe("FakeGoogleIdp Calendar grants", () => {
+  test("captures offline consent, issues refresh tokens, refreshes, and records revocation", async () => {
+    const idp = new FakeGoogleIdp();
+    const oauth = new GoogleCalendarOAuth({ clientId: idp.clientId, clientSecret: "secret", redirectUri: "http://localhost:3000/calendar/connect/callback", fetchImpl: idp.fetchImpl });
+    const authorizationUrl = oauth.authorizeUrl({ state: "state", codeChallenge: codeChallengeS256("verifier") });
+    const grant = idp.authorize(authorizationUrl);
+    expect(idp.authorizationRequests[0]).toEqual({ scope: [GOOGLE_CALENDAR_SCOPE], accessType: "offline", includeGrantedScopes: "true", prompt: "consent", redirectUri: "http://localhost:3000/calendar/connect/callback", state: "state" });
+    const exchanged = await oauth.exchangeCode({ code: grant.code, codeVerifier: "verifier" });
+    expect(exchanged.ok).toBe(true);
+    if (!exchanged.ok) return;
+    const refreshed = await idp.fetchImpl("https://oauth2.googleapis.com/token", {
+      method: "POST", body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: exchanged.refreshToken }).toString(),
+    });
+    expect(refreshed.status).toBe(200);
+    idp.invalidateRefreshToken(exchanged.refreshToken);
+    const invalid = await idp.fetchImpl("https://oauth2.googleapis.com/token", {
+      method: "POST", body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: exchanged.refreshToken }).toString(),
+    });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toEqual({ error: "invalid_grant" });
+    expect(await oauth.revoke(exchanged.refreshToken)).toBe(true);
+    expect(idp.revokedTokens).toEqual([exchanged.refreshToken]);
+  });
+
+  test("can omit refresh_token and reject invalid PKCE", async () => {
+    const idp = new FakeGoogleIdp({ omitRefreshToken: true });
+    const oauth = new GoogleCalendarOAuth({ clientId: idp.clientId, clientSecret: "secret", redirectUri: "http://localhost:3000/calendar/connect/callback", fetchImpl: idp.fetchImpl });
+    const omitted = idp.authorize(oauth.authorizeUrl({ state: "s", codeChallenge: codeChallengeS256("right") }));
+    expect((await oauth.exchangeCode({ code: omitted.code, codeVerifier: "right" })).ok).toBe(false);
+    const wrong = idp.authorize(oauth.authorizeUrl({ state: "s2", codeChallenge: codeChallengeS256("right") }));
+    expect((await oauth.exchangeCode({ code: wrong.code, codeVerifier: "wrong" })).ok).toBe(false);
   });
 });
 

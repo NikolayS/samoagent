@@ -137,4 +137,11 @@ export const AUTH_ERRORS: Record<AuthErrorCode, AuthErrorInfo> = {
     message: "Something went wrong on our end — please try again.",
     retryable: true,
   },
+  "SAMO-CALENDAR-001": { code: "SAMO-CALENDAR-001", httpStatus: 503, message: "Google Calendar isn’t available here.", retryable: false },
+  "SAMO-CALENDAR-002": { code: "SAMO-CALENDAR-002", httpStatus: 302, message: "Google Calendar wasn’t connected.", retryable: true },
+  "SAMO-CALENDAR-003": { code: "SAMO-CALENDAR-003", httpStatus: 302, message: "That Google Calendar connection expired. Please try again.", retryable: true },
+  "SAMO-CALENDAR-004": { code: "SAMO-CALENDAR-004", httpStatus: 302, message: "Google Calendar couldn’t be connected. Please try again.", retryable: true },
+  "SAMO-CALENDAR-005": { code: "SAMO-CALENDAR-005", httpStatus: 409, message: "Google Calendar needs to be reconnected.", retryable: true },
+  "SAMO-CALENDAR-006": { code: "SAMO-CALENDAR-006", httpStatus: 502, message: "Upcoming meetings couldn’t be refreshed. Please try again.", retryable: true },
+  "SAMO-CALENDAR-500": { code: "SAMO-CALENDAR-500", httpStatus: 500, message: "Something went wrong connecting Google Calendar.", retryable: true },
 };

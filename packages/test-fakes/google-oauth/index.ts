@@ -29,6 +29,9 @@ import {
   GOOGLE_JWKS_URL,
   GOOGLE_ID_TOKEN_ISSUERS,
 } from "../../../apps/app-api/auth/google-id-token.ts";
+import { GOOGLE_TOKEN_URL } from "../../../apps/app-api/auth/google-oauth.ts";
+import { GOOGLE_REVOKE_URL } from "../../../apps/app-api/calendar/google-calendar-oauth.ts";
+import { codeChallengeS256 } from "../../../apps/app-api/auth/oauth-state.ts";
 
 // Re-exported so tests reach for the pinned production values through the fake.
 export { GOOGLE_JWKS_URL, GOOGLE_ID_TOKEN_ISSUERS };
@@ -66,6 +69,15 @@ export interface FakeGoogleIdpOptions {
   status?: number;
   /** Replace the JWKS body wholesale (non-JSON, truncated, …). */
   rawBody?: string;
+  /** Model Google's legal omission of a refresh token on an offline exchange. */
+  omitRefreshToken?: boolean;
+  /** Configurable revocation response; local disconnect must ignore failures. */
+  revocationStatus?: number;
+}
+
+export interface FakeAuthorizationRecord {
+  scope: string[]; accessType: string | null; includeGrantedScopes: string | null;
+  prompt: string | null; redirectUri: string | null; state: string | null;
 }
 
 /** Header/claim surgery, so every negative case is expressible. */
@@ -110,6 +122,8 @@ export class FakeGoogleIdp {
   fetchCount = 0;
   /** Every URL the injected fetch was asked for, in order. */
   readonly requestedUrls: string[] = [];
+  readonly authorizationRequests: FakeAuthorizationRecord[] = [];
+  readonly revokedTokens: string[] = [];
 
   readonly #privateKey: KeyObject;
   readonly #publicJwk: Record<string, unknown>;
@@ -122,6 +136,11 @@ export class FakeGoogleIdp {
   readonly #rawBody: string | undefined;
   #failure: string | undefined;
   #foreignKey: KeyObject | undefined;
+  readonly #codes = new Map<string, { refreshToken?: string; redirectUri: string | null; codeChallenge: string | null }>();
+  readonly #refreshTokens = new Map<string, string>();
+  readonly #invalidRefreshTokens = new Set<string>();
+  #omitRefreshToken: boolean;
+  #revocationStatus: number;
 
   constructor(opts: FakeGoogleIdpOptions = {}) {
     this.clientId = opts.clientId ?? "fake-client-id.apps.googleusercontent.com";
@@ -135,6 +154,8 @@ export class FakeGoogleIdp {
     this.#padBodyBytes = opts.padBodyBytes ?? 0;
     this.#status = opts.status ?? 200;
     this.#rawBody = opts.rawBody;
+    this.#omitRefreshToken = opts.omitRefreshToken ?? false;
+    this.#revocationStatus = opts.revocationStatus ?? 200;
 
     const { publicKey, privateKey } = generateKeyPairSync("rsa", {
       modulusLength: opts.modulusLength ?? 2048,
@@ -177,6 +198,30 @@ export class FakeGoogleIdp {
     this.#failure = undefined;
   }
 
+  omitNextRefreshToken(value = true): void { this.#omitRefreshToken = value; }
+  invalidateRefreshToken(token: string): void { this.#invalidRefreshTokens.add(token); }
+  setRevocationStatus(status: number): void { this.#revocationStatus = status; }
+
+  /** Accept an authorization URL and issue a code carrying offline consent state. */
+  authorize(input: string | URL): { code: string; state: string | null; refreshToken?: string } {
+    const url = new URL(input);
+    const record: FakeAuthorizationRecord = {
+      scope: (url.searchParams.get("scope") ?? "").split(/\s+/).filter(Boolean),
+      accessType: url.searchParams.get("access_type"),
+      includeGrantedScopes: url.searchParams.get("include_granted_scopes"),
+      prompt: url.searchParams.get("prompt"), redirectUri: url.searchParams.get("redirect_uri"),
+      state: url.searchParams.get("state"),
+    };
+    this.authorizationRequests.push(record);
+    const code = `fake-code-${this.authorizationRequests.length}`;
+    const shouldIssue = record.accessType === "offline" && record.prompt === "consent" && !this.#omitRefreshToken;
+    const refreshToken = shouldIssue ? `fake-refresh-${this.authorizationRequests.length}` : undefined;
+    this.#codes.set(code, { refreshToken, redirectUri: record.redirectUri, codeChallenge: url.searchParams.get("code_challenge") });
+    if (refreshToken) this.#refreshTokens.set(refreshToken, `fake-access-${this.authorizationRequests.length}`);
+    this.#omitRefreshToken = false;
+    return { code, state: record.state, ...(refreshToken ? { refreshToken } : {}) };
+  }
+
   /**
    * The injected transport. It answers ONLY the pinned production JWKS URL —
    * anything else 404s, so a verifier that invents its own endpoint (runtime
@@ -193,6 +238,26 @@ export class FakeGoogleIdp {
           ? input.toString()
           : input.url;
     this.requestedUrls.push(url);
+    if (url === GOOGLE_TOKEN_URL) {
+      const params = new URLSearchParams(String(_init?.body ?? ""));
+      if (params.get("grant_type") === "authorization_code") {
+        const grant = this.#codes.get(params.get("code") ?? "");
+        if (!grant || grant.redirectUri !== params.get("redirect_uri") || (grant.codeChallenge && grant.codeChallenge !== codeChallengeS256(params.get("code_verifier") ?? ""))) return Response.json({ error: "invalid_grant" }, { status: 400 });
+        this.#codes.delete(params.get("code") ?? "");
+        return Response.json({ access_token: "fake-access", token_type: "Bearer", expires_in: 3600, scope: this.authorizationRequests.at(-1)?.scope.join(" "), ...(grant.refreshToken ? { refresh_token: grant.refreshToken } : {}) });
+      }
+      if (params.get("grant_type") === "refresh_token") {
+        const token = params.get("refresh_token") ?? "";
+        if (!this.#refreshTokens.has(token) || this.#invalidRefreshTokens.has(token) || this.revokedTokens.includes(token)) return Response.json({ error: "invalid_grant" }, { status: 400 });
+        return Response.json({ access_token: this.#refreshTokens.get(token), token_type: "Bearer", expires_in: 3600 });
+      }
+      return Response.json({ error: "unsupported_grant_type" }, { status: 400 });
+    }
+    if (url === GOOGLE_REVOKE_URL) {
+      const token = new URLSearchParams(String(_init?.body ?? "")).get("token");
+      if (token) this.revokedTokens.push(token);
+      return new Response(null, { status: this.#revocationStatus });
+    }
     if (url !== GOOGLE_JWKS_URL) {
       return new Response("not found", { status: 404 });
     }

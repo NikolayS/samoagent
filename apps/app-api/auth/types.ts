@@ -29,7 +29,10 @@ export type AuthErrorCode =
   | "SAMO-AUTH-008" // Google-side or ID-token failure (exchange, JWKS, signature, iss/aud/exp/nonce)
   | "SAMO-AUTH-009" // `email_verified` is not boolean `true` on the verified ID token
   | "SAMO-AUTH-010" // Google sign-in is not configured on this deployment (branch previews)
-  | "SAMO-AUTH-500"; // our fault — provisioning/infra failure; link stays retryable (#180)
+  | "SAMO-AUTH-500" // our fault — provisioning/infra failure; link stays retryable (#180)
+  | "SAMO-CALENDAR-001" | "SAMO-CALENDAR-002" | "SAMO-CALENDAR-003"
+  | "SAMO-CALENDAR-004" | "SAMO-CALENDAR-005" | "SAMO-CALENDAR-006"
+  | "SAMO-CALENDAR-500";
 
 /**
  * How an account was CREATED — persisted as `users.signup_method` (migration

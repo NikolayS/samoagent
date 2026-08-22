@@ -56,6 +56,8 @@ import {
 } from "../bot-orchestrator/statusPoller.ts";
 import { PgListenNotifyPublisher } from "../../packages/shared/transcript/publisher.ts";
 import { MetricsRegistry } from "../../packages/shared/observe/index.ts";
+import { googleCalendarOAuthFromEnv } from "./calendar/google-calendar-oauth.ts";
+import { calendarTokenEncryptionFromEnv } from "./calendar/encryption-config.ts";
 
 /**
  * DEV-ONLY guard: this file carries the local shortcuts (Secure-strip, dev
@@ -182,6 +184,10 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
   // Secure cookies on http://localhost, and stripping it would make the browser
   // DISCARD the cookie outright (see `devCookieFix`).
   const GOOGLE_OAUTH = googleOAuthFromEnv(env, WEB_ORIGIN);
+  const GOOGLE_CALENDAR_OAUTH = googleCalendarOAuthFromEnv(env, WEB_ORIGIN);
+  const CALENDAR_TOKEN_ENCRYPTION = GOOGLE_CALENDAR_OAUTH
+    ? calendarTokenEncryptionFromEnv(env)
+    : undefined;
 
   // Validate PUBLIC_WEBHOOK_BASE once (fail fast on a malformed value).
   const WEBHOOK_BASE = publicWebhookBase(env);
@@ -260,6 +266,8 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
     emailSender: sender,
     webOrigin: WEB_ORIGIN,
     googleOAuth: GOOGLE_OAUTH,
+    googleCalendarOAuth: GOOGLE_CALENDAR_OAUTH,
+    calendarTokenEncryption: CALENDAR_TOKEN_ENCRYPTION,
     enqueue,
     // §5.14 per-call delete: force-leave a live bot + erase its Recall recording
     // (the in-repo fake locally; real acts only when RECALL_LIVE).

@@ -74,6 +74,13 @@ describe("AUTH_ERRORS — the §5.16 Google rows (006–010)", () => {
       "SAMO-AUTH-009",
       "SAMO-AUTH-010",
       "SAMO-AUTH-500",
+      "SAMO-CALENDAR-001",
+      "SAMO-CALENDAR-002",
+      "SAMO-CALENDAR-003",
+      "SAMO-CALENDAR-004",
+      "SAMO-CALENDAR-005",
+      "SAMO-CALENDAR-006",
+      "SAMO-CALENDAR-500",
     ];
     expect(Object.keys(AUTH_ERRORS).sort()).toEqual([...codes].sort());
     for (const code of codes) expect(AUTH_ERRORS[code].code).toBe(code);

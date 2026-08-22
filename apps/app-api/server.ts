@@ -65,6 +65,8 @@ import {
 import { PgListenNotifyPublisher } from "../../packages/shared/transcript/publisher.ts";
 import { MetricsRegistry } from "../../packages/shared/observe/index.ts";
 import { createCachedFunnelSource } from "./metrics/funnelSource.ts";
+import { googleCalendarOAuthFromEnv } from "./calendar/google-calendar-oauth.ts";
+import { calendarTokenEncryptionFromEnv } from "./calendar/encryption-config.ts";
 
 /**
  * Prod email fallback: if `RESEND_API_KEY` is not configured there is NO dev
@@ -203,6 +205,10 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   // redirect URI cannot be derived, rather than letting every user's click die
   // at Google with `redirect_uri_mismatch`. See docs/runbooks/google-oauth.md.
   const googleOAuth = googleOAuthFromEnv(env, webOrigin);
+  const googleCalendarOAuth = googleCalendarOAuthFromEnv(env, webOrigin);
+  const calendarTokenEncryption = googleCalendarOAuth
+    ? calendarTokenEncryptionFromEnv(env)
+    : undefined;
 
   // Validate PUBLIC_WEBHOOK_BASE once (fail fast on a malformed value).
   const webhookBase = publicWebhookBase(env);
@@ -265,6 +271,8 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
     emailSender: sender,
     webOrigin,
     googleOAuth,
+    googleCalendarOAuth,
+    calendarTokenEncryption,
     enqueue,
     // §5.14 per-call delete: force-leave a live bot + erase its Recall recording.
     // Real acts when RECALL_LIVE, else the in-repo fake (no key, no network).

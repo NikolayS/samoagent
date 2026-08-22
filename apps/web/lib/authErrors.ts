@@ -80,6 +80,13 @@ const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
   // Google leg — on the latter the status is 302 whatever happened, so this row
   // is the only thing that keeps the message honest.
   "SAMO-AUTH-500": "Something went wrong on our end — please try again.",
+  "SAMO-CALENDAR-001": "Google Calendar isn’t available here.",
+  "SAMO-CALENDAR-002": "Google Calendar wasn’t connected.",
+  "SAMO-CALENDAR-003": "That Google Calendar connection expired. Please try again.",
+  "SAMO-CALENDAR-004": "Google Calendar couldn’t be connected. Please try again.",
+  "SAMO-CALENDAR-005": "Google Calendar needs to be reconnected.",
+  "SAMO-CALENDAR-006": "Upcoming meetings couldn’t be refreshed. Please try again.",
+  "SAMO-CALENDAR-500": "Something went wrong connecting Google Calendar.",
 };
 
 /**

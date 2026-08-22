@@ -78,7 +78,9 @@ function specWithDuplicateRow(order: "drift-first" | "correct-first"): string {
 describe("SPEC §5.16 error table (S5-1 fold-in, #225)", () => {
   test("documents every SAMO-AUTH code that ships, exactly once", () => {
     const documented = specAuthRows(SPEC);
-    expect([...documented.keys()].sort()).toEqual(Object.keys(AUTH_ERRORS).sort());
+    expect([...documented.keys()].sort()).toEqual(
+      Object.keys(AUTH_ERRORS).filter((code) => code.startsWith("SAMO-AUTH-")).sort(),
+    );
   });
 
   test("every documented message is byte-identical to AUTH_ERRORS", () => {
