@@ -3,10 +3,10 @@ import { validateMeetingUrl } from "../calls/validate.ts";
 import { GoogleCalendarFailure, type GoogleCalendarClient, type GoogleCalendarEvent } from "./google-calendar-client.ts";
 
 export type BrokenReason = "invalid_grant" | "revoked" | "scope_missing" | "refresh_failed";
-export interface SyncConnection { id: string; userId: string; tenantId: string; encryptedRefreshToken: Buffer; refreshTokenIv: Buffer; refreshTokenTag: Buffer; encryptionKeyVersion: number; status: "connected" | "broken"; }
+export interface SyncConnection { id: string; userId: string; tenantId: string; encryptedRefreshToken: Buffer; refreshTokenIv: Buffer; refreshTokenTag: Buffer; encryptionKeyVersion: number; status: "connected" | "broken"; syncSeq: bigint; }
 export interface NormalizedCalendarEvent { providerEventId: string; recurringEventId: string | null; title: string; organizerEmail: string | null; startsAt: Date; endsAt: Date; allDay: boolean; attendeeResponse: "needsAction" | "declined" | "tentative" | "accepted" | null; meetingUrl: string | null; meetingProvider: "google_meet" | "zoom" | null; sourceUpdatedAt: Date | null; }
 export interface CalendarSyncStore {
-  getById(connectionId: string): Promise<SyncConnection | null>;
+  startSync(connectionId: string): Promise<SyncConnection | null>;
   reconcile(connection: SyncConnection, events: NormalizedCalendarEvent[], input: { windowStart: Date; windowEnd: Date; syncStartedAt: Date }): Promise<void>;
   markFailure(connectionId: string, input: { brokenReason: BrokenReason | null; at: Date; retryAfterMs?: number }): Promise<void>;
 }
@@ -24,21 +24,26 @@ function meeting(raw: unknown): Pick<NormalizedCalendarEvent, "meetingUrl" | "me
   }
   return null;
 }
-function zonedMidnight(value: unknown, timeZone: unknown): Date | null {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || typeof timeZone !== "string") return null;
+function validTimeZone(value: unknown): value is string {
+  if (typeof value !== "string" || !value) return false;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: value }).format(); return true; } catch { return false; }
+}
+function zonedMidnight(value: unknown, ...timeZones: unknown[]): Date | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const timeZone = timeZones.find(validTimeZone) ?? "UTC";
   const [year, month, day] = value.split("-").map(Number); let instant = Date.UTC(year, month - 1, day);
   try {
     const formatter = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
     for (let i = 0; i < 3; i++) { const parts = Object.fromEntries(formatter.formatToParts(new Date(instant)).map((p) => [p.type, p.value])); const represented = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second)); instant += Date.UTC(year, month - 1, day) - represented; }
     return new Date(instant);
-  } catch { return null; }
+  } catch { return new Date(Date.UTC(year, month - 1, day)); }
 }
 export function normalizeGoogleEvent(raw: GoogleCalendarEvent, calendarTimeZone: string | null = null): NormalizedCalendarEvent | null {
   if (raw.status === "cancelled" || typeof raw.id !== "string" || !raw.id) return null;
   const start = raw.start as Record<string, unknown> | undefined, end = raw.end as Record<string, unknown> | undefined;
   const allDay = typeof start?.date === "string";
-  const startsAt = allDay ? zonedMidnight(start?.date, start?.timeZone ?? calendarTimeZone) : date(start?.dateTime);
-  const endsAt = allDay ? zonedMidnight(end?.date, end?.timeZone ?? calendarTimeZone) : date(end?.dateTime);
+  const startsAt = allDay ? zonedMidnight(start?.date, start?.timeZone, calendarTimeZone, "UTC") : date(start?.dateTime);
+  const endsAt = allDay ? zonedMidnight(end?.date, end?.timeZone, calendarTimeZone, "UTC") : date(end?.dateTime);
   if (!startsAt || !endsAt || endsAt < startsAt) return null;
   const attendees = Array.isArray(raw.attendees) ? raw.attendees : [];
   const self = attendees.find((item) => item && typeof item === "object" && (item as Record<string, unknown>).self === true) as Record<string, unknown> | undefined;
@@ -51,7 +56,7 @@ export function normalizeGoogleEvent(raw: GoogleCalendarEvent, calendarTimeZone:
 export class CalendarSyncService {
   constructor(readonly deps: { store: CalendarSyncStore; client: GoogleCalendarClient; decryptionKeys: Map<number, Buffer>; clock?: () => number }) {}
   async sync(connectionId: string): Promise<void> {
-    const connection = await this.deps.store.getById(connectionId); if (!connection || connection.status === "broken") return;
+    const connection = await this.deps.store.startSync(connectionId); if (!connection || connection.status === "broken") return;
     const syncStartedAt = new Date((this.deps.clock ?? Date.now)()); const windowEnd = new Date(syncStartedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
     try {
       const key = this.deps.decryptionKeys.get(connection.encryptionKeyVersion); if (!key) throw new GoogleCalendarFailure("refresh_failed");

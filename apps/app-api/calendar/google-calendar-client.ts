@@ -12,10 +12,19 @@ export class GoogleCalendarFailure extends Error {
 export type GoogleCalendarEvent = Record<string, unknown> & { id?: unknown };
 
 async function bounded(res: Response): Promise<Record<string, unknown>> {
-  const declared = Number(res.headers.get("content-length") ?? 0);
-  if (declared > MAX_BODY) throw new GoogleCalendarFailure("oversized");
-  const text = await res.text();
-  if (Buffer.byteLength(text) > MAX_BODY) throw new GoogleCalendarFailure("oversized");
+  const length = res.headers.get("content-length");
+  const declared = length === null ? null : Number(length);
+  if (declared !== null && Number.isSafeInteger(declared) && declared >= 0 && declared > MAX_BODY) { await res.body?.cancel(); throw new GoogleCalendarFailure("oversized"); }
+  const reader = res.body?.getReader(); const decoder = new TextDecoder(); let bytes = 0; let text = "";
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_BODY) { await reader.cancel(); throw new GoogleCalendarFailure("oversized"); }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  }
   try { const parsed = JSON.parse(text); if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(); return parsed as Record<string, unknown>; }
   catch (error) { if (error instanceof GoogleCalendarFailure) throw error; throw new GoogleCalendarFailure("malformed"); }
 }
@@ -39,7 +48,7 @@ export class GoogleCalendarClient {
     catch { throw new GoogleCalendarFailure("transient"); }
     const classified = statusFailure(res); if (classified) throw classified;
     let value: Record<string, unknown>;
-    try { value = await bounded(res); } catch { throw new GoogleCalendarFailure("transient"); }
+    try { value = await bounded(res); } catch (error) { if (error instanceof GoogleCalendarFailure && error.kind === "oversized") throw error; throw new GoogleCalendarFailure("transient"); }
     if (!res.ok) {
       if (res.status === 400 && value.error === "invalid_grant") throw new GoogleCalendarFailure("invalid_grant");
       throw new GoogleCalendarFailure("unauthorized");
@@ -57,7 +66,7 @@ export class GoogleCalendarClient {
       catch { throw new GoogleCalendarFailure("transient"); }
       const classified = statusFailure(res); if (classified) throw classified;
       if (!res.ok) throw new GoogleCalendarFailure("malformed");
-      let body: Record<string, unknown>; try { body = await bounded(res); } catch { throw new GoogleCalendarFailure("transient"); }
+      let body: Record<string, unknown>; try { body = await bounded(res); } catch (error) { if (error instanceof GoogleCalendarFailure && error.kind === "oversized") throw error; throw new GoogleCalendarFailure("transient"); }
       if (!Array.isArray(body.items)) throw new GoogleCalendarFailure("transient");
       if (timeZone === null && typeof body.timeZone === "string") timeZone = body.timeZone;
       all.push(...body.items as GoogleCalendarEvent[]); if (all.length > MAX_EVENTS) throw new GoogleCalendarFailure("oversized");

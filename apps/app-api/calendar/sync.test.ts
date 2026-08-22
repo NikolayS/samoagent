@@ -2,16 +2,16 @@ import { describe, expect, it } from "bun:test";
 import { encryptSecret } from "../../../packages/shared/crypto.ts";
 import { FakeGoogleCalendar } from "../../../packages/test-fakes/google-calendar/index.ts";
 import { GoogleCalendarClient } from "./google-calendar-client.ts";
-import { CalendarSyncService, type CalendarSyncStore, type SyncConnection } from "./sync.ts";
+import { CalendarSyncService, normalizeGoogleEvent, type CalendarSyncStore, type SyncConnection } from "./sync.ts";
 
 const now = new Date("2026-08-21T12:00:00.000Z");
 const key = Buffer.alloc(32, 7);
 const base = { id: "00000000-0000-4000-8000-000000000001", userId: "00000000-0000-4000-8000-000000000002", tenantId: "00000000-0000-4000-8000-000000000003" };
 function fixture() {
   const encrypted = encryptSecret("refresh-token", key, 1, `samo.calendar.refresh.v1|${base.id}|${base.userId}|${base.tenantId}`);
-  const connection: SyncConnection = { ...base, encryptedRefreshToken: encrypted.ciphertext, refreshTokenIv: encrypted.iv, refreshTokenTag: encrypted.tag, encryptionKeyVersion: 1, status: "connected" };
+  const connection: SyncConnection = { ...base, encryptedRefreshToken: encrypted.ciphertext, refreshTokenIv: encrypted.iv, refreshTokenTag: encrypted.tag, encryptionKeyVersion: 1, status: "connected", syncSeq: 1n };
   const reconciles: unknown[][] = [], failures: unknown[] = [];
-  const store: CalendarSyncStore = { getById: async () => connection, reconcile: async (_c, events) => { reconciles.push(events); }, markFailure: async (_id, failure) => { failures.push(failure); } };
+  const store: CalendarSyncStore = { startSync: async () => connection, reconcile: async (_c, events) => { reconciles.push(events); }, markFailure: async (_id, failure) => { failures.push(failure); } };
   const fake = new FakeGoogleCalendar();
   const service = new CalendarSyncService({ store, client: new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: fake.fetchImpl }), decryptionKeys: new Map([[1, key]]), clock: () => now.getTime() });
   return { service, fake, reconciles, failures };
@@ -43,6 +43,19 @@ describe("CalendarSyncService", () => {
       endsAt: new Date("2026-08-24T07:00:00.000Z"),
       allDay: true,
     });
+  });
+
+  it("falls back through valid all-day time zones and preserves exact DST midnights", async () => {
+    const cases = [
+      { id: "event-invalid", start: { date: "2026-08-23", timeZone: "Mars/Olympus" }, end: { date: "2026-08-24", timeZone: "Mars/Olympus" }, calendar: "America/Los_Angeles", expected: ["2026-08-23T07:00:00.000Z", "2026-08-24T07:00:00.000Z"] },
+      { id: "all-invalid", start: { date: "2026-08-23", timeZone: "Invalid/Zone" }, end: { date: "2026-08-24" }, calendar: "Also/Invalid", expected: ["2026-08-23T00:00:00.000Z", "2026-08-24T00:00:00.000Z"] },
+      { id: "spring", start: { date: "2026-03-08", timeZone: "America/New_York" }, end: { date: "2026-03-09", timeZone: "America/New_York" }, calendar: "UTC", expected: ["2026-03-08T05:00:00.000Z", "2026-03-09T04:00:00.000Z"] },
+      { id: "fall", start: { date: "2026-11-01", timeZone: "America/New_York" }, end: { date: "2026-11-02", timeZone: "America/New_York" }, calendar: "UTC", expected: ["2026-11-01T04:00:00.000Z", "2026-11-02T05:00:00.000Z"] },
+    ];
+    for (const value of cases) {
+      const event = normalizeGoogleEvent({ id: value.id, start: value.start, end: value.end }, value.calendar);
+      expect(event && [event.providerEventId, event.startsAt.toISOString(), event.endsAt.toISOString()]).toEqual([value.id, ...value.expected]);
+    }
   });
 
   it("checks every video entry point and rejects fallback credentials/fragments", async () => {

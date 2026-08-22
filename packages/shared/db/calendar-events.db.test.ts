@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { connect, migrate, setTenant } from "./index.ts";
 import { PostgresCalendarConnectionStore } from "../../../apps/app-api/calendar/pg-store.ts";
-import type { NormalizedCalendarEvent, SyncConnection } from "../../../apps/app-api/calendar/sync.ts";
+import { normalizeGoogleEvent, type NormalizedCalendarEvent, type SyncConnection } from "../../../apps/app-api/calendar/sync.ts";
 
 const d = process.env.DATABASE_URL ? describe : describe.skip;
 d("calendar_events migration", () => {
@@ -41,22 +41,43 @@ d("calendar_events migration", () => {
   });
 
   it("never lets an older reconciliation overwrite a newer success", async () => {
-    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql); const connection = { ...row, id: row.connectionId, encryptedRefreshToken: Buffer.from("x"), refreshTokenIv: Buffer.alloc(12), refreshTokenTag: Buffer.alloc(16), encryptionKeyVersion: 1, status: "connected" } as SyncConnection;
+    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql); const olderConnection = await store.startSync(row.connectionId); const newerConnection = await store.startSync(row.connectionId);
     const normalized = (title: string): NormalizedCalendarEvent => ({ providerEventId: "race", recurringEventId: null, title, organizerEmail: null, startsAt: new Date("2026-08-24T10:00:00Z"), endsAt: new Date("2026-08-24T11:00:00Z"), allDay: false, attendeeResponse: null, meetingUrl: null, meetingProvider: null, sourceUpdatedAt: null });
     const newer = new Date("2026-08-21T12:00:02Z"), older = new Date("2026-08-21T12:00:01Z");
-    await store.reconcile(connection, [normalized("newer")], { windowStart: older, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: newer });
-    await store.reconcile(connection, [normalized("older")], { windowStart: older, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: older });
+    await store.reconcile(newerConnection!, [normalized("newer")], { windowStart: older, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: newer });
+    await store.reconcile(olderConnection!, [normalized("older")], { windowStart: older, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: older });
     expect(await sql`SELECT title FROM calendar_events WHERE connection_id=${row.connectionId} AND provider_event_id='race'` as unknown).toEqual([{ title: "newer" }]);
     expect(await sql`SELECT last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ last_sync_at: newer }]);
     await store.markFailure(row.connectionId, { brokenReason: "revoked", at: older });
     expect(await sql`SELECT status,broken_reason,last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ status: "connected", broken_reason: null, last_sync_at: newer }]);
   });
 
-  it("uses a unique sync identity when two reconciliations share a timestamp", async () => {
-    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql); const connection = { ...row, id: row.connectionId, encryptedRefreshToken: Buffer.from("x"), refreshTokenIv: Buffer.alloc(12), refreshTokenTag: Buffer.alloc(16), encryptionKeyVersion: 1, status: "connected" } as SyncConnection;
-    const at = new Date("2026-08-21T12:00:00Z"); const event: NormalizedCalendarEvent = { providerEventId: "cancelled-next", recurringEventId: null, title: "first", organizerEmail: null, startsAt: new Date("2026-08-24T10:00:00Z"), endsAt: new Date("2026-08-24T11:00:00Z"), allDay: false, attendeeResponse: null, meetingUrl: null, meetingProvider: null, sourceUpdatedAt: null };
+  it("keeps the newer snapshot when an older reconciliation commits last at the same timestamp", async () => {
+    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql);
+    const older = await store.startSync(row.connectionId); const newer = await store.startSync(row.connectionId);
+    expect([older?.syncSeq, newer?.syncSeq]).toEqual([1n, 2n]);
+    const at = new Date("2026-08-21T12:00:00Z");
+    const normalized = (title: string): NormalizedCalendarEvent => ({ providerEventId: "race", recurringEventId: null, title, organizerEmail: null, startsAt: new Date("2026-08-24T10:00:00Z"), endsAt: new Date("2026-08-24T11:00:00Z"), allDay: false, attendeeResponse: null, meetingUrl: null, meetingProvider: null, sourceUpdatedAt: null });
     const bounds = { windowStart: at, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: at };
-    await store.reconcile(connection, [event], bounds); await store.reconcile(connection, [], bounds);
+    await store.reconcile(newer!, [normalized("newer")], bounds); await store.reconcile(older!, [normalized("older")], bounds);
+    expect(await sql`SELECT title FROM calendar_events WHERE connection_id=${row.connectionId} AND provider_event_id='race'` as unknown).toEqual([{ title: "newer" }]);
+    expect(await sql`SELECT sync_seq,committed_sync_seq,last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ sync_seq: "2", committed_sync_seq: "2", last_sync_at: at }]);
+  });
+
+  it("does not delete a cached all-day row when its event time zone becomes invalid", async () => {
+    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql); const first = await store.startSync(row.connectionId); const second = await store.startSync(row.connectionId);
+    const at = new Date("2026-08-21T12:00:00Z"); const bounds = { windowStart: at, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: at };
+    const valid = normalizeGoogleEvent({ id: "all-day", summary: "Retained", start: { date: "2026-08-24", timeZone: "UTC" }, end: { date: "2026-08-25", timeZone: "UTC" } }, "UTC");
+    const invalid = normalizeGoogleEvent({ id: "all-day", summary: "Retained", start: { date: "2026-08-24", timeZone: "Invalid/Zone" }, end: { date: "2026-08-25", timeZone: "Invalid/Zone" } }, "Also/Invalid");
+    await store.reconcile(first!, [valid!], bounds); await store.reconcile(second!, invalid ? [invalid] : [], bounds);
+    expect(await sql`SELECT provider_event_id,title,starts_at,ends_at,all_day FROM calendar_events WHERE connection_id=${row.connectionId}` as unknown).toEqual([{ provider_event_id: "all-day", title: "Retained", starts_at: new Date("2026-08-24T00:00:00.000Z"), ends_at: new Date("2026-08-25T00:00:00.000Z"), all_day: true }]);
+  });
+
+  it("reconciles the same overlap window used by Google timeMin and timeMax", async () => {
+    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql); const first = await store.startSync(row.connectionId); const second = await store.startSync(row.connectionId);
+    const windowStart = new Date("2026-08-21T12:00:00Z"); const bounds = { windowStart, windowEnd: new Date("2026-09-20T12:00:00Z"), syncStartedAt: windowStart };
+    const inProgress: NormalizedCalendarEvent = { providerEventId: "in-progress", recurringEventId: null, title: "In progress", organizerEmail: null, startsAt: new Date("2026-08-21T11:30:00Z"), endsAt: new Date("2026-08-21T12:30:00Z"), allDay: false, attendeeResponse: null, meetingUrl: null, meetingProvider: null, sourceUpdatedAt: null };
+    await store.reconcile(first!, [inProgress], bounds); await store.reconcile(second!, [], bounds);
     expect(await sql`SELECT provider_event_id FROM calendar_events WHERE connection_id=${row.connectionId}` as unknown).toEqual([]);
   });
 });

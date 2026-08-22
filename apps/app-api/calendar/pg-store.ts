@@ -25,16 +25,19 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
       ON CONFLICT (user_id,provider) DO UPDATE SET tenant_id=EXCLUDED.tenant_id, encrypted_refresh_token=EXCLUDED.encrypted_refresh_token, refresh_token_iv=EXCLUDED.refresh_token_iv, refresh_token_tag=EXCLUDED.refresh_token_tag, encryption_key_version=EXCLUDED.encryption_key_version, granted_scopes=EXCLUDED.granted_scopes, status='connected', broken_reason=NULL, connected_at=EXCLUDED.connected_at, updated_at=EXCLUDED.updated_at, last_sync_at=NULL, last_sync_error_at=NULL`;
   }
   async delete(userId: string, tenantId: string) { await this.sql`DELETE FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'`; }
-  async getById(connectionId: string): Promise<SyncConnection | null> {
-    const rows = await this.sql`SELECT * FROM calendar_connections WHERE id=${connectionId}` as unknown as Row[];
-    const row = rows[0] ? map(rows[0]) : null;
-    return row ? { id: row.id, userId: row.userId, tenantId: row.tenantId, encryptedRefreshToken: row.encryptedRefreshToken, refreshTokenIv: row.refreshTokenIv, refreshTokenTag: row.refreshTokenTag, encryptionKeyVersion: row.encryptionKeyVersion, status: row.status } : null;
+  async startSync(connectionId: string): Promise<SyncConnection | null> {
+    return this.sql.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${connectionId}))`;
+      const rows = await tx`UPDATE calendar_connections SET sync_seq=sync_seq+1 WHERE id=${connectionId} AND status='connected' RETURNING *` as unknown as Row[];
+      const row = rows[0] ? map(rows[0]) : null;
+      return row ? { id: row.id, userId: row.userId, tenantId: row.tenantId, encryptedRefreshToken: row.encryptedRefreshToken, refreshTokenIv: row.refreshTokenIv, refreshTokenTag: row.refreshTokenTag, encryptionKeyVersion: row.encryptionKeyVersion, status: row.status, syncSeq: BigInt(rows[0].sync_seq as bigint) } : null;
+    });
   }
   async reconcile(connection: SyncConnection, events: NormalizedCalendarEvent[], input: { windowStart: Date; windowEnd: Date; syncStartedAt: Date }): Promise<void> {
     await this.sql.begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${connection.id}))`;
-      const state = await tx`SELECT last_sync_at FROM calendar_connections WHERE id=${connection.id} FOR UPDATE` as unknown as Array<{ last_sync_at: Date | null }>;
-      if (!state[0] || (state[0].last_sync_at && new Date(state[0].last_sync_at).getTime() > input.syncStartedAt.getTime())) return;
+      const state = await tx`SELECT committed_sync_seq FROM calendar_connections WHERE id=${connection.id} FOR UPDATE` as unknown as Array<{ committed_sync_seq: bigint }>;
+      if (!state[0] || BigInt(state[0].committed_sync_seq) > connection.syncSeq) return;
       const syncId = randomUUID();
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, connection.tenantId);
@@ -43,11 +46,11 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
           VALUES (${connection.tenantId},${connection.id},${event.providerEventId},${event.recurringEventId},${event.title},${event.organizerEmail},${event.startsAt},${event.endsAt},${event.allDay},${event.attendeeResponse},${event.meetingUrl},${event.meetingProvider},${event.sourceUpdatedAt},${syncId},${input.syncStartedAt},${input.syncStartedAt})
           ON CONFLICT (connection_id,provider_event_id) DO UPDATE SET recurring_event_id=EXCLUDED.recurring_event_id,title=EXCLUDED.title,organizer_email=EXCLUDED.organizer_email,starts_at=EXCLUDED.starts_at,ends_at=EXCLUDED.ends_at,all_day=EXCLUDED.all_day,attendee_response=EXCLUDED.attendee_response,meeting_url=EXCLUDED.meeting_url,meeting_provider=EXCLUDED.meeting_provider,source_updated_at=EXCLUDED.source_updated_at,sync_id=EXCLUDED.sync_id,synced_at=EXCLUDED.synced_at,updated_at=EXCLUDED.updated_at`;
       }
-      await tx`DELETE FROM calendar_events WHERE connection_id=${connection.id} AND starts_at >= ${input.windowStart} AND starts_at <= ${input.windowEnd} AND sync_id <> ${syncId}`;
-      await tx`DELETE FROM calendar_events WHERE connection_id=${connection.id} AND ends_at < ${input.syncStartedAt}`;
+      await tx`DELETE FROM calendar_events WHERE connection_id=${connection.id} AND ends_at > ${input.windowStart} AND starts_at < ${input.windowEnd} AND sync_id <> ${syncId}`;
+      await tx`DELETE FROM calendar_events WHERE connection_id=${connection.id} AND ends_at <= ${input.syncStartedAt}`;
       // Credential state is privileged; temporarily return to the transaction owner.
       await tx.unsafe("RESET ROLE");
-      await tx`UPDATE calendar_connections SET status='connected',broken_reason=NULL,last_sync_at=${input.syncStartedAt},updated_at=${input.syncStartedAt} WHERE id=${connection.id}`;
+      await tx`UPDATE calendar_connections SET status='connected',broken_reason=NULL,committed_sync_seq=${connection.syncSeq},last_sync_at=${input.syncStartedAt},updated_at=${input.syncStartedAt} WHERE id=${connection.id}`;
     });
   }
   async markFailure(connectionId: string, input: { brokenReason: BrokenReason | null; at: Date }): Promise<void> {

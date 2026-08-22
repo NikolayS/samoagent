@@ -4,6 +4,11 @@
 -- 0014. Runtime access is therefore protected by enabled + forced RLS using
 -- the scalar sub-SELECT tenant policy established by 0010_settings.
 
+ALTER TABLE calendar_connections
+  ADD COLUMN sync_seq bigint NOT NULL DEFAULT 0,
+  ADD COLUMN committed_sync_seq bigint NOT NULL DEFAULT 0,
+  ADD CONSTRAINT calendar_connections_sync_seq_order CHECK (committed_sync_seq <= sync_seq);
+
 CREATE TABLE calendar_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,

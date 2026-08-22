@@ -57,9 +57,12 @@ export class FakeGoogleCalendar {
     if (this.#expired.delete(access)) return Response.json({ error: { status: "UNAUTHENTICATED" } }, { status: 401 });
     if (this.#revoked.has(access)) return Response.json({ error: { status: "PERMISSION_DENIED" } }, { status: 403 });
     const windowEvents = this.#events.filter((event) => {
-      const start = event.start as Record<string, unknown> | undefined; const value = start?.dateTime ?? start?.date;
-      if (typeof value !== "string") return false; const instant = Date.parse(typeof start?.date === "string" ? `${value}T00:00:00Z` : value);
-      return Number.isFinite(instant) && instant >= timeMin && instant < timeMax;
+      const start = event.start as Record<string, unknown> | undefined; const end = event.end as Record<string, unknown> | undefined;
+      const startValue = start?.dateTime ?? start?.date; const endValue = end?.dateTime ?? end?.date;
+      if (typeof startValue !== "string" || typeof endValue !== "string") return false;
+      const startInstant = Date.parse(typeof start?.date === "string" ? `${startValue}T00:00:00Z` : startValue);
+      const endInstant = Date.parse(typeof end?.date === "string" ? `${endValue}T00:00:00Z` : endValue);
+      return Number.isFinite(startInstant) && Number.isFinite(endInstant) && endInstant > timeMin && startInstant < timeMax;
     });
     const offset = pageToken ? (Number(pageToken.replace("page-", "")) - 1) * this.#pageSize : 0;
     const items = windowEvents.slice(offset, offset + this.#pageSize);

@@ -44,6 +44,25 @@ describe("GoogleCalendarClient", () => {
     expect((await large.listEvents("access", new Date(0), new Date(1))).events).toHaveLength(400);
   });
 
+  it("cancels an oversized streaming body before the producer finishes", async () => {
+    const chunk = new Uint8Array(1024 * 1024); let pulls = 0; let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) { pulls++; if (pulls > 20) controller.close(); else controller.enqueue(chunk); },
+      cancel() { cancelled = true; },
+    }, { highWaterMark: 0 });
+    const client = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => new Response(body)) as unknown as typeof fetch });
+    await expect(client.listEvents("access", new Date(0), new Date(1))).rejects.toMatchObject({ kind: "oversized" });
+    expect({ cancelled, pulls, bytesProduced: pulls * chunk.byteLength }).toEqual({ cancelled: true, pulls: 9, bytesProduced: 9 * 1024 * 1024 });
+  });
+
+  it("rejects a declared oversized body without reading it", async () => {
+    let pulls = 0; let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({ pull(controller) { pulls++; controller.enqueue(new Uint8Array([123])); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+    const client = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => new Response(body, { headers: { "content-length": String(8 * 1024 * 1024 + 1) } })) as unknown as typeof fetch });
+    await expect(client.listEvents("access", new Date(0), new Date(1))).rejects.toMatchObject({ kind: "oversized" });
+    expect({ pulls, cancelled }).toEqual({ pulls: 0, cancelled: true });
+  });
+
   it("clamps Retry-After to one hour", async () => {
     const client = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => new Response("", { status: 429, headers: { "retry-after": "999999" } })) as unknown as typeof fetch });
     await expect(client.listEvents("access", new Date(0), new Date(1))).rejects.toMatchObject({ kind: "rate_limited", retryAfterMs: 3_600_000 });
