@@ -8,7 +8,7 @@ export interface NormalizedCalendarEvent { providerEventId: string; recurringEve
 export interface CalendarSyncStore {
   startSync(connectionId: string): Promise<SyncConnection | null>;
   reconcile(connection: SyncConnection, events: NormalizedCalendarEvent[], input: { windowStart: Date; windowEnd: Date; syncStartedAt: Date }): Promise<void>;
-  markFailure(connectionId: string, input: { brokenReason: BrokenReason | null; at: Date; retryAfterMs?: number }): Promise<void>;
+  markFailure(connectionId: string, input: { syncSeq: bigint; brokenReason: BrokenReason | null; at: Date; retryAfterMs?: number }): Promise<void>;
 }
 const responses = new Set(["needsAction", "declined", "tentative", "accepted"]);
 function date(value: unknown): Date | null { if (typeof value !== "string") return null; const out = new Date(value); return Number.isNaN(out.getTime()) ? null : out; }
@@ -65,13 +65,13 @@ export class CalendarSyncService {
       catch { throw new GoogleCalendarFailure("refresh_failed"); }
       let access: string;
       try { access = await this.deps.client.refreshAccessToken(refresh); }
-      catch (error) { if (error instanceof GoogleCalendarFailure && ["invalid_grant", "rate_limited", "transient"].includes(error.kind)) throw error; throw new GoogleCalendarFailure("refresh_failed"); }
+      catch (error) { if (error instanceof GoogleCalendarFailure && ["invalid_grant", "rate_limited", "transient", "malformed", "oversized"].includes(error.kind)) throw error; throw new GoogleCalendarFailure("refresh_failed"); }
       let raw: Awaited<ReturnType<GoogleCalendarClient["listEvents"]>>;
       try { raw = await this.deps.client.listEvents(access, syncStartedAt, windowEnd); }
       catch (error) {
         if (!(error instanceof GoogleCalendarFailure) || (error.kind !== "unauthorized" && error.kind !== "forbidden")) throw error;
         try { access = await this.deps.client.refreshAccessToken(refresh); }
-        catch (refreshError) { if (refreshError instanceof GoogleCalendarFailure && ["invalid_grant", "rate_limited", "transient"].includes(refreshError.kind)) throw refreshError; throw new GoogleCalendarFailure("refresh_failed"); }
+        catch (refreshError) { if (refreshError instanceof GoogleCalendarFailure && ["invalid_grant", "rate_limited", "transient", "malformed", "oversized"].includes(refreshError.kind)) throw refreshError; throw new GoogleCalendarFailure("refresh_failed"); }
         try { raw = await this.deps.client.listEvents(access, syncStartedAt, windowEnd); }
         catch (second) {
           if (second instanceof GoogleCalendarFailure && second.kind === "forbidden") throw new GoogleCalendarFailure("forbidden");
@@ -82,8 +82,8 @@ export class CalendarSyncService {
       await this.deps.store.reconcile(connection, raw.events.map((event) => normalizeGoogleEvent(event, raw.timeZone)).filter((event): event is NormalizedCalendarEvent => event !== null), { windowStart: syncStartedAt, windowEnd, syncStartedAt });
     } catch (error) {
       const failure = error instanceof GoogleCalendarFailure ? error : new GoogleCalendarFailure("transient");
-      const brokenReason: BrokenReason | null = failure.kind === "invalid_grant" ? "invalid_grant" : failure.kind === "forbidden" ? "scope_missing" : failure.kind === "unauthorized" ? "revoked" : failure.kind === "refresh_failed" ? "refresh_failed" : null;
-      await this.deps.store.markFailure(connectionId, { brokenReason, at: syncStartedAt, ...(failure.retryAfterMs === undefined ? {} : { retryAfterMs: failure.retryAfterMs }) });
+      const brokenReason: BrokenReason | null = failure.kind === "invalid_grant" ? "invalid_grant" : failure.kind === "forbidden" ? "scope_missing" : failure.kind === "unauthorized" ? "revoked" : null;
+      await this.deps.store.markFailure(connectionId, { syncSeq: connection.syncSeq, brokenReason, at: syncStartedAt, ...(failure.retryAfterMs === undefined ? {} : { retryAfterMs: failure.retryAfterMs }) });
       throw failure;
     }
   }

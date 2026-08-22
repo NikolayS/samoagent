@@ -22,7 +22,7 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
   async save(r: CalendarConnection) {
     await this.sql`INSERT INTO calendar_connections (id,user_id,tenant_id,provider,encrypted_refresh_token,refresh_token_iv,refresh_token_tag,encryption_key_version,granted_scopes,status,broken_reason,connected_at,updated_at,last_sync_at,last_sync_error_at)
       VALUES (${r.id},${r.userId},${r.tenantId},'google',${r.encryptedRefreshToken},${r.refreshTokenIv},${r.refreshTokenTag},${r.encryptionKeyVersion},${r.grantedScopes},'connected',NULL,${r.connectedAt},${r.connectedAt},NULL,NULL)
-      ON CONFLICT (user_id,provider) DO UPDATE SET tenant_id=EXCLUDED.tenant_id, encrypted_refresh_token=EXCLUDED.encrypted_refresh_token, refresh_token_iv=EXCLUDED.refresh_token_iv, refresh_token_tag=EXCLUDED.refresh_token_tag, encryption_key_version=EXCLUDED.encryption_key_version, granted_scopes=EXCLUDED.granted_scopes, status='connected', broken_reason=NULL, connected_at=EXCLUDED.connected_at, updated_at=EXCLUDED.updated_at, last_sync_at=NULL, last_sync_error_at=NULL`;
+      ON CONFLICT (user_id,provider) DO UPDATE SET tenant_id=EXCLUDED.tenant_id, encrypted_refresh_token=EXCLUDED.encrypted_refresh_token, refresh_token_iv=EXCLUDED.refresh_token_iv, refresh_token_tag=EXCLUDED.refresh_token_tag, encryption_key_version=EXCLUDED.encryption_key_version, granted_scopes=EXCLUDED.granted_scopes, status='connected', broken_reason=NULL, connected_at=EXCLUDED.connected_at, updated_at=EXCLUDED.updated_at, last_sync_at=NULL, last_sync_error_at=NULL, sync_seq=calendar_connections.sync_seq+1, committed_sync_seq=calendar_connections.sync_seq+1`;
   }
   async delete(userId: string, tenantId: string) { await this.sql`DELETE FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'`; }
   async startSync(connectionId: string): Promise<SyncConnection | null> {
@@ -53,8 +53,8 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
       await tx`UPDATE calendar_connections SET status='connected',broken_reason=NULL,committed_sync_seq=${connection.syncSeq},last_sync_at=${input.syncStartedAt},updated_at=${input.syncStartedAt} WHERE id=${connection.id}`;
     });
   }
-  async markFailure(connectionId: string, input: { brokenReason: BrokenReason | null; at: Date }): Promise<void> {
-    if (input.brokenReason) await this.sql`UPDATE calendar_connections SET status='broken',broken_reason=${input.brokenReason},last_sync_error_at=${input.at},updated_at=${input.at} WHERE id=${connectionId} AND (last_sync_at IS NULL OR last_sync_at < ${input.at})`;
-    else await this.sql`UPDATE calendar_connections SET last_sync_error_at=${input.at},updated_at=${input.at} WHERE id=${connectionId} AND (last_sync_at IS NULL OR last_sync_at < ${input.at})`;
+  async markFailure(connectionId: string, input: { syncSeq: bigint; brokenReason: BrokenReason | null; at: Date }): Promise<void> {
+    if (input.brokenReason) await this.sql`UPDATE calendar_connections SET status='broken',broken_reason=${input.brokenReason},last_sync_error_at=${input.at},updated_at=${input.at} WHERE id=${connectionId} AND committed_sync_seq<=${input.syncSeq}`;
+    else await this.sql`UPDATE calendar_connections SET last_sync_error_at=${input.at},updated_at=${input.at} WHERE id=${connectionId} AND committed_sync_seq<=${input.syncSeq}`;
   }
 }

@@ -46,7 +46,7 @@ export class GoogleCalendarClient {
     let res: Response;
     try { res = await this.#fetch(GOOGLE_TOKEN_URL, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: this.opts.clientId, client_secret: this.opts.clientSecret }).toString(), signal: AbortSignal.timeout(TIMEOUT_MS) }); }
     catch { throw new GoogleCalendarFailure("transient"); }
-    const classified = statusFailure(res); if (classified) throw classified;
+    const classified = statusFailure(res); if (classified) { await res.body?.cancel(); throw classified; }
     let value: Record<string, unknown>;
     try { value = await bounded(res); } catch (error) { if (error instanceof GoogleCalendarFailure && error.kind === "oversized") throw error; throw new GoogleCalendarFailure("transient"); }
     if (!res.ok) {
@@ -64,8 +64,8 @@ export class GoogleCalendarClient {
       let res: Response;
       try { res = await this.#fetch(url, { headers: { authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(TIMEOUT_MS) }); }
       catch { throw new GoogleCalendarFailure("transient"); }
-      const classified = statusFailure(res); if (classified) throw classified;
-      if (!res.ok) throw new GoogleCalendarFailure("malformed");
+      const classified = statusFailure(res); if (classified) { await res.body?.cancel(); throw classified; }
+      if (!res.ok) { await res.body?.cancel(); throw new GoogleCalendarFailure("malformed"); }
       let body: Record<string, unknown>; try { body = await bounded(res); } catch (error) { if (error instanceof GoogleCalendarFailure && error.kind === "oversized") throw error; throw new GoogleCalendarFailure("transient"); }
       if (!Array.isArray(body.items)) throw new GoogleCalendarFailure("transient");
       if (timeZone === null && typeof body.timeZone === "string") timeZone = body.timeZone;

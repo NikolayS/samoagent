@@ -80,9 +80,29 @@ describe("CalendarSyncService", () => {
       { id: "two", status: "confirmed", start: { dateTime: "2026-08-23T10:00:00Z" }, end: { dateTime: "2026-08-23T11:00:00Z" } },
     ], 1); transient.fake.failListPage("page-2", { status: 500 });
     await expect(transient.service.sync(base.id)).rejects.toMatchObject({ kind: "transient" });
-    expect(transient.reconciles).toEqual([]); expect(transient.failures).toEqual([{ brokenReason: null, at: now }]);
+    expect(transient.reconciles).toEqual([]); expect(transient.failures).toEqual([{ syncSeq: 1n, brokenReason: null, at: now }]);
     const revoked = fixture(); revoked.fake.revokeGrant("refresh-token");
     await expect(revoked.service.sync(base.id)).rejects.toMatchObject({ kind: "invalid_grant" });
-    expect(revoked.fake.refreshRequests).toHaveLength(1); expect(revoked.failures).toEqual([{ brokenReason: "invalid_grant", at: now }]);
+    expect(revoked.fake.refreshRequests).toHaveLength(1); expect(revoked.failures).toEqual([{ syncSeq: 1n, brokenReason: "invalid_grant", at: now }]);
+  });
+
+  it("keeps the grant connected when a 2xx token refresh response is malformed", async () => {
+    const encrypted = encryptSecret("refresh-token", key, 1, `samo.calendar.refresh.v1|${base.id}|${base.userId}|${base.tenantId}`);
+    const connection: SyncConnection = { ...base, encryptedRefreshToken: encrypted.ciphertext, refreshTokenIv: encrypted.iv, refreshTokenTag: encrypted.tag, encryptionKeyVersion: 1, status: "connected", syncSeq: 1n };
+    const state: { status: "connected" | "broken"; lastSyncErrorAt: Date | null; brokenReason: string | null } = { status: "connected", lastSyncErrorAt: null, brokenReason: null };
+    const store: CalendarSyncStore = {
+      startSync: async () => connection,
+      reconcile: async () => {},
+      markFailure: async (_id, failure) => {
+        state.lastSyncErrorAt = failure.at;
+        state.brokenReason = failure.brokenReason;
+        if (failure.brokenReason) state.status = "broken";
+      },
+    };
+    const client = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => Response.json({})) as unknown as typeof fetch });
+    const service = new CalendarSyncService({ store, client, decryptionKeys: new Map([[1, key]]), clock: () => now.getTime() });
+
+    await expect(service.sync(base.id)).rejects.toMatchObject({ kind: "malformed" });
+    expect(state).toEqual({ status: "connected", lastSyncErrorAt: now, brokenReason: null });
   });
 });

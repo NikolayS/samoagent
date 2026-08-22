@@ -36,6 +36,20 @@ describe("GoogleCalendarClient", () => {
     }
   });
 
+  it("cancels a classified error response body before surfacing the failure", async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) { controller.enqueue(new Uint8Array([115, 101, 99, 114, 101, 116])); },
+      cancel() { cancelled = true; },
+    }, { highWaterMark: 0 });
+    const client = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => new Response(body, { status: 503 })) as unknown as typeof fetch });
+
+    try { await client.listEvents("access", new Date(0), new Date(1)); throw new Error("expected failure"); }
+    catch (error) {
+      expect({ kind: (error as GoogleCalendarFailure).kind, cancelled }).toEqual({ kind: "transient", cancelled: true });
+    }
+  });
+
   it("treats malformed 2xx payloads as transient and accepts realistic large pages", async () => {
     const malformed = new GoogleCalendarClient({ clientId: "id", clientSecret: "secret", fetchImpl: (async () => new Response("{")) as unknown as typeof fetch });
     await expect(malformed.listEvents("access", new Date(0), new Date(1))).rejects.toMatchObject({ kind: "transient" });

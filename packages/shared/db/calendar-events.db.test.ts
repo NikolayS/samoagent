@@ -48,7 +48,7 @@ d("calendar_events migration", () => {
     await store.reconcile(olderConnection!, [normalized("older")], { windowStart: older, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: older });
     expect(await sql`SELECT title FROM calendar_events WHERE connection_id=${row.connectionId} AND provider_event_id='race'` as unknown).toEqual([{ title: "newer" }]);
     expect(await sql`SELECT last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ last_sync_at: newer }]);
-    await store.markFailure(row.connectionId, { brokenReason: "revoked", at: older });
+    await store.markFailure(row.connectionId, { syncSeq: olderConnection!.syncSeq, brokenReason: "revoked", at: older });
     expect(await sql`SELECT status,broken_reason,last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ status: "connected", broken_reason: null, last_sync_at: newer }]);
   });
 
@@ -62,6 +62,17 @@ d("calendar_events migration", () => {
     await store.reconcile(newer!, [normalized("newer")], bounds); await store.reconcile(older!, [normalized("older")], bounds);
     expect(await sql`SELECT title FROM calendar_events WHERE connection_id=${row.connectionId} AND provider_event_id='race'` as unknown).toEqual([{ title: "newer" }]);
     expect(await sql`SELECT sync_seq,committed_sync_seq,last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ sync_seq: "2", committed_sync_seq: "2", last_sync_at: at }]);
+  });
+
+  it("does not let a pre-reconnect failure break replacement credentials", async () => {
+    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql);
+    const stale = await store.startSync(row.connectionId);
+    const replacement = await store.get(row.userId, row.tenantId);
+    await store.save({ ...replacement!, encryptedRefreshToken: Buffer.from("replacement"), grantedScopes: "{calendar.readonly}" as unknown as string[], connectedAt: new Date("2026-08-21T12:00:01Z"), lastSyncAt: null, lastSyncErrorAt: null, status: "connected" });
+
+    await store.markFailure(row.connectionId, { syncSeq: stale!.syncSeq, brokenReason: "invalid_grant", at: new Date("2026-08-21T12:00:02Z") });
+    expect(await sql`SELECT status,broken_reason,last_sync_error_at,sync_seq,committed_sync_seq FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ status: "connected", broken_reason: null, last_sync_error_at: null, sync_seq: "2", committed_sync_seq: "2" }]);
+    expect((await store.startSync(row.connectionId))?.syncSeq).toBe(3n);
   });
 
   it("does not delete a cached all-day row when its event time zone becomes invalid", async () => {
