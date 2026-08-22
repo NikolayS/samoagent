@@ -56,8 +56,7 @@ import {
 } from "../bot-orchestrator/statusPoller.ts";
 import { PgListenNotifyPublisher } from "../../packages/shared/transcript/publisher.ts";
 import { MetricsRegistry } from "../../packages/shared/observe/index.ts";
-import { googleCalendarOAuthFromEnv } from "./calendar/google-calendar-oauth.ts";
-import { calendarTokenEncryptionFromEnv } from "./calendar/encryption-config.ts";
+import { resolveCalendarConfig, formatCalendarStartupLine } from "./calendar/resolve-config.ts";
 import { startCalendarSyncPoller } from "./calendar/poller.ts";
 import { CalendarSyncService } from "./calendar/sync.ts";
 import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
@@ -187,10 +186,10 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
   // Secure cookies on http://localhost, and stripping it would make the browser
   // DISCARD the cookie outright (see `devCookieFix`).
   const GOOGLE_OAUTH = googleOAuthFromEnv(env, WEB_ORIGIN);
-  const GOOGLE_CALENDAR_OAUTH = googleCalendarOAuthFromEnv(env, WEB_ORIGIN);
-  const CALENDAR_TOKEN_ENCRYPTION = GOOGLE_CALENDAR_OAUTH
-    ? calendarTokenEncryptionFromEnv(env)
-    : undefined;
+  const {
+    googleCalendarOAuth: GOOGLE_CALENDAR_OAUTH,
+    calendarTokenEncryption: CALENDAR_TOKEN_ENCRYPTION,
+  } = resolveCalendarConfig(env, WEB_ORIGIN);
   const calendarPoller = GOOGLE_CALENDAR_OAUTH && CALENDAR_TOKEN_ENCRYPTION && GOOGLE_CALENDAR_OAUTH.apiClient
     ? startCalendarSyncPoller({
         sql,
@@ -306,6 +305,10 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
       `          GET /auth/google/callback | POST/GET /calls | GET /calls/:id |\n` +
       `          GET /__dev/last-magic-link\n` +
       `  Google sign-in: ${GOOGLE_OAUTH ? `ON → redirect_uri ${GOOGLE_OAUTH.redirectUri}` : "OFF (no credentials — magic link only)"}\n` +
+      formatCalendarStartupLine({
+        googleCalendarOAuth: GOOGLE_CALENDAR_OAUTH,
+        calendarTokenEncryption: CALENDAR_TOKEN_ENCRYPTION,
+      }) +
       `  magic-link callbacks point at ${WEB_ORIGIN} (the web app)\n` +
       `  Recall: ${recallMode}\n` +
       `  Email:  ${

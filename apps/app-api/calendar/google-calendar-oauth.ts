@@ -1,5 +1,6 @@
 import { GOOGLE_AUTHORIZE_URL, GOOGLE_REGISTERED_REDIRECT_ORIGINS, GOOGLE_TOKEN_URL } from "../auth/google-oauth.ts";
 import { GoogleCalendarClient } from "./google-calendar-client.ts";
+import { present } from "../../../packages/shared/config/env.ts";
 
 export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly";
 export const GOOGLE_CALENDAR_CALLBACK_PATH = "/calendar/connect/callback";
@@ -60,7 +61,6 @@ export class GoogleCalendarOAuth implements GoogleCalendarOAuthPort {
   }
 }
 
-function present(value: string | undefined): string | undefined { const trimmed = value?.trim(); return trimmed ? trimmed : undefined; }
 export function googleCalendarOAuthFromEnv(env: Record<string, string | undefined>, webOrigin: string): GoogleCalendarOAuth | undefined {
   const id = present(env.GOOGLE_OAUTH_CLIENT_ID), secret = present(env.GOOGLE_OAUTH_CLIENT_SECRET);
   if (!id && !secret) return undefined;

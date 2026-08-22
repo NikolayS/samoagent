@@ -34,6 +34,7 @@ import type {
   OAuthExchangeRejection,
   OAuthProvider,
 } from "./oauth.ts";
+import { present } from "../../../packages/shared/config/env.ts";
 
 /** Google's OAuth 2.0 authorization endpoint. Compile-time literal, never discovered. */
 export const GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -344,12 +345,6 @@ export class GoogleOAuthProvider implements OAuthProvider {
 
     return { ok: true, identity: verified.identity };
   }
-}
-
-/** Trim and treat blank as absent — a whitespace-only env var is not a value. */
-function present(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
 }
 
 /**
