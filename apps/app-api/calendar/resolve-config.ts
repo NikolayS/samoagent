@@ -2,10 +2,19 @@ import type { CalendarTokenEncryptionConfig } from "./encryption-config.ts";
 import { calendarTokenEncryptionFromEnv } from "./encryption-config.ts";
 import type { GoogleCalendarOAuth } from "./google-calendar-oauth.ts";
 import { googleCalendarOAuthFromEnv } from "./google-calendar-oauth.ts";
+import { present } from "../../../packages/shared/config/env.ts";
 
 export interface ResolvedCalendarConfig {
   googleCalendarOAuth: GoogleCalendarOAuth | undefined;
   calendarTokenEncryption: CalendarTokenEncryptionConfig | undefined;
+}
+
+export function formatCalendarStartupLine(
+  config: CalendarTokenEncryptionConfig | undefined,
+): string {
+  return config
+    ? "  Google Calendar: enabled\n"
+    : "  Google Calendar: disabled (no CALENDAR_TOKEN_* configured)\n";
 }
 
 const CALENDAR_TOKEN_ENV_KEYS = [
@@ -23,7 +32,7 @@ export function resolveCalendarConfig(
   env: Record<string, string | undefined>,
   webOrigin: string,
 ): ResolvedCalendarConfig {
-  const calendarRequested = CALENDAR_TOKEN_ENV_KEYS.some((key) => env[key] !== undefined);
+  const calendarRequested = CALENDAR_TOKEN_ENV_KEYS.some((key) => present(env[key]) !== undefined);
   if (!calendarRequested) {
     return { googleCalendarOAuth: undefined, calendarTokenEncryption: undefined };
   }

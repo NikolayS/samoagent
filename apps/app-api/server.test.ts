@@ -12,6 +12,7 @@ import {
   startAppApiServer,
   assertGoogleWebOriginConfigured,
   APP_API_WEB_ORIGIN_FALLBACK,
+  formatCalendarStartupLine,
 } from "./server.ts";
 import {
   DEV_DEFAULT_SECRETS,
@@ -27,6 +28,21 @@ const goodProdEnv = (): Record<string, string | undefined> => ({
 });
 
 const SIGNING_KEYS = ["SESSION_SECRET", "MAGIC_LINK_SECRET", "TOKEN_SECRET"] as const;
+
+describe("server.ts startup banner — Google Calendar", () => {
+  it("reports enabled without exposing encryption key material", () => {
+    const keyMaterial = "never-print-this-key";
+    const line = formatCalendarStartupLine({ activeKeyVersion: 7, activeKey: Buffer.from(keyMaterial), decryptionKeys: new Map() });
+    expect(line).toBe("  Google Calendar: enabled\n");
+    expect(line).not.toContain(keyMaterial);
+  });
+
+  it("reports the explicit opt-in reason when disabled", () => {
+    expect(formatCalendarStartupLine(undefined)).toBe(
+      "  Google Calendar: disabled (no CALENDAR_TOKEN_* configured)\n",
+    );
+  });
+});
 
 describe("server.ts prod entrypoint — fail-closed before bind (#64)", () => {
   for (const key of SIGNING_KEYS) {

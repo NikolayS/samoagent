@@ -30,10 +30,45 @@ describe("resolveCalendarConfig — Calendar is explicitly opt-in (#240)", () =>
     CALENDAR_TOKEN_DECRYPTION_KEYS: JSON.stringify({ 1: encoded }),
   };
 
-  it("Google sign-in credentials without CALENDAR_TOKEN_* disable Calendar without throwing", () => {
+  it("regression: Google sign-in credentials without CALENDAR_TOKEN_* boot with Calendar disabled", () => {
     const config = resolveCalendarConfig(credentials, "https://samograph.dev");
     expect(config.googleCalendarOAuth).toBeUndefined();
     expect(config.calendarTokenEncryption).toBeUndefined();
+  });
+
+  it("all empty CALENDAR_TOKEN_* values disable Calendar without throwing", () => {
+    const config = resolveCalendarConfig({
+      ...credentials,
+      CALENDAR_TOKEN_ENCRYPTION_KEY: "",
+      CALENDAR_TOKEN_ENCRYPTION_KEY_VERSION: "",
+      CALENDAR_TOKEN_DECRYPTION_KEYS: "",
+    }, "https://samograph.dev");
+    expect(config).toEqual({
+      googleCalendarOAuth: undefined,
+      calendarTokenEncryption: undefined,
+    });
+  });
+
+  it("all whitespace-only CALENDAR_TOKEN_* values disable Calendar without throwing", () => {
+    const config = resolveCalendarConfig({
+      ...credentials,
+      CALENDAR_TOKEN_ENCRYPTION_KEY: "   ",
+      CALENDAR_TOKEN_ENCRYPTION_KEY_VERSION: "   ",
+      CALENDAR_TOKEN_DECRYPTION_KEYS: "   ",
+    }, "https://samograph.dev");
+    expect(config).toEqual({
+      googleCalendarOAuth: undefined,
+      calendarTokenEncryption: undefined,
+    });
+  });
+
+  it("one real CALENDAR_TOKEN_* value plus two empty values fails as partial configuration", () => {
+    expect(() => resolveCalendarConfig({
+      ...credentials,
+      CALENDAR_TOKEN_ENCRYPTION_KEY: encoded,
+      CALENDAR_TOKEN_ENCRYPTION_KEY_VERSION: "",
+      CALENDAR_TOKEN_DECRYPTION_KEYS: "",
+    }, "https://samograph.dev")).toThrow("CALENDAR_TOKEN_ENCRYPTION_KEY_VERSION must be a positive integer");
   });
 
   it("Google sign-in credentials plus all CALENDAR_TOKEN_* enable Calendar", () => {

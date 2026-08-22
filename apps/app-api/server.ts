@@ -65,7 +65,8 @@ import {
 import { PgListenNotifyPublisher } from "../../packages/shared/transcript/publisher.ts";
 import { MetricsRegistry } from "../../packages/shared/observe/index.ts";
 import { createCachedFunnelSource } from "./metrics/funnelSource.ts";
-import { resolveCalendarConfig } from "./calendar/resolve-config.ts";
+import { resolveCalendarConfig, formatCalendarStartupLine } from "./calendar/resolve-config.ts";
+export { formatCalendarStartupLine } from "./calendar/resolve-config.ts";
 import { startCalendarSyncPoller } from "./calendar/poller.ts";
 import { CalendarSyncService } from "./calendar/sync.ts";
 import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
@@ -307,6 +308,7 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
       `          POST /auth/logout | GET /auth/providers | GET /auth/google/start |\n` +
       `          GET /auth/google/callback | POST/GET /calls | share routes\n` +
       `  Google sign-in: ${googleOAuth ? `ON → redirect_uri ${googleOAuth.redirectUri}` : "OFF (no credentials — magic link only)"}\n` +
+      formatCalendarStartupLine(calendarTokenEncryption) +
       `  magic-link callbacks point at ${webOrigin}\n` +
       `  Recall: ${isRecallLive() ? `REAL → webhook base ${webhookBase ?? "(regional default)"}` : "FAKE"}\n` +
       `  Email:  ${env.RESEND_API_KEY ? `REAL via Resend from ${env.MAGIC_LINK_FROM}` : "UNCONFIGURED (magic-link send will error)"}\n` +

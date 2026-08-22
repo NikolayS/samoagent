@@ -63,6 +63,12 @@ export const WS_HUB_SIGNING_SECRETS: readonly SigningSecretName[] = ["SESSION_SE
 /** Minimal env shape (a subset of `process.env`). */
 export type EnvLike = Record<string, string | undefined>;
 
+/** Trim an environment value and treat empty/whitespace-only strings as absent. */
+export function present(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 /**
  * Resolve SAMO_ENV once. Only the exact string `"dev"` is dev; `"preview"` is a
  * prod-mode variant (real secrets, real auth) distinguishable from `"prod"` for
