@@ -1,6 +1,7 @@
 import { clientIp } from "../auth/http.ts";
+import { AUTH_ERROR_REDIRECT_PATH } from "../auth/google-http.ts";
 import { sessionInvalidResponse } from "../auth/owner-session.ts";
-import { SESSION_COOKIE_NAME, verifySession } from "../auth/session.ts";
+import { buildClearedSessionCookie, SESSION_COOKIE_NAME, verifySession } from "../auth/session.ts";
 import { buildClearedCalendarOAuthStateCookie, readCalendarOAuthStateCookie } from "./oauth-state.ts";
 import type { CalendarErrorCode, CalendarService } from "./service.ts";
 
@@ -12,12 +13,18 @@ function jsonError(code: CalendarErrorCode, status: number) { return Response.js
 function redirect(code?: CalendarErrorCode) {
   return new Response(null, { status: 302, headers: { location: code ? `/settings?calendar_error=${code}` : "/settings?calendar=connected", "set-cookie": buildClearedCalendarOAuthStateCookie(), "cache-control": "no-store" } });
 }
+function deadSessionCallbackRedirect(): Response {
+  const headers = new Headers({ location: AUTH_ERROR_REDIRECT_PATH, "cache-control": "no-store" });
+  headers.append("set-cookie", buildClearedSessionCookie());
+  headers.append("set-cookie", buildClearedCalendarOAuthStateCookie());
+  return new Response(null, { status: 302, headers });
+}
 export function createCalendarHandler(service: CalendarService, sessionSecret: string, now: () => number) {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url), isCallback = req.method === "GET" && url.pathname === "/calendar/connect/callback";
     const raw = cookie(req, SESSION_COOKIE_NAME), claims = raw ? verifySession(raw, sessionSecret, now()) : null;
     if (!claims) return isCallback ? redirect("SAMO-CALENDAR-003") : new Response(null, { status: 401 });
-    if (!(await service.tenantExists(claims.tenantId).catch(() => false))) return sessionInvalidResponse();
+    if (!(await service.tenantExists(claims.tenantId).catch(() => false))) return isCallback ? deadSessionCallbackRedirect() : sessionInvalidResponse();
     if (req.method === "POST" && url.pathname === "/calendar/connect/start") {
       const result = await service.start({ userId: claims.userId, tenantId: claims.tenantId, ip: clientIp(req) });
       return result.ok ? Response.json({ authorization_url: result.authorizationUrl }, { headers: { "set-cookie": result.setCookie, "cache-control": "no-store" } }) : jsonError(result.code, result.code === "SAMO-CALENDAR-001" ? 503 : 500);

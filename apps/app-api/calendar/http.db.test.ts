@@ -5,9 +5,9 @@ import { migrate } from "../../../packages/shared/db/migrate.ts";
 import { FakeGoogleIdp } from "../../../packages/test-fakes/google-oauth/index.ts";
 import { createAccountHandler } from "../account/http.ts";
 import { InMemoryEmailSender } from "../auth/email.ts";
-import { SESSION_COOKIE_NAME, signSession } from "../auth/session.ts";
+import { buildClearedSessionCookie, SESSION_COOKIE_NAME, signSession } from "../auth/session.ts";
 import { InMemoryRateLimiter } from "../auth/rate-limit.ts";
-import { CALENDAR_OAUTH_COOKIE_NAME } from "./oauth-state.ts";
+import { buildClearedCalendarOAuthStateCookie, CALENDAR_OAUTH_COOKIE_NAME } from "./oauth-state.ts";
 import { GoogleCalendarOAuth } from "./google-calendar-oauth.ts";
 import { createCalendarHandler } from "./http.ts";
 import { PostgresCalendarConnectionStore } from "./pg-store.ts";
@@ -106,7 +106,12 @@ d("Calendar HTTP after account erasure (§5.14)", () => {
       `http://app-api.local/calendar/connect/callback?code=${grant.code}&state=${grant.state}`,
       { headers: { cookie: `${sessionCookie}; ${stateCookie}` } },
     ));
-    await expectDeadSession(callback);
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get("location")).toBe("/auth");
+    expect(callback.headers.getSetCookie()).toEqual([
+      buildClearedSessionCookie(),
+      buildClearedCalendarOAuthStateCookie(),
+    ]);
 
     await expectDeadSession(await calendar(new Request("http://app-api.local/calendar/status", {
       headers: { cookie: sessionCookie },

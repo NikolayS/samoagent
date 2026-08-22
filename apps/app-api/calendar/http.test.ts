@@ -2,9 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { createCalendarHandler } from "./http.ts";
 import { CalendarService, type CalendarConnection, type CalendarConnectionStore } from "./service.ts";
 import { InMemoryRateLimiter } from "../auth/rate-limit.ts";
-import { signSession } from "../auth/session.ts";
+import { buildClearedSessionCookie, signSession } from "../auth/session.ts";
 import { GoogleCalendarOAuth } from "./google-calendar-oauth.ts";
 import { FakeGoogleIdp } from "../../../packages/test-fakes/google-oauth/index.ts";
+import { buildClearedCalendarOAuthStateCookie } from "./oauth-state.ts";
 
 const now = 50_000, secret = "session-secret";
 class Store implements CalendarConnectionStore {
@@ -25,14 +26,14 @@ function handler() {
 const session = () => `samo_session=${signSession({ userId: "user", tenantId: "tenant", iat: now }, secret)}`;
 
 describe("calendar HTTP adapter", () => {
-  it("uses the dead-session convention on all routes when owner resolution marks the tenant erased", async () => {
+  it("uses the dead-session convention when owner resolution marks the tenant erased", async () => {
     const store = new Store();
     store.active = false;
     const service = new CalendarService({ provider: undefined, store,
       rateLimiter: new InMemoryRateLimiter(), sessionSecret: secret, clock: () => now,
       activeKey: Buffer.alloc(32), activeKeyVersion: 1, decryptionKeys: new Map([[1, Buffer.alloc(32)]]) });
     const h = createCalendarHandler(service, secret, () => now);
-    for (const [method, path] of [["POST", "/calendar/connect/start"], ["GET", "/calendar/connect/callback"], ["GET", "/calendar/status"], ["DELETE", "/calendar/connection"]]) {
+    for (const [method, path] of [["POST", "/calendar/connect/start"], ["GET", "/calendar/status"], ["DELETE", "/calendar/connection"]]) {
       const response = await h(new Request(`http://api.test${path}`, { method, headers: { cookie: session() } }));
       expect(response.status).toBe(401);
       expect(await response.json()).toEqual({
@@ -42,6 +43,16 @@ describe("calendar HTTP adapter", () => {
       });
       expect(response.headers.get("set-cookie") ?? "").toContain("samo_session=;");
     }
+
+    const callback = await h(new Request("http://api.test/calendar/connect/callback", {
+      headers: { cookie: `${session()}; __Host-samo_calendar_oauth=live-state` },
+    }));
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get("location")).toBe("/auth");
+    expect(callback.headers.getSetCookie()).toEqual([
+      buildClearedSessionCookie(),
+      buildClearedCalendarOAuthStateCookie(),
+    ]);
   });
 
   it("redirects a scope-deficient Google grant to SAMO-CALENDAR-004 without persisting it", async () => {
