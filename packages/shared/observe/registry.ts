@@ -50,6 +50,9 @@ export const COUNTER_SPECS = {
     label: "result",
     help: "Google sign-in callbacks by result (`ok` or the §5.16 code).",
   },
+  calendar_connect_callback_total: { label: "result", help: "Calendar OAuth callbacks by result." },
+  calendar_disconnect_total: { label: "revocation_result", help: "Calendar disconnects by revocation result." },
+  calendar_sync_total: { label: "result", help: "Calendar connection syncs by result." },
 } as const;
 
 export type CounterName = keyof typeof COUNTER_SPECS;
@@ -67,6 +70,8 @@ export const SCALAR_COUNTER_SPECS = {
   auth_identity_linked_total: {
     help: "Google identities SILENTLY linked to an already-existing account (S5-1 item 5).",
   },
+  calendar_connect_start_total: { help: "Calendar OAuth starts accepted." },
+  calendar_sync_events_total: { help: "Calendar events reconciled successfully." },
 } as const;
 
 export type ScalarCounterName = keyof typeof SCALAR_COUNTER_SPECS;
@@ -82,9 +87,15 @@ export const GAUGE_SPECS = {
     label: "status",
     help: "Magic links by lifecycle status (outstanding/consumed/superseded, §5.1).",
   },
+  calendar_connections: { label: "state", help: "Calendar connections by state." },
 } as const;
 
 export type GaugeName = keyof typeof GAUGE_SPECS;
+
+export const SCALAR_GAUGE_SPECS = {
+  calendar_sync_age_seconds: { help: "Age of the oldest connected Calendar synchronization, using connected_at for never-synced connections; 0 when none are connected." },
+} as const;
+export type ScalarGaugeName = keyof typeof SCALAR_GAUGE_SPECS;
 
 /** Nearest-rank pickup-latency percentiles (§5.11). */
 export interface PickupLatencySummary {
@@ -120,6 +131,7 @@ export class MetricsRegistry {
   private readonly scalarCounters = new Map<ScalarCounterName, number>();
   /** name → (label value → last SET value). */
   private readonly gauges = new Map<GaugeName, Map<string, number>>();
+  private readonly scalarGauges = new Map<ScalarGaugeName, number>();
   /** Raw pickup-latency sample (ms). */
   private readonly pickupSamples: number[] = [];
 
@@ -187,6 +199,14 @@ export class MetricsRegistry {
     this.bumpScalar("auth_identity_linked_total");
   }
 
+  incCalendarConnectStart(): void { this.bumpScalar("calendar_connect_start_total"); }
+  incCalendarConnectCallback(result: string): void { this.bump("calendar_connect_callback_total", result, 1); }
+  incCalendarDisconnect(result: string): void { this.bump("calendar_disconnect_total", result, 1); }
+  incCalendarSync(result: string): void { this.bump("calendar_sync_total", result, 1); }
+  incCalendarSyncEvents(by: number): void { this.bumpScalarBy("calendar_sync_events_total", by); }
+  setCalendarConnections(state: string, count: number): void { this.setGauge("calendar_connections", state, count); }
+  setCalendarSyncAgeSeconds(seconds: number): void { this.scalarGauges.set("calendar_sync_age_seconds", seconds); }
+
   /** `samograph_magic_link_status{status}` — SET from the periodic DB read. */
   setMagicLinkStatus(status: string, count: number): void {
     this.setGauge("samograph_magic_link_status", status, count);
@@ -204,6 +224,9 @@ export class MetricsRegistry {
 
   private bumpScalar(name: ScalarCounterName): void {
     this.scalarCounters.set(name, (this.scalarCounters.get(name) ?? 0) + 1);
+  }
+  private bumpScalarBy(name: ScalarCounterName, by: number): void {
+    this.scalarCounters.set(name, (this.scalarCounters.get(name) ?? 0) + by);
   }
 
   // --- read surface ---
@@ -260,6 +283,12 @@ export class MetricsRegistry {
           lines.push(`${name}{${spec.label}="${escapeLabel(labelValue)}"} ${series.get(labelValue)}`);
         }
       }
+    }
+
+    for (const name of Object.keys(SCALAR_GAUGE_SPECS) as ScalarGaugeName[]) {
+      lines.push(`# HELP ${name} ${SCALAR_GAUGE_SPECS[name].help}`);
+      lines.push(`# TYPE ${name} gauge`);
+      lines.push(`${name} ${this.scalarGauges.get(name) ?? 0}`);
     }
 
     const p = this.pickupLatency();

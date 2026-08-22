@@ -29,7 +29,7 @@ function stateFixture() {
   return { ...x, state };
 }
 
-async function failureValue(operation: Promise<void>): Promise<{ kind: string; retryAfterMs?: number }> {
+async function failureValue(operation: Promise<unknown>): Promise<{ kind: string; retryAfterMs?: number }> {
   try { await operation; throw new Error("expected failure"); }
   catch (error) {
     if (error instanceof Error && error.message === "expected failure") throw error;

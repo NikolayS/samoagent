@@ -137,6 +137,10 @@ describe("next.config.mjs — Calendar OAuth rewrites (#240)", () => {
       source: "/calendar/status", has: SEC_FETCH_DEST_EMPTY,
       destination: `${ORIGIN}/calendar/status`,
     });
+    expect(ruleFor("/calendar/meetings")).toEqual({
+      source: "/calendar/meetings", has: SEC_FETCH_DEST_EMPTY,
+      destination: `${ORIGIN}/calendar/meetings`,
+    });
     expect(ruleFor("/calendar/connection")).toEqual({
       source: "/calendar/connection", has: SEC_FETCH_DEST_EMPTY,
       destination: `${ORIGIN}/calendar/connection`,

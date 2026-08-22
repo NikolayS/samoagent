@@ -19,12 +19,15 @@ export interface CalendarConnectionStore {
   get(userId: string, tenantId: string): Promise<CalendarConnection | null>;
   save(row: CalendarConnection): Promise<void>;
   delete(userId: string, tenantId: string): Promise<void>;
+  meetings?(userId: string, tenantId: string, limit: number, now: Date): Promise<CalendarMeetingsSnapshot>;
 }
+export interface CalendarMeeting { id: string; title: string; startsAt: Date; endsAt: Date; allDay: boolean; meetingUrl: string | null; meetingProvider: "google_meet" | "zoom" | null; organizerEmail: string | null; attendeeResponse: "needsAction" | "declined" | "tentative" | "accepted" | null; }
+export interface CalendarMeetingsSnapshot { connection: Pick<CalendarConnection, "status" | "lastSyncAt"> | null; meetings: CalendarMeeting[]; }
 export interface CalendarServiceDeps {
   provider?: GoogleCalendarOAuthPort; store: CalendarConnectionStore; rateLimiter: RateLimiter;
   sessionSecret: string; clock: () => number; randomValue?: () => string;
   activeKey: Buffer; activeKeyVersion: number; decryptionKeys: Map<number, Buffer>;
-  immediateSync?: (connectionId: string) => Promise<void>;
+  immediateSync?: (connectionId: string) => Promise<unknown>;
 }
 const START_LIMIT = 20, CALLBACK_LIMIT = 20;
 const aad = (row: Pick<CalendarConnection, "id" | "userId" | "tenantId">) => `samo.calendar.refresh.v1|${row.id}|${row.userId}|${row.tenantId}`;
@@ -72,13 +75,16 @@ export class CalendarService {
     } catch { return { ok: false as const, code: "SAMO-CALENDAR-500" as const }; }
   }
   async status(userId: string, tenantId: string) { return this.#deps.store.get(userId, tenantId); }
-  async disconnect(userId: string, tenantId: string): Promise<void> {
+  async meetings(userId: string, tenantId: string, limit: number) { return this.#deps.store.meetings?.(userId, tenantId, limit, new Date(this.#deps.clock())) ?? { connection: null, meetings: [] }; }
+  async disconnect(userId: string, tenantId: string): Promise<"ok" | "failed" | "not_configured" | "not_connected"> {
     const row = await this.#deps.store.get(userId, tenantId);
-    if (!row) return;
+    if (!row) return "not_connected";
+    let revocationResult = "not_configured";
     try {
       const key = this.#deps.decryptionKeys.get(row.encryptionKeyVersion);
-      if (key && this.#deps.provider) await this.#deps.provider.revoke(decryptSecret({ ciphertext: row.encryptedRefreshToken, iv: row.refreshTokenIv, tag: row.refreshTokenTag, keyVersion: row.encryptionKeyVersion }, key, aad(row)));
-    } catch { /* Revocation is best effort; local deletion is the privacy boundary. */ }
+      if (key && this.#deps.provider) revocationResult = await this.#deps.provider.revoke(decryptSecret({ ciphertext: row.encryptedRefreshToken, iv: row.refreshTokenIv, tag: row.refreshTokenTag, keyVersion: row.encryptionKeyVersion }, key, aad(row))) ? "ok" : "failed";
+    } catch { revocationResult = "failed"; }
     await this.#deps.store.delete(userId, tenantId);
+    return revocationResult as "ok" | "failed" | "not_configured";
   }
 }
