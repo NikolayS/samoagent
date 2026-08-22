@@ -58,6 +58,9 @@ import { PgListenNotifyPublisher } from "../../packages/shared/transcript/publis
 import { MetricsRegistry } from "../../packages/shared/observe/index.ts";
 import { googleCalendarOAuthFromEnv } from "./calendar/google-calendar-oauth.ts";
 import { calendarTokenEncryptionFromEnv } from "./calendar/encryption-config.ts";
+import { startCalendarSyncPoller } from "./calendar/poller.ts";
+import { CalendarSyncService } from "./calendar/sync.ts";
+import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
 
 /**
  * DEV-ONLY guard: this file carries the local shortcuts (Secure-strip, dev
@@ -188,6 +191,14 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
   const CALENDAR_TOKEN_ENCRYPTION = GOOGLE_CALENDAR_OAUTH
     ? calendarTokenEncryptionFromEnv(env)
     : undefined;
+  const calendarPoller = GOOGLE_CALENDAR_OAUTH && CALENDAR_TOKEN_ENCRYPTION && GOOGLE_CALENDAR_OAUTH.apiClient
+    ? startCalendarSyncPoller({
+        sql,
+        syncConnection: (connectionId) => new CalendarSyncService({ store: new PostgresCalendarConnectionStore(sql), client: GOOGLE_CALENDAR_OAUTH.apiClient!, decryptionKeys: CALENDAR_TOKEN_ENCRYPTION.decryptionKeys }).sync(connectionId),
+        metrics: registry,
+        logger: { warn: (message) => console.warn(message) },
+      })
+    : undefined;
 
   // Validate PUBLIC_WEBHOOK_BASE once (fail fast on a malformed value).
   const WEBHOOK_BASE = publicWebhookBase(env);
@@ -279,6 +290,11 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
   });
 
   const server = Bun.serve({ port: PORT, fetch: api.fetch });
+  const stopServer = server.stop.bind(server);
+  server.stop = ((closeActiveConnections?: boolean) => {
+    calendarPoller?.stop();
+    return stopServer(closeActiveConnections);
+  }) as typeof server.stop;
 
   const recallMode = isRecallLive()
     ? `REAL (RECALL_LIVE) → bot joins; webhook base ${WEBHOOK_BASE ?? "(regional tunnel default)"}`

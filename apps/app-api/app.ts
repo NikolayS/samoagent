@@ -190,7 +190,7 @@ export function createAppApi(config: AppApiConfig): AppApi {
     ...calendarKeys,
     immediateSync: calendarSync ? (connectionId) => calendarSync.sync(connectionId) : undefined,
   });
-  const calendarHandler = createCalendarHandler(calendarService, config.sessionSecret, clock);
+  const calendarHandler = createCalendarHandler(calendarService, config.sessionSecret, clock, config.registry);
   const googleHandler = createGoogleAuthHandler(
     new GoogleAuthService({
       provider: config.googleOAuth,

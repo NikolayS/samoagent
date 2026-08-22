@@ -67,6 +67,9 @@ import { MetricsRegistry } from "../../packages/shared/observe/index.ts";
 import { createCachedFunnelSource } from "./metrics/funnelSource.ts";
 import { googleCalendarOAuthFromEnv } from "./calendar/google-calendar-oauth.ts";
 import { calendarTokenEncryptionFromEnv } from "./calendar/encryption-config.ts";
+import { startCalendarSyncPoller } from "./calendar/poller.ts";
+import { CalendarSyncService } from "./calendar/sync.ts";
+import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
 
 /**
  * Prod email fallback: if `RESEND_API_KEY` is not configured there is NO dev
@@ -209,6 +212,14 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   const calendarTokenEncryption = googleCalendarOAuth
     ? calendarTokenEncryptionFromEnv(env)
     : undefined;
+  const calendarPoller = googleCalendarOAuth && calendarTokenEncryption && googleCalendarOAuth.apiClient
+    ? startCalendarSyncPoller({
+        sql,
+        syncConnection: (connectionId) => new CalendarSyncService({ store: new PostgresCalendarConnectionStore(sql), client: googleCalendarOAuth.apiClient!, decryptionKeys: calendarTokenEncryption.decryptionKeys }).sync(connectionId),
+        metrics: registry,
+        logger: { warn: (message) => console.warn(message) },
+      })
+    : undefined;
 
   // Validate PUBLIC_WEBHOOK_BASE once (fail fast on a malformed value).
   const webhookBase = publicWebhookBase(env);
@@ -289,6 +300,11 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   });
 
   const server = Bun.serve({ port, fetch: api.fetch });
+  const stopServer = server.stop.bind(server);
+  server.stop = ((closeActiveConnections?: boolean) => {
+    calendarPoller?.stop();
+    return stopServer(closeActiveConnections);
+  }) as typeof server.stop;
   console.log(
     `\n[app-api] PROD server listening on http://localhost:${server.port} (SAMO_ENV=prod)\n` +
       `  routes: GET /health | POST /auth/magic-link | GET /auth/callback |\n` +

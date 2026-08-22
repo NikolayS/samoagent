@@ -55,8 +55,8 @@ export function normalizeGoogleEvent(raw: GoogleCalendarEvent, calendarTimeZone:
 }
 export class CalendarSyncService {
   constructor(readonly deps: { store: CalendarSyncStore; client: GoogleCalendarClient; decryptionKeys: Map<number, Buffer>; clock?: () => number }) {}
-  async sync(connectionId: string): Promise<void> {
-    const connection = await this.deps.store.startSync(connectionId); if (!connection || connection.status === "broken") return;
+  async sync(connectionId: string): Promise<number> {
+    const connection = await this.deps.store.startSync(connectionId); if (!connection || connection.status === "broken") return 0;
     const syncStartedAt = new Date((this.deps.clock ?? Date.now)()); const windowEnd = new Date(syncStartedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
     try {
       const key = this.deps.decryptionKeys.get(connection.encryptionKeyVersion); if (!key) throw new GoogleCalendarFailure("refresh_failed");
@@ -79,7 +79,9 @@ export class CalendarSyncService {
           throw second;
         }
       }
-      await this.deps.store.reconcile(connection, raw.events.map((event) => normalizeGoogleEvent(event, raw.timeZone)).filter((event): event is NormalizedCalendarEvent => event !== null), { windowStart: syncStartedAt, windowEnd, syncStartedAt });
+      const events = raw.events.map((event) => normalizeGoogleEvent(event, raw.timeZone)).filter((event): event is NormalizedCalendarEvent => event !== null);
+      await this.deps.store.reconcile(connection, events, { windowStart: syncStartedAt, windowEnd, syncStartedAt });
+      return events.length;
     } catch (error) {
       const failure = error instanceof GoogleCalendarFailure ? error : new GoogleCalendarFailure("transient");
       const brokenReason: BrokenReason | null = failure.kind === "invalid_grant" ? "invalid_grant" : failure.kind === "forbidden" ? "scope_missing" : failure.kind === "unauthorized" ? "revoked" : null;

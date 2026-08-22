@@ -195,3 +195,26 @@ describe("S5-1 item 7 auth metrics — #222", () => {
     expect(out).not.toContain('samograph_funnel_stage{stage="auth_completed"}');
   });
 });
+
+describe("Calendar observability — #240 Slice 4", () => {
+  test("exports exact low-cardinality counters and gauges", () => {
+    const r = new MetricsRegistry();
+    r.incCalendarConnectStart();
+    r.incCalendarConnectCallback("ok");
+    r.incCalendarDisconnect("ok");
+    r.incCalendarSync("ok");
+    r.incCalendarSyncEvents(7);
+    r.setCalendarConnections("connected", 3);
+    r.setCalendarConnections("broken", 1);
+    r.setCalendarSyncAgeSeconds(42);
+    const out = r.renderPrometheus();
+    expect(out).toContain("calendar_connect_start_total 1");
+    expect(out).toContain('calendar_connect_callback_total{result="ok"} 1');
+    expect(out).toContain('calendar_disconnect_total{revocation_result="ok"} 1');
+    expect(out).toContain('calendar_sync_total{result="ok"} 1');
+    expect(out).toContain("calendar_sync_events_total 7");
+    expect(out).toContain('calendar_connections{state="connected"} 3');
+    expect(out).toContain('calendar_connections{state="broken"} 1');
+    expect(out).toContain("calendar_sync_age_seconds 42");
+  });
+});

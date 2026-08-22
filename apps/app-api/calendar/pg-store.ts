@@ -2,7 +2,7 @@ import type { SQL } from "bun";
 import { randomUUID } from "node:crypto";
 import { tenantActive } from "../auth/owner-session.ts";
 import { setTenant } from "../../../packages/shared/db/client.ts";
-import type { CalendarConnection, CalendarConnectionStore } from "./service.ts";
+import type { CalendarConnection, CalendarConnectionStore, CalendarMeeting, CalendarMeetingsSnapshot } from "./service.ts";
 import type { BrokenReason, CalendarSyncStore, NormalizedCalendarEvent, SyncConnection } from "./sync.ts";
 
 type Row = Record<string, unknown>;
@@ -25,6 +25,18 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
       ON CONFLICT (user_id,provider) DO UPDATE SET tenant_id=EXCLUDED.tenant_id, encrypted_refresh_token=EXCLUDED.encrypted_refresh_token, refresh_token_iv=EXCLUDED.refresh_token_iv, refresh_token_tag=EXCLUDED.refresh_token_tag, encryption_key_version=EXCLUDED.encryption_key_version, granted_scopes=EXCLUDED.granted_scopes, status='connected', broken_reason=NULL, connected_at=EXCLUDED.connected_at, updated_at=EXCLUDED.updated_at, last_sync_at=NULL, last_sync_error_at=NULL, sync_seq=calendar_connections.sync_seq+1, committed_sync_seq=calendar_connections.sync_seq+1`;
   }
   async delete(userId: string, tenantId: string) { await this.sql`DELETE FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'`; }
+  async meetings(userId: string, tenantId: string, limit: number, now: Date): Promise<CalendarMeetingsSnapshot> {
+    return this.sql.begin(async (tx) => {
+      const connections = await tx`SELECT status,last_sync_at FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'` as unknown as Array<{ status: "connected" | "broken"; last_sync_at: string | null }>;
+      const connection = connections[0] ? { status: connections[0].status, lastSyncAt: connections[0].last_sync_at ? new Date(connections[0].last_sync_at) : null } : null;
+      if (!connection || connection.status === "broken") return { connection, meetings: [] };
+      await tx.unsafe("SET LOCAL ROLE samograph_app");
+      await setTenant(tx, tenantId);
+      const rows = await tx`SELECT id,title,starts_at,ends_at,all_day,meeting_url,meeting_provider,organizer_email,attendee_response FROM calendar_events WHERE ends_at>${now} ORDER BY starts_at,id LIMIT ${limit}` as unknown as Row[];
+      const meetings: CalendarMeeting[] = rows.map((row) => ({ id: String(row.id), title: String(row.title), startsAt: new Date(row.starts_at as string), endsAt: new Date(row.ends_at as string), allDay: Boolean(row.all_day), meetingUrl: row.meeting_url === null ? null : String(row.meeting_url), meetingProvider: row.meeting_provider as CalendarMeeting["meetingProvider"], organizerEmail: row.organizer_email === null ? null : String(row.organizer_email), attendeeResponse: row.attendee_response as CalendarMeeting["attendeeResponse"] }));
+      return { connection, meetings };
+    });
+  }
   async startSync(connectionId: string): Promise<SyncConnection | null> {
     return this.sql.begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${connectionId}))`;

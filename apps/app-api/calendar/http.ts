@@ -4,6 +4,9 @@ import { sessionInvalidResponse } from "../auth/owner-session.ts";
 import { buildClearedSessionCookie, SESSION_COOKIE_NAME, verifySession } from "../auth/session.ts";
 import { buildClearedCalendarOAuthStateCookie, readCalendarOAuthStateCookie } from "./oauth-state.ts";
 import type { CalendarErrorCode, CalendarService } from "./service.ts";
+import type { MetricsRegistry } from "../../../packages/shared/observe/registry.ts";
+
+export type CalendarHttpService = Pick<CalendarService, "tenantExists" | "start" | "callback" | "status" | "disconnect" | "meetings">;
 
 function cookie(req: Request, name: string): string | null {
   for (const part of (req.headers.get("cookie") ?? "").split(";")) { const i = part.indexOf("="); if (i >= 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim(); }
@@ -19,7 +22,7 @@ function deadSessionCallbackRedirect(): Response {
   headers.append("set-cookie", buildClearedCalendarOAuthStateCookie());
   return new Response(null, { status: 302, headers });
 }
-export function createCalendarHandler(service: CalendarService, sessionSecret: string, now: () => number) {
+export function createCalendarHandler(service: CalendarHttpService, sessionSecret: string, now: () => number, metrics?: MetricsRegistry) {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url), isCallback = req.method === "GET" && url.pathname === "/calendar/connect/callback";
     const raw = cookie(req, SESSION_COOKIE_NAME), claims = raw ? verifySession(raw, sessionSecret, now()) : null;
@@ -27,10 +30,12 @@ export function createCalendarHandler(service: CalendarService, sessionSecret: s
     if (!(await service.tenantExists(claims.tenantId).catch(() => false))) return isCallback ? deadSessionCallbackRedirect() : sessionInvalidResponse();
     if (req.method === "POST" && url.pathname === "/calendar/connect/start") {
       const result = await service.start({ userId: claims.userId, tenantId: claims.tenantId, ip: clientIp(req) });
+      if (result.ok) metrics?.incCalendarConnectStart();
       return result.ok ? Response.json({ authorization_url: result.authorizationUrl }, { headers: { "set-cookie": result.setCookie, "cache-control": "no-store" } }) : jsonError(result.code, result.code === "SAMO-CALENDAR-001" ? 503 : 500);
     }
     if (isCallback) {
       const result = await service.callback({ userId: claims.userId, tenantId: claims.tenantId, ip: clientIp(req), stateCookie: readCalendarOAuthStateCookie(req), params: url.searchParams }).catch(() => ({ ok: false as const, code: "SAMO-CALENDAR-500" as const }));
+      metrics?.incCalendarConnectCallback(result.ok ? "ok" : result.code);
       return result.ok ? redirect() : redirect(result.code);
     }
     if (req.method === "GET" && url.pathname === "/calendar/status") {
@@ -38,7 +43,16 @@ export function createCalendarHandler(service: CalendarService, sessionSecret: s
       if (!row) return Response.json({ provider: "google", state: "not_connected", connected_at: null, last_sync_at: null, last_sync_error_at: null }, { headers: { "cache-control": "no-store" } });
       return Response.json({ provider: "google", state: row.status, connected_at: row.connectedAt.toISOString(), last_sync_at: row.lastSyncAt?.toISOString() ?? null, last_sync_error_at: row.lastSyncErrorAt?.toISOString() ?? null, ...(row.status === "broken" ? { error: { code: "SAMO-CALENDAR-005" } } : {}) }, { headers: { "cache-control": "no-store" } });
     }
-    if (req.method === "DELETE" && url.pathname === "/calendar/connection") { await service.disconnect(claims.userId, claims.tenantId); return new Response(null, { status: 204 }); }
+    if (req.method === "GET" && url.pathname === "/calendar/meetings") {
+      const limitValue = url.searchParams.get("limit");
+      const rawLimit = Number(limitValue);
+      const limit = limitValue !== null && limitValue.trim() !== "" && Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, Math.trunc(rawLimit))) : 20;
+      const snapshot = await service.meetings(claims.userId, claims.tenantId, limit);
+      if (!snapshot.connection) return Response.json({ connection_state: "not_connected", meetings: [], last_sync_at: null }, { headers: { "cache-control": "no-store" } });
+      if (snapshot.connection.status === "broken") return Response.json({ connection_state: "broken", meetings: [], last_sync_at: snapshot.connection.lastSyncAt?.toISOString() ?? null, error: { code: "SAMO-CALENDAR-005" } }, { headers: { "cache-control": "no-store" } });
+      return Response.json({ connection_state: "connected", meetings: snapshot.meetings.map((meeting) => ({ id: meeting.id, title: meeting.title, starts_at: meeting.startsAt.toISOString(), ends_at: meeting.endsAt.toISOString(), all_day: meeting.allDay, meeting_url: meeting.meetingUrl, meeting_provider: meeting.meetingProvider, organizer_email: meeting.organizerEmail, attendee_response: meeting.attendeeResponse })), last_sync_at: snapshot.connection.lastSyncAt?.toISOString() ?? null }, { headers: { "cache-control": "no-store" } });
+    }
+    if (req.method === "DELETE" && url.pathname === "/calendar/connection") { const result = await service.disconnect(claims.userId, claims.tenantId); metrics?.incCalendarDisconnect(result); return new Response(null, { status: 204 }); }
     return new Response("not found", { status: 404 });
   };
 }
