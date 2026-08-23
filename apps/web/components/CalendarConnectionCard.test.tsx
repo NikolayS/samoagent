@@ -70,4 +70,20 @@ describe("Settings Calendar connection", () => {
     await waitFor(() => expect(client.requests.some((r) => r.path === "/calendar/connection" && r.method === "DELETE")).toBe(true));
     expect(await view.findByRole("button", { name: "Connect Google Calendar" })).toBeDefined();
   });
+
+  it("clears a failed reconnect error when disconnect succeeds", async () => {
+    const client = createFakeAppApiClient({
+      seedCalendarStatus: { provider: "google", state: "broken", connectedAt: "2026-08-20T18:30:00Z", lastSyncAt: null, lastSyncErrorAt: "2026-08-20T18:35:00Z" },
+      failStartCalendarConnectWith: { code: "unexpected", message: "failed" },
+    });
+    window.confirm = () => true;
+    const view = render(<CalendarConnectionCard client={client} onAuthFailure={() => {}} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Reconnect" }));
+    expect((await view.findByRole("status")).textContent).toBe("Google Calendar couldn’t be connected. Please try again.");
+    fireEvent.click(view.getByRole("button", { name: "Disconnect" }));
+
+    expect(await view.findByRole("button", { name: "Connect Google Calendar" })).toBeDefined();
+    expect(view.queryByText("Google Calendar couldn’t be connected. Please try again.")).toBeNull();
+  });
 });
