@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { render } from "@testing-library/react";
+import { describe, expect, it, mock } from "bun:test";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import { Dashboard } from "./Dashboard.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { createFakeAppApiClient } from "../lib/fakeAppApiClient.ts";
@@ -7,6 +7,54 @@ import { installDom } from "../test/setup.tsx";
 installDom();
 
 describe("Dashboard upcoming meetings", () => {
+  it("starts Google Calendar connect from the dashboard when the capability is available", async () => {
+    const assign = mock(() => {});
+    Object.defineProperty(window.location, "assign", { configurable: true, value: assign });
+    const authorizationUrl = "https://accounts.google.com/o/oauth2/v2/auth?client_id=test&scope=calendar";
+    const client = createFakeAppApiClient({
+      googleCalendarEnabled: true,
+      calendarAuthorizationUrl: authorizationUrl,
+      seedCalendarMeetings: { connectionState: "not_connected", lastSyncAt: null, meetings: [] },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+
+    const connect = await view.findByRole("button", { name: "Connect Google Calendar" });
+    expect(view.queryByRole("link", { name: "Connect Google Calendar" })).toBeNull();
+    fireEvent.click(connect);
+
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(assign).toHaveBeenCalledWith(authorizationUrl);
+    expect(client.requests.filter((request) => request.path === "/calendar/connect/start" && request.method === "POST")).toHaveLength(1);
+  });
+
+  it("shows the guarded connect error inline and does not navigate for javascript URLs", async () => {
+    const assign = mock(() => {});
+    Object.defineProperty(window.location, "assign", { configurable: true, value: assign });
+    const client = createFakeAppApiClient({
+      googleCalendarEnabled: true,
+      calendarAuthorizationUrl: "javascript:alert(1)",
+      seedCalendarMeetings: { connectionState: "not_connected", lastSyncAt: null, meetings: [] },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Connect Google Calendar" }));
+
+    expect((await view.findByRole("alert")).textContent).toBe("Something went wrong connecting Google Calendar.");
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Settings when Google Calendar capability is unavailable", async () => {
+    const client = createFakeAppApiClient({
+      googleCalendarEnabled: false,
+      seedCalendarMeetings: { connectionState: "not_connected", lastSyncAt: null, meetings: [] },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+
+    const settings = await view.findByRole("link", { name: "Manage in Settings" });
+    expect(settings.getAttribute("href")).toBe("/settings");
+    expect(view.queryByRole("button", { name: "Connect Google Calendar" })).toBeNull();
+  });
+
   it("formats meeting times with the supplied locale and time zone", async () => {
     const client = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [
       { id: "utc", title: "UTC meeting", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: null, meetingProvider: null, organizerEmail: null, attendeeResponse: null },

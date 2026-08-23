@@ -4,13 +4,20 @@ import { useCallback, useEffect, useState } from "react";
 import { AppApiError, type AppApiClient, type CalendarStatus } from "../lib/appApiClient.ts";
 import { authErrorMessage, isAuthErrorCode } from "../lib/authErrors.ts";
 import { formatDateTime, type DateTimeFormatOptions } from "../lib/formatDateTime.ts";
+import { useCalendarConnect } from "../lib/useCalendarConnect.ts";
 
 type CalendarConnectionCardProps = DateTimeFormatOptions & { client: AppApiClient; onAuthFailure: () => void };
 
 export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone }: CalendarConnectionCardProps) {
   const [status, setStatus] = useState<CalendarStatus | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [disconnectBusy, setDisconnectBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const { busy: connectBusy, error: connectError, connect } = useCalendarConnect({
+    client,
+    onAuthFailure,
+    navigate: (authorizationUrl) => window.location.assign(authorizationUrl),
+  });
+  const busy = connectBusy || disconnectBusy;
 
   const handleError = useCallback((error: unknown, fallback: string) => {
     if (error instanceof AppApiError && error.status === 401) { onAuthFailure(); return; }
@@ -35,31 +42,17 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     }
   }, []);
 
-  async function connect() {
-    setBusy(true); setMessage(null);
-    try {
-      const result = await client.startCalendarConnect();
-      let authorizationUrl: URL;
-      try { authorizationUrl = new URL(result.authorizationUrl); }
-      catch { setMessage(authErrorMessage("SAMO-CALENDAR-500")); setBusy(false); return; }
-      if (authorizationUrl.protocol !== "https:" || authorizationUrl.hostname !== "accounts.google.com") {
-        setMessage(authErrorMessage("SAMO-CALENDAR-500")); setBusy(false); return;
-      }
-      window.location.assign(result.authorizationUrl);
-    }
-    catch (error) { handleError(error, "Google Calendar couldn’t be connected. Please try again."); setBusy(false); }
-  }
   async function disconnect() {
     if (!window.confirm("Disconnect Google Calendar? Upcoming meetings will be removed.")) return;
-    setBusy(true); setMessage(null);
+    setDisconnectBusy(true); setMessage(null);
     try { await client.disconnectCalendar(); await load(); }
     catch (error) { handleError(error, "Google Calendar couldn’t be disconnected. Try again."); }
-    finally { setBusy(false); }
+    finally { setDisconnectBusy(false); }
   }
 
   return <section aria-label="Google Calendar" className="samograph-signin samograph-calendar-card">
     <h2>Google Calendar</h2>
-    {message ? <p role="status">{message}</p> : null}
+    {connectError || message ? <p role="status">{connectError ?? message}</p> : null}
     {!status ? <p aria-busy="true">Loading Google Calendar…</p> : status.state === "not_connected" ? <>
       <p>Show upcoming meetings from your calendar.</p>
       <button type="button" disabled={busy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>
