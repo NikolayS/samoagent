@@ -226,12 +226,18 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
   });
 
   describe("landing link touch targets", () => {
-    for (const selector of ["\\.samograph-nav-links a", "\\.samograph-site-footer a"]) {
+    for (const selector of [
+      "\\.samograph-nav-links a",
+      "\\.samograph-site-footer nav a",
+      "\\.samograph-brand",
+    ]) {
       it(`gives ${selector} a 44px minimum touch target`, () => {
         const rule = flatBlockBody(selector);
         expect(rule.length).toBeGreaterThan(0);
         expect(/display\s*:\s*inline-flex\s*;/.test(rule)).toBe(true);
         expect(/align-items\s*:\s*center\s*;/.test(rule)).toBe(true);
+        expect(/justify-content\s*:\s*center\s*;/.test(rule)).toBe(true);
+        expect(/min-width\s*:\s*44px\s*;/.test(rule)).toBe(true);
         expect(/min-height\s*:\s*44px\s*;/.test(rule)).toBe(true);
       });
     }
