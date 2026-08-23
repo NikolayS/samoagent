@@ -55,6 +55,19 @@ describe("Dashboard upcoming meetings", () => {
     expect(view.queryByRole("button", { name: "Connect Google Calendar" })).toBeNull();
   });
 
+  it("falls back to Settings when the calendar capability probe rejects", async () => {
+    const client = createFakeAppApiClient({
+      seedCalendarMeetings: { connectionState: "not_connected", lastSyncAt: null, meetings: [] },
+    });
+    client.authProviders = async () => { throw new Error("transient probe failure"); };
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+
+    const settings = await view.findByRole("link", { name: "Manage in Settings" });
+    await Promise.resolve();
+    expect(settings.getAttribute("href")).toBe("/settings");
+    expect(view.queryByRole("button", { name: "Connect Google Calendar" })).toBeNull();
+  });
+
   it("formats meeting times with the supplied locale and time zone", async () => {
     const client = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [
       { id: "utc", title: "UTC meeting", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: null, meetingProvider: null, organizerEmail: null, attendeeResponse: null },

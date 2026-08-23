@@ -31,6 +31,8 @@ export function UpcomingMeetings({ client, onAuthFailure, locale, timeZone }: Up
     let active = true;
     client.authProviders().then((providers) => {
       if (active) setCalendarAvailable(providers.googleCalendar === true);
+    }).catch(() => {
+      if (active) setCalendarAvailable(false);
     });
     return () => { active = false; };
   }, [client]);

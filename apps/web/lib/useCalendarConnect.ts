@@ -13,6 +13,7 @@ interface UseCalendarConnectOptions {
 export function useCalendarConnect({ client, onAuthFailure, navigate }: UseCalendarConnectOptions) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const clearError = useCallback(() => setError(null), []);
 
   const connect = useCallback(async () => {
     setBusy(true);
@@ -44,5 +45,5 @@ export function useCalendarConnect({ client, onAuthFailure, navigate }: UseCalen
     }
   }, [client, navigate, onAuthFailure]);
 
-  return { busy, error, connect };
+  return { busy, error, connect, clearError };
 }

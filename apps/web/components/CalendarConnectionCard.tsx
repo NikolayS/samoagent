@@ -12,7 +12,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
   const [status, setStatus] = useState<CalendarStatus | null>(null);
   const [disconnectBusy, setDisconnectBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const { busy: connectBusy, error: connectError, connect } = useCalendarConnect({
+  const { busy: connectBusy, error: connectError, connect, clearError: clearConnectError } = useCalendarConnect({
     client,
     onAuthFailure,
     navigate: (authorizationUrl) => window.location.assign(authorizationUrl),
@@ -25,9 +25,9 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
   }, [onAuthFailure]);
 
   const load = useCallback(async () => {
-    try { setStatus(await client.getCalendarStatus()); }
+    try { setStatus(await client.getCalendarStatus()); clearConnectError(); }
     catch (error) { handleError(error, "Couldn’t load Google Calendar. Try again."); }
-  }, [client, handleError]);
+  }, [client, clearConnectError, handleError]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -44,7 +44,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
 
   async function disconnect() {
     if (!window.confirm("Disconnect Google Calendar? Upcoming meetings will be removed.")) return;
-    setDisconnectBusy(true); setMessage(null);
+    setDisconnectBusy(true); setMessage(null); clearConnectError();
     try { await client.disconnectCalendar(); await load(); }
     catch (error) { handleError(error, "Google Calendar couldn’t be disconnected. Try again."); }
     finally { setDisconnectBusy(false); }
