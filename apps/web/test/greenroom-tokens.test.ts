@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Greenroom design-token contract (issue #178).
+ * Refined design-token contract (issue #241).
  *
  * `apps/web/app/globals.css` is the single source of truth for the "Greenroom"
  * palette. This test locks the contract that future visual changes touch ONE
@@ -68,8 +68,20 @@ const CORE_TOKENS = [
   "ground",
   "surface",
   "ink",
+  "ink-soft",
   "muted",
+  "faint",
   "line",
+  "line-strong",
+  "panel-ground",
+  "panel-surface",
+  "panel-strip",
+  "panel-ink",
+  "panel-muted",
+  "panel-line",
+  "panel-gutter",
+  "accent-live",
+  "signal",
   "green",
   "green-deep",
   "green-soft",
@@ -95,8 +107,8 @@ const STATE_TOKENS = [
   "state-error",
 ];
 
-describe("Greenroom design tokens — globals.css contract (issue #178)", () => {
-  describe("(a) :root defines the full Greenroom token set", () => {
+describe("Refined design tokens — globals.css contract (issue #241)", () => {
+  describe("(a) :root defines the full Refined token set", () => {
     const root = baseRootBody();
 
     it("finds a base :root token block", () => {
@@ -120,7 +132,59 @@ describe("Greenroom design tokens — globals.css contract (issue #178)", () => 
     });
   });
 
-  describe("(b) themes in BOTH directions, each redefining --ground and --ink", () => {
+  describe("(b) matches the approved mockup palette", () => {
+    const LIGHT = {
+      ground: "#f4f2ed", surface: "#faf9f6", ink: "#14130f",
+      "ink-soft": "#3a382f", muted: "#6b675c", faint: "#9c978a",
+      line: "#dfdbd1", "line-strong": "#b9b4a6",
+    };
+    const DARK = {
+      ground: "#111110", surface: "#191918", ink: "#edeae2",
+      "ink-soft": "#c6c2b7", muted: "#918c80", faint: "#6a665d",
+      line: "#2a2926", "line-strong": "#45433d",
+    };
+    const INSTRUMENT = {
+      "panel-ground": "#0c0c0b", "panel-surface": "#141413",
+      "panel-strip": "#1c1b18", "panel-ink": "#e2dfd7",
+      "panel-muted": "#837f76", "panel-line": "#24231f",
+      "panel-gutter": "#4a4842", "accent-live": "#4ed18a",
+      signal: "#ff4fb0",
+    };
+
+    it("uses exact light values in base :root and explicit light", () => {
+      const explicit = flatBlockBody(':root\\[data-theme="light"\\]');
+      for (const [token, value] of Object.entries(LIGHT)) {
+        expect(valueOf(baseRootBody(), token)).toBe(value);
+        expect(valueOf(explicit, token)).toBe(value);
+      }
+    });
+
+    it("uses exact dark values for OS preference and explicit dark", () => {
+      const media = nestedBlockBody("@media (prefers-color-scheme: dark)");
+      const explicit = flatBlockBody(':root\\[data-theme="dark"\\]');
+      for (const [token, value] of Object.entries(DARK)) {
+        expect(valueOf(media, token)).toBe(value);
+        expect(valueOf(explicit, token)).toBe(value);
+      }
+    });
+
+    it("keeps instrument, live, and one-element signal tokens invariant", () => {
+      for (const [token, value] of Object.entries(INSTRUMENT)) {
+        expect(valueOf(baseRootBody(), token)).toBe(value);
+      }
+      // One compatibility alias declaration plus one actual use: the streaming caret.
+      expect(CSS_NO_COMMENTS.match(/var\(--signal\)/g)?.length ?? 0).toBe(2);
+    });
+
+    it("uses JetBrains Mono for every font role", () => {
+      const root = baseRootBody();
+      for (const token of ["font-body", "font-display", "font-mono"]) {
+        expect(valueOf(root, token)).toContain('"JetBrains Mono"');
+      }
+    });
+  });
+
+  describe("(c) themes in BOTH directions, each redefining --ground and --ink", () => {
     it("has a @media (prefers-color-scheme: dark) block redefining --ground and --ink", () => {
       expect(CSS_NO_COMMENTS).toContain("@media (prefers-color-scheme: dark)");
       const media = nestedBlockBody("@media (prefers-color-scheme: dark)");
@@ -143,7 +207,7 @@ describe("Greenroom design tokens — globals.css contract (issue #178)", () => 
     });
   });
 
-  describe("(c) no raw hex in a non-token declaration value — every color via var()", () => {
+  describe("(d) no raw hex in a non-token declaration value — every color via var()", () => {
     // Match `property: value;` declarations. `[\w-]+` captures custom properties
     // (`--x`) and standard ones alike; `[^;{}]+` cannot cross a rule boundary, so
     // selectors and media features (no terminating `;`) are never captured.
@@ -159,6 +223,24 @@ describe("Greenroom design tokens — globals.css contract (issue #178)", () => 
       }
       expect(offenders).toEqual([]);
     });
+  });
+
+  describe("landing link touch targets", () => {
+    for (const selector of [
+      "\\.samograph-nav-links a",
+      "\\.samograph-site-footer nav a",
+      "\\.samograph-brand",
+    ]) {
+      it(`gives ${selector} a 44px minimum touch target`, () => {
+        const rule = flatBlockBody(selector);
+        expect(rule.length).toBeGreaterThan(0);
+        expect(/display\s*:\s*inline-flex\s*;/.test(rule)).toBe(true);
+        expect(/align-items\s*:\s*center\s*;/.test(rule)).toBe(true);
+        expect(/justify-content\s*:\s*center\s*;/.test(rule)).toBe(true);
+        expect(/min-width\s*:\s*44px\s*;/.test(rule)).toBe(true);
+        expect(/min-height\s*:\s*44px\s*;/.test(rule)).toBe(true);
+      });
+    }
   });
 
   /**

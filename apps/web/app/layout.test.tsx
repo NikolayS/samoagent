@@ -1,6 +1,11 @@
-import { describe, it, expect } from "bun:test";
-import { isValidElement, type ReactElement } from "react";
-import RootLayout from "./layout.tsx";
+import { describe, it, expect, mock } from "bun:test";
+import { Children, isValidElement, type ReactElement } from "react";
+
+mock.module("next/font/local", () => ({
+  default: () => ({ variable: "mock-jetbrains-mono" }),
+}));
+
+const { default: RootLayout } = await import("./layout.tsx");
 
 /**
  * Issue #70 — the owner saw a React "attributes of the server rendered HTML
@@ -20,7 +25,10 @@ describe("RootLayout (app shell) — issue #70 hydration mitigation", () => {
     suppressHydrationWarning?: boolean;
     children: ReactElement<{ suppressHydrationWarning?: boolean }>;
   }>;
-  const body = tree.props.children;
+  const children = Children.toArray(tree.props.children) as ReactElement<{
+    suppressHydrationWarning?: boolean;
+  }>[];
+  const body = children.find((child) => child.type === "body")!;
 
   it("renders <html lang=\"en\"> wrapping a <body>", () => {
     expect(tree.type).toBe("html");
@@ -32,7 +40,7 @@ describe("RootLayout (app shell) — issue #70 hydration mitigation", () => {
     expect(body.props.suppressHydrationWarning).toBe(true);
   });
 
-  it("does NOT suppress on <html>, so the mitigation stays narrow", () => {
-    expect(tree.props.suppressHydrationWarning).toBeUndefined();
+  it("suppresses on <html> because the no-flash theme script sets data-theme before hydration", () => {
+    expect(tree.props.suppressHydrationWarning).toBe(true);
   });
 });

@@ -9,6 +9,8 @@ __pycache__/
 !apple-touch-icon.png
 !favicon-192.png
 !favicon-512.png
+!apps/web/public/robot-mark.png
+!apps/web/public/favicon-32.png
 !docs/logos/*.png
 node_modules/
 .venv/
