@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-jetbrains",
+});
 
 const themeBootScript = `(function(){try{var t=localStorage.getItem("samograph-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;else document.documentElement.removeAttribute("data-theme")}catch(e){}})()`;
 
@@ -8,18 +15,19 @@ export const metadata: Metadata = {
   title: "samograph — live transcripts for your calls",
   description:
     "Zero-setup live transcripts for your Zoom and Google Meet calls. Sign in, add a meeting link, watch it stream live, then share read-only or download.",
+  icons: { icon: "/robot-mark.png" },
+  openGraph: {
+    title: "samograph — live transcripts for your calls",
+    description:
+      "Zero-setup live transcripts for your Zoom and Google Meet calls. Sign in, add a meeting link, watch it stream live, then share read-only or download.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
-          rel="stylesheet"
-        />
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       {/*
@@ -30,7 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         the no-flash theme script intentionally sets its data-theme before React
         hydrates. Real mismatches inside the app still surface.
       */}
-      <body suppressHydrationWarning>{children}</body>
+      <body className={jetBrainsMono.variable} suppressHydrationWarning>{children}</body>
     </html>
   );
 }

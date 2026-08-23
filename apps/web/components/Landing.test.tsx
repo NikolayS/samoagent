@@ -1,60 +1,47 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { render } from "@testing-library/react";
 import { Landing } from "./Landing.tsx";
 import { installDom } from "../test/setup.tsx";
 
 installDom();
 
-describe("Landing (Greenroom hero)", () => {
-  it("leads with a display headline and a 'Get started' CTA into the auth flow", () => {
+describe("Landing (Refined redesign)", () => {
+  it("renders navigation with branding, theme switcher, and auth CTA", () => {
     const { getByRole } = render(<Landing />);
-    const h1 = getByRole("heading", { level: 1 });
-    expect(h1.textContent).toBe(
-      "Zero-setup live transcripts for your Zoom and Google Meet calls.",
-    );
-    // The CTA is an accessible link/button named "Get started" into /auth.
-    const cta = getByRole("link", { name: /get started/i }) as HTMLAnchorElement;
-    expect(cta.getAttribute("href")).toBe("/auth");
+    const nav = getByRole("navigation", { name: "Primary" });
+    expect(nav.querySelector('img[src="/robot-mark.png"]')).not.toBeNull();
+    expect(nav.textContent).toContain("samograph.dev");
+    expect(getByRole("group", { name: "Theme" })).toBeDefined();
+    expect((nav.querySelector('a[href="/auth"]') as HTMLAnchorElement).textContent).toBe("Get started");
   });
 
-  it("keeps the truthful hosted value prop — no CLI, no Recall token, no tunnel", () => {
-    const { getByText } = render(<Landing />);
-    expect(
-      getByText(
-        "samograph is hosted — no local CLI, no Recall token, no tunnel to run. Sign in, add a meeting link, and watch the transcript stream live. Share it read-only with anyone, or download it when the call ends.",
-      ),
-    ).toBeDefined();
+  it("uses the approved hero copy and sends every primary CTA to /auth", () => {
+    const { getByRole, getAllByRole } = render(<Landing />);
+    expect(getByRole("heading", { level: 1 }).textContent).toBe("Paste a meeting link.The transcript starts arriving.");
+    const links = getAllByRole("link", { name: "Get started" });
+    expect(links.length).toBeGreaterThanOrEqual(3);
+    expect(links.every((link) => link.getAttribute("href") === "/auth")).toBe(true);
   });
 
-  it("lists the four v1 steps in order (sign in → add → watch → share/download)", () => {
+  it("renders the transcript instrument speakers and approved sample lines", () => {
     const { getByRole } = render(<Landing />);
-    const steps = getByRole("list", { name: "How it works" });
-    const items = Array.from(steps.querySelectorAll("li")).map(
-      (li) => li.textContent,
-    );
-    expect(items).toEqual([
-      "Sign in with a magic link.",
-      "Add a Zoom or Google Meet meeting link.",
-      "Watch the transcript stream live.",
-      "Share it read-only, or download it.",
-    ]);
+    const transcript = getByRole("list", { name: "Sample transcript lines" });
+    expect(transcript.textContent).toContain("Dana:");
+    expect(transcript.textContent).toContain("Morgan:");
+    expect(transcript.textContent).toContain("Jamie:");
+    expect(transcript.textContent).toContain("P99 climbed right after we expanded the canary rollout to ten percent.");
+    expect(transcript.textContent).toContain("The incident timeline shows the same three retries as last week.");
   });
 
-  it("shows an illustrative product-preview panel clearly marked as a sample, not live data", () => {
-    const { getByText, getByRole } = render(<Landing />);
-    // The panel is explicitly labeled an example — never the viewer's real call.
-    expect(
-      getByText("Sample transcript — an illustrative example, not a live call."),
-    ).toBeDefined();
-    // A couple of `[HH:MM:SS] Speaker: …` sample lines are rendered.
-    const sample = getByRole("list", { name: "Sample transcript lines" });
-    const lines = Array.from(sample.querySelectorAll("li")).map(
-      (li) => li.textContent,
-    );
-    expect(lines).toEqual([
-      "[00:00:04] Alex: Morning — can everyone hear me okay?",
-      "[00:00:11] Priya: Loud and clear. Let's start with the rollout.",
-      "[00:00:18] Alex: So the cutover plan is",
-    ]);
+  it("renders all approved pricing tier names and prices", () => {
+    const { getByRole } = render(<Landing />);
+    const pricing = getByRole("region", { name: "Pricing" });
+    for (const text of ["Free", "$0", "Individual", "$20/mo", "Team", "$25/user/mo"]) expect(pricing.textContent).toContain(text);
+  });
+
+  it("renders the centered footer link set", () => {
+    const { getByRole } = render(<Landing />);
+    const labels = Array.from(getByRole("contentinfo").querySelectorAll("a"), (link) => link.textContent);
+    expect(labels).toEqual(["get started", "docs", "cli on github", "dictionaries", "status", "privacy", "hello@samograph.dev"]);
   });
 });

@@ -1,6 +1,11 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, mock } from "bun:test";
 import { Children, isValidElement, type ReactElement } from "react";
-import RootLayout from "./layout.tsx";
+
+mock.module("next/font/google", () => ({
+  JetBrains_Mono: () => ({ variable: "mock-jetbrains-mono" }),
+}));
+
+const { default: RootLayout } = await import("./layout.tsx");
 
 /**
  * Issue #70 — the owner saw a React "attributes of the server rendered HTML
