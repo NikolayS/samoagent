@@ -31,6 +31,8 @@ describe("Landing (Refined redesign)", () => {
     expect(transcript.textContent).toContain("Jamie:");
     expect(transcript.textContent).toContain("P99 climbed right after we expanded the canary rollout to ten percent.");
     expect(transcript.textContent).toContain("The incident timeline shows the same three retries as last week.");
+    expect(transcript.classList.contains("samograph-instrument-lines")).toBe(true);
+    expect(transcript.classList.contains("samograph-transcript")).toBe(false);
   });
 
   it("renders all approved pricing tier names and prices", () => {
@@ -42,6 +44,6 @@ describe("Landing (Refined redesign)", () => {
   it("renders the centered footer link set", () => {
     const { getByRole } = render(<Landing />);
     const labels = Array.from(getByRole("contentinfo").querySelectorAll("a"), (link) => link.textContent);
-    expect(labels).toEqual(["get started", "docs", "cli on github", "dictionaries", "status", "privacy", "hello@samograph.dev"]);
+    expect(labels).toEqual(["get started", "docs", "cli on github", "dictionaries", "hello@samograph.dev"]);
   });
 });

@@ -9,15 +9,24 @@ const THEMES: Theme[] = ["light", "dark", "sys"];
 function applyTheme(theme: Theme): void {
   if (theme === "sys") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.dataset.theme = theme;
-  localStorage.setItem(STORAGE_KEY, theme);
+  try {
+    localStorage.setItem(STORAGE_KEY, theme);
+  } catch {
+    // Web Storage can throw (for example, in Safari private mode). The DOM
+    // theme above must still apply even when the preference cannot persist.
+  }
 }
 
 export function ThemeSwitcher() {
   const [theme, setTheme] = useState<Theme>("sys");
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark" || stored === "sys") setTheme(stored);
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "light" || stored === "dark" || stored === "sys") setTheme(stored);
+    } catch {
+      // Keep the system default when Web Storage is unavailable.
+    }
   }, []);
 
   return (

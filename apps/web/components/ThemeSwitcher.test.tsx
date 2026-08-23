@@ -33,4 +33,27 @@ describe("ThemeSwitcher", () => {
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
     expect(localStorage.getItem("samograph-theme")).toBe("sys");
   });
+
+  it("still applies every theme when Web Storage is unavailable", () => {
+    const originalStorage = globalThis.localStorage;
+    const throwingStorage = {
+      getItem() { throw new Error("storage unavailable"); },
+      setItem() { throw new Error("storage unavailable"); },
+      clear() { throw new Error("storage unavailable"); },
+    };
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: throwingStorage });
+
+    try {
+      let view: ReturnType<typeof render> | undefined;
+      expect(() => { view = render(<ThemeSwitcher />); }).not.toThrow();
+      expect(() => fireEvent.click(view!.getByRole("button", { name: "light" }))).not.toThrow();
+      expect(document.documentElement.dataset.theme).toBe("light");
+      expect(() => fireEvent.click(view!.getByRole("button", { name: "dark" }))).not.toThrow();
+      expect(document.documentElement.dataset.theme).toBe("dark");
+      expect(() => fireEvent.click(view!.getByRole("button", { name: "sys" }))).not.toThrow();
+      expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    } finally {
+      Object.defineProperty(globalThis, "localStorage", { configurable: true, value: originalStorage });
+    }
+  });
 });

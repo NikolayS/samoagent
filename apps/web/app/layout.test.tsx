@@ -1,8 +1,8 @@
 import { describe, it, expect, mock } from "bun:test";
 import { Children, isValidElement, type ReactElement } from "react";
 
-mock.module("next/font/google", () => ({
-  JetBrains_Mono: () => ({ variable: "mock-jetbrains-mono" }),
+mock.module("next/font/local", () => ({
+  default: () => ({ variable: "mock-jetbrains-mono" }),
 }));
 
 const { default: RootLayout } = await import("./layout.tsx");
