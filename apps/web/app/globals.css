@@ -1,19 +1,14 @@
 /* =============================================================================
- * Greenroom — samograph.dev design tokens (issue #178)
+ * Refined — samograph.dev design tokens (issue #241)
  *
  * ONE source of truth for the palette. Every color in a style rule below is
  * delivered through `var(--token)`; raw hex literals appear ONLY in the token
  * registries (`:root` and the `data-theme` / `prefers-color-scheme` overrides).
  * A future visual change touches this file, not scattered literals.
  *
- * Palette rationale:
- *  - Two-green split: `--green` (bright evergreen) carries interactive accents
- *    and the live pulse; `--green-deep` (deep evergreen) is the "ink-adjacent"
- *    accent for links, headings and the live CTA. `--green-soft` is the pale
- *    wash for hovers/tints.
- *  - Pink is RATIONED to the "bot speaks" moment only — the streaming partial
- *    caret and the speaking cue. It never becomes chrome.
- *  - Full light AND dark support, in BOTH mechanisms: the OS preference
+ * The page palette is neutral and the transcript instrument remains dark in
+ * both themes. Signal magenta is reserved for one streaming caret element.
+ * Full light AND dark support uses BOTH mechanisms: the OS preference
  *    (`@media prefers-color-scheme`) AND an explicit, higher-specificity
  *    `:root[data-theme="…"]` override so a user toggle always wins.
  *
@@ -29,36 +24,48 @@
 :root {
   color-scheme: light dark;
 
-  /* Surfaces & text */
-  --ground: #f4f8f5;
-  --surface: #ffffff;
-  --ink: #0f2e1e;
-  --muted: #566f61;
-  --line: #d7e6dc;
+  /* Page */
+  --ground: #f4f2ed;
+  --surface: #faf9f6;
+  --ink: #14130f;
+  --ink-soft: #3a382f;
+  --muted: #6b675c;
+  --faint: #9c978a;
+  --line: #dfdbd1;
+  --line-strong: #b9b4a6;
 
-  /* Two-green split (+ soft wash) */
-  --green: #16a34a;
-  --green-deep: #12813f;
-  --green-soft: #e5f5ec;
+  /* Theme-invariant transcript instrument */
+  --panel-ground: #0c0c0b;
+  --panel-surface: #141413;
+  --panel-strip: #1c1b18;
+  --panel-ink: #e2dfd7;
+  --panel-muted: #837f76;
+  --panel-line: #24231f;
+  --panel-gutter: #4a4842;
+  --accent-live: #4ed18a;
+  --signal: #ff4fb0;
 
-  /* Rationed pink (bot-speaks moment) */
-  --pink: #c13b7f;
-  --pink-soft: #fbe6f1;
+  /* Compatibility aliases for pre-redesign components. */
+  --green: var(--accent-live);
+  --green-deep: var(--ink-soft);
+  --green-soft: var(--surface);
+  --pink: var(--signal);
+  --pink-soft: var(--panel-strip);
 
   /* Semantic status */
-  --good: var(--green);
-  --warn: #9a6a12;
-  --crit: #b00020;
+  --good: var(--accent-live);
+  --warn: #8a5a00;
+  --crit: #a63a3a;
 
   /* Foregrounds for filled accents */
-  --on-green: #ffffff;
-  --on-pink: #ffffff;
+  --on-green: var(--panel-ground);
+  --on-pink: var(--panel-ground);
 
   /* Per-kind status-chip tokens (callStatusView.ts `StatusKind`). These
      reference the hue tokens above, so they re-resolve automatically per theme. */
   --state-pending: var(--muted);
-  --state-joining: var(--green-deep);
-  --state-live: var(--green);
+  --state-joining: var(--ink-soft);
+  --state-live: var(--accent-live);
   --state-ended: var(--muted);
   --state-error: var(--crit);
 
@@ -76,11 +83,9 @@
   --google-btn-ink: #1f1f1f;
 
   /* Type */
-  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
-  --font-display: var(--font-body);
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  --font-body: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* Dark by OS preference. The explicit `data-theme` blocks below have higher
@@ -89,20 +94,16 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --ground: #0b1712;
-    --surface: #10201a;
-    --ink: #e7f2ec;
-    --muted: #9fb6aa;
-    --line: #22392e;
-    --green: #3ecf7f;
-    --green-deep: #6fe0a0;
-    --green-soft: #14291d;
-    --pink: #ef7ab0;
-    --pink-soft: #351826;
-    --warn: #e0a94a;
-    --crit: #ff6b7d;
-    --on-green: #06210f;
-    --on-pink: #2a0f1c;
+    --ground: #111110;
+    --surface: #191918;
+    --ink: #edeae2;
+    --ink-soft: #c6c2b7;
+    --muted: #918c80;
+    --faint: #6a665d;
+    --line: #2a2926;
+    --line-strong: #45433d;
+    --warn: #e2b45a;
+    --crit: #ff7a7a;
     /* Google's approved DARK button set (#209) — not our palette to tune. */
     --google-btn-bg: #131314;
     --google-btn-border: #8e918f;
@@ -113,20 +114,16 @@
 /* Explicit user theme choice — wins over the OS preference above. */
 :root[data-theme="light"] {
   color-scheme: light;
-  --ground: #f4f8f5;
-  --surface: #ffffff;
-  --ink: #0f2e1e;
-  --muted: #566f61;
-  --line: #d7e6dc;
-  --green: #16a34a;
-  --green-deep: #12813f;
-  --green-soft: #e5f5ec;
-  --pink: #c13b7f;
-  --pink-soft: #fbe6f1;
-  --warn: #9a6a12;
-  --crit: #b00020;
-  --on-green: #ffffff;
-  --on-pink: #ffffff;
+  --ground: #f4f2ed;
+  --surface: #faf9f6;
+  --ink: #14130f;
+  --ink-soft: #3a382f;
+  --muted: #6b675c;
+  --faint: #9c978a;
+  --line: #dfdbd1;
+  --line-strong: #b9b4a6;
+  --warn: #8a5a00;
+  --crit: #a63a3a;
   /* Google's approved LIGHT button set (#209). */
   --google-btn-bg: #ffffff;
   --google-btn-border: #747775;
@@ -135,20 +132,16 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ground: #0b1712;
-  --surface: #10201a;
-  --ink: #e7f2ec;
-  --muted: #9fb6aa;
-  --line: #22392e;
-  --green: #3ecf7f;
-  --green-deep: #6fe0a0;
-  --green-soft: #14291d;
-  --pink: #ef7ab0;
-  --pink-soft: #351826;
-  --warn: #e0a94a;
-  --crit: #ff6b7d;
-  --on-green: #06210f;
-  --on-pink: #2a0f1c;
+  --ground: #111110;
+  --surface: #191918;
+  --ink: #edeae2;
+  --ink-soft: #c6c2b7;
+  --muted: #918c80;
+  --faint: #6a665d;
+  --line: #2a2926;
+  --line-strong: #45433d;
+  --warn: #e2b45a;
+  --crit: #ff7a7a;
   /* Google's approved DARK button set (#209). */
   --google-btn-bg: #131314;
   --google-btn-border: #8e918f;
@@ -183,7 +176,7 @@ h3 {
 }
 
 h1 {
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 a {
@@ -242,6 +235,46 @@ button {
 button:hover {
   background: var(--green-soft);
   border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+}
+
+/* Compact segmented theme control; each hit target remains 44px tall. */
+.samograph-theme-switcher {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: var(--ground);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+}
+
+.samograph-theme-switcher__option {
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 11px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.samograph-theme-switcher__option:hover {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: transparent;
+}
+
+.samograph-theme-switcher__option[aria-pressed="true"] {
+  color: var(--ground);
+  background: var(--ink);
+  font-weight: 500;
 }
 
 [role="alert"] {

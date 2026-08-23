@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
 
+const themeBootScript = `(function(){try{var t=localStorage.getItem("samograph-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;else document.documentElement.removeAttribute("data-theme")}catch(e){}})()`;
+
 export const metadata: Metadata = {
   title: "samograph — live transcripts for your calls",
   description:
@@ -10,15 +12,23 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+          rel="stylesheet"
+        />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       {/*
         Issue #70: browser extensions (Grammarly, ColorZilla, password managers)
         stamp attributes onto <body> before React hydrates, which trips the
-        "attributes of the server rendered HTML didn't match" warning. This is
-        not a SSR↔client divergence in our code (the page is static and clean in
-        a fresh headless browser). `suppressHydrationWarning` here is the
-        standard, narrow mitigation: it applies to <body> ONLY (one level deep),
-        so real mismatches inside the app still surface.
+        "attributes of the server rendered HTML didn't match" warning. The body
+        suppression stays narrow; the html element is also suppressed because
+        the no-flash theme script intentionally sets its data-theme before React
+        hydrates. Real mismatches inside the app still surface.
       */}
       <body suppressHydrationWarning>{children}</body>
     </html>
