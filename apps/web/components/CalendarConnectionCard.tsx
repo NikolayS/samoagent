@@ -20,7 +20,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
   const [messageKind, setMessageKind] = useState<"error" | "success">(initialCalendarError ? "error" : "success");
   const [confirming, setConfirming] = useState(false);
   const disconnectTrigger = useRef<HTMLButtonElement>(null);
-  const card = useRef<HTMLElement>(null);
+  const card = useRef<HTMLDivElement>(null);
   const restoreFocusAfterDisconnect = useRef(false);
   const { busy: connectBusy, error: connectError, connect, clearError: clearConnectError } = useCalendarConnect({
     client,
