@@ -1,12 +1,5 @@
 import { ThemeSwitcher } from "./ThemeSwitcher.tsx";
 
-const glimpse = [
-  ["[00:12:04]", "Dana:", "P99 climbed after the canary rollout."],
-  ["[00:12:11]", "Morgan:", "Same three retries as last week."],
-  ["[00:12:19]", "Jamie:", "Check idempotency and error rates."],
-  ["[00:12:27]", "Dana:", "Pausing the rollout now."],
-] as const;
-
 const REPO = "https://github.com/NikolayS/samograph";
 
 export function SiteNav() {
@@ -70,15 +63,6 @@ export function Landing() {
               github
             </a>
           </div>
-          <ol className="samograph-glimpse" aria-label="Transcript format">
-            {glimpse.map(([time, speaker, text]) => (
-              <li key={time}>
-                <time>{time}</time>
-                <b>{speaker}</b>
-                <span>{text}</span>
-              </li>
-            ))}
-          </ol>
         </section>
       </main>
       <SiteFooter />
