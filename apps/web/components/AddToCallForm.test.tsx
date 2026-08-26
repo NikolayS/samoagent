@@ -22,11 +22,7 @@ describe("AddToCallForm — the dashboard's single primary action", () => {
     );
     expect(getByText("Add samograph to a call")).toBeDefined();
     expect(queryByRole("heading", { level: 1 })).toBeNull();
-    const levelTwoHeading = queryByRole("heading", {
-      level: 2,
-      name: "Add samograph to a call",
-    });
-    expect(levelTwoHeading ?? getByText("Add samograph to a call")).toBeDefined();
+    expect(getByRole("heading", { level: 2, name: "Add samograph to a call" })).toBeDefined();
     expect((getByLabelText("Meeting link") as HTMLInputElement).tagName).toBe("INPUT");
     expect(getByRole("button", { name: "Add to call" })).toBeDefined();
     expect(getByRole("button", { name: "Add to call" }).classList.contains("samograph-btn")).toBe(true);
