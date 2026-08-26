@@ -77,7 +77,7 @@ export function MagicLinkCallback({ token, client }: MagicLinkCallbackProps) {
   return (
     <section>
       <h1>Sign-in failed</h1>
-      <p role="alert">{state.message}</p>
+      <p role="alert" className="samograph-alert samograph-alert--error">{state.message}</p>
       <a href="/auth">Request a new link</a>
     </section>
   );

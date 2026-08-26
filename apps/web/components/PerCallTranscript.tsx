@@ -374,7 +374,7 @@ export function PerCallTranscript({
       <DegradedBanner degraded={state.degraded} />
 
       {fatalError || (!hasLines && view.kind === "error") ? (
-        <div role="alert" className="samograph-stream-error">
+        <div role="alert" className="samograph-stream-error samograph-alert samograph-alert--error">
           <p>{fatalError ? streamErrorCopy(fatalError.code, fatalError.message) : view.message}</p>
         </div>
       ) : (

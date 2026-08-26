@@ -25,12 +25,11 @@ if (source.includes("samograph-call-cta-${kind}")) {
 
 // shrinks each slice
 const ALLOWLIST = new Set([
-  "samograph-field", "samograph-field-hint", "samograph-signin", "samograph-signin-methods",
+  "samograph-signin", "samograph-signin-methods",
   "samograph-signin-method", "samograph-signin-method-name", "samograph-signin-method-state",
   "samograph-share-modal", "samograph-share-header", "samograph-share-actions", "samograph-share-url",
   "samograph-share-blurb", "samograph-share-active", "samograph-share-rotated", "samograph-share-page",
-  "samograph-danger-zone", "samograph-danger-zone-title", "samograph-danger-confirm", "samograph-danger-delete",
-  "samograph-danger-error", "samograph-delete-confirm", "samograph-delete-error", "samograph-call-item",
+  "samograph-call-item",
   "samograph-call-cta-text", "samograph-line", "samograph-download-transcript-speech", "samograph-theme",
   "samograph-call-cta-open",
 ]);
