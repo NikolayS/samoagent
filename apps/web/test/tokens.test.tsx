@@ -103,18 +103,9 @@ describe("Slice 1 typography regressions", () => {
     expect(landingHeadingIndex).toBeGreaterThan(globalHeadingIndex);
   });
 
-  it("keeps the landing's historical inherited line height", () => {
-    const { container } = render(createElement(Landing));
-    const heritageHeading = container.querySelector<HTMLElement>(".samograph-heritage h2")!;
-    expect(getComputedStyle(heritageHeading).lineHeight).toBe("1.25");
-  });
-
-  it("keeps the heritage heading's historical letter spacing", () =>
-    expect(rule(/\.samograph-heritage h2/)).toMatch(/letter-spacing\s*:\s*normal/));
-
   it("pins the landing heading weight and historical line heights", () => {
     const { container } = render(createElement(Landing));
-    const heroHeading = container.querySelector<HTMLElement>(".samograph-hero-copy h1")!;
+    const heroHeading = container.querySelector<HTMLElement>(".samograph-landing-hero h1")!;
     expect(getComputedStyle(heroHeading).fontWeight).toBe("700");
     expect(getComputedStyle(heroHeading).lineHeight).toBe("1.14");
   });

@@ -1371,3 +1371,11 @@ The stable Calendar errors added to §5.16 are:
 **What differs:** `accent-live` is restricted to the transcript instrument. General focus and hover treatments are achromatic through `--focus-ring` and `--hover-surface`. These tokens land in Slice 1; adoption across controls follows in Slices 2–6.
 
 **Why:** Reserving green for live state protects its meaning, while ink-based interaction states provide stronger contrast in both themes.
+
+### S6-1. Landing page — radical simplification — *Deviation (post-v1)*
+
+**Amends:** `SPEC.md` §5 landing description and the Refined landing composition in `DESIGN.md` / `design-ref/RefinedLight.dc.html` + `RefinedDark.dc.html`, which specify a hero with a simulated live "instrument" panel, a four-card differentiators grid, a four-step "From link to live page" list, a heritage/CLI section, and a closing band.
+
+**What differs:** The landing is one screen: nav (brand, theme switcher, sign-in button), a single `h1` — "An agent that joins your call and transcribes it live." — one supporting line, one primary CTA to `/auth` plus a `github` secondary link, a compact four-line transcript glimpse in the real `[time] Speaker: text` format, and a minimal footer. The simulated instrument, differentiators, step list (including the "Sign in" step), heritage/CLI section, and closing band are removed, along with their CSS. Rendered visible text above the footer drops from 428 words to 55. A skip link is added; the transcript-panel CSS primitives the per-call view composes are retained.
+
+**Why:** Owner feedback on the shipped page: it was too complicated and too wordy, and a "Sign in" step is not information a developer needs. A developer should be able to tell what samograph is, and start, in about five seconds.

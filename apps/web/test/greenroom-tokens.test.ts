@@ -225,11 +225,11 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
       for (const [token, value] of Object.entries(INSTRUMENT)) {
         expect(valueOf(baseRootBody(), token)).toBe(value);
       }
-      // One compatibility alias declaration plus the streaming caret — drawn
-      // twice now: the landing's instrument sample and the real transcript
-      // (Slice 3). The signal magenta stays a ONE-ELEMENT accent.
-      expect(CSS_NO_COMMENTS.match(/var\(--signal\)/g)?.length ?? 0).toBe(3);
-      expect(CSS_NO_COMMENTS.match(/background: var\(--signal\)/g)?.length ?? 0).toBe(2);
+      // One compatibility alias declaration plus the streaming caret, now drawn
+      // once — only the real transcript (Slice 3); the landing no longer fakes
+      // an instrument. The signal magenta stays a ONE-ELEMENT accent.
+      expect(CSS_NO_COMMENTS.match(/var\(--signal\)/g)?.length ?? 0).toBe(2);
+      expect(CSS_NO_COMMENTS.match(/background: var\(--signal\)/g)?.length ?? 0).toBe(1);
     });
 
     it("uses the Slice 1 dual sans/mono font roles", () => {
@@ -284,7 +284,6 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
 
   describe("landing link touch targets", () => {
     for (const selector of [
-      "\\.samograph-nav-links a",
       "\\.samograph-site-footer nav a",
       "\\.samograph-brand",
     ]) {
