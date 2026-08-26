@@ -82,10 +82,14 @@
   --google-btn-border: #747775;
   --google-btn-ink: #1f1f1f;
 
-  /* Type */
-  --font-body: var(--font-jetbrains), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-display: var(--font-jetbrains), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-mono: var(--font-jetbrains), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Type.
+     The var() fallback ("JetBrains Mono") keeps these tokens valid even if
+     --font-jetbrains is not visible at :root — an undefined var() inside a
+     declaration makes the whole declaration invalid at computed-value time,
+     which once collapsed the entire site to the browser default serif. */
+  --font-body: var(--font-jetbrains, "JetBrains Mono"), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: var(--font-jetbrains, "JetBrains Mono"), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: var(--font-jetbrains, "JetBrains Mono"), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* Refined public landing (issue #241). */
