@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   AppApiError,
   type ShareApiClient,
   type ShareLink,
 } from "../lib/shareApiClient.ts";
+import { ModalFrame } from "./ModalFrame.tsx";
 
 export interface ShareModalProps {
   shareClient: ShareApiClient;
@@ -31,6 +32,7 @@ const GENERIC_ERROR = "Something went wrong with the share link. Try again.";
  * `role="alert"`, never a silent no-op.
  */
 export function ShareModal({ shareClient, callId, onClose }: ShareModalProps) {
+  const titleId = useId();
   const [phase, setPhase] = useState<Phase>("loading");
   const [link, setLink] = useState<ShareLink | null>(null);
   const [busy, setBusy] = useState(false);
@@ -131,58 +133,55 @@ export function ShareModal({ shareClient, callId, onClose }: ShareModalProps) {
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Share read-only link"
-      className="samograph-share-modal"
-    >
-      <header className="samograph-share-header">
-        <h2>Share read-only link</h2>
-        <button type="button" className="samograph-btn samograph-btn--secondary" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-      </header>
+    <ModalFrame titleId={titleId} onClose={onClose}>
+      <div className="samograph-share-modal">
+        <header className="samograph-share-header">
+          <h2 id={titleId}>Share read-only link</h2>
+          <button type="button" className="samograph-btn samograph-btn--ghost" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </header>
 
-      <p className="samograph-share-blurb">
-        Anyone with this link can watch the live transcript read-only — they can't
-        control the bot, mint tokens, or see your other calls.
-      </p>
+        <p className="samograph-share-blurb">
+          Anyone with this link can watch the live transcript read-only — they can't
+          control the bot, mint tokens, or see your other calls.
+        </p>
 
-      {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+        {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
 
-      {phase === "loading" ? <p>Loading share status…</p> : null}
+        {phase === "loading" ? <p>Loading share status…</p> : null}
 
-      {phase === "empty" ? (
-        <button type="button" className="samograph-btn samograph-btn--primary" onClick={() => void onCreate()} disabled={busy} aria-busy={busy}>
-          Create share link
-        </button>
-      ) : null}
+        {phase === "empty" ? (
+          <button type="button" className="samograph-btn samograph-btn--primary" onClick={() => void onCreate()} disabled={busy} aria-busy={busy}>
+            Create share link
+          </button>
+        ) : null}
 
-      {phase === "active" && link ? (
-        <div className="samograph-share-active">
-          <a href={link.url} className="samograph-share-url">
-            {link.url}
-          </a>
-          {rotated ? (
-            <p className="samograph-share-rotated">
-              The previous link stopped working.
-            </p>
-          ) : null}
-          <div className="samograph-share-actions">
-            <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onCopy()}>
-              Copy link
-            </button>
-            {copied ? <span role="status">Copied</span> : null}
-            <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onRotate()} disabled={busy} aria-busy={busy}>
-              Rotate
-            </button>
-            <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onRevoke()} disabled={busy} aria-busy={busy}>
-              Revoke
-            </button>
+        {phase === "active" && link ? (
+          <div className="samograph-share-active">
+            <a href={link.url} className="samograph-share-url">
+              {link.url}
+            </a>
+            {rotated ? (
+              <p className="samograph-share-rotated">
+                The previous link stopped working.
+              </p>
+            ) : null}
+            <div className="samograph-share-actions">
+              <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onCopy()}>
+                Copy link
+              </button>
+              {copied ? <span role="status">Copied</span> : null}
+              <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onRotate()} disabled={busy} aria-busy={busy}>
+                Rotate
+              </button>
+              <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onRevoke()} disabled={busy} aria-busy={busy}>
+                Revoke
+              </button>
+            </div>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </ModalFrame>
   );
 }
