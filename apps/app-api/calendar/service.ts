@@ -72,7 +72,10 @@ export class CalendarService {
       // Slice 2 seam: Slices 3/4 inject the shared immediate synchronization service.
       await this.#deps.immediateSync?.(row.id).catch(() => {});
       return { ok: true as const };
-    } catch { return { ok: false as const, code: "SAMO-CALENDAR-500" as const }; }
+    } catch (error) {
+      console.error("SAMO-CALENDAR-500 Calendar callback failed:", error instanceof Error ? error.message : String(error));
+      return { ok: false as const, code: "SAMO-CALENDAR-500" as const };
+    }
   }
   async status(userId: string, tenantId: string) { return this.#deps.store.get(userId, tenantId); }
   async meetings(userId: string, tenantId: string, limit: number) { return this.#deps.store.meetings?.(userId, tenantId, limit, new Date(this.#deps.clock())) ?? { connection: null, meetings: [] }; }

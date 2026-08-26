@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 import { CalendarService, type CalendarConnection, type CalendarConnectionStore } from "./service.ts";
 import { InMemoryRateLimiter } from "../auth/rate-limit.ts";
 import { decryptSecret } from "../../../packages/shared/crypto.ts";
@@ -76,6 +76,23 @@ describe("CalendarService", () => {
     const state2 = new URL(started2.authorizationUrl).searchParams.get("state")!;
     await ctx.service.callback({ userId: "user", tenantId: "tenant", ip: "ip", stateCookie: cookie2, params: new URLSearchParams({ code: "code2", state: state2 }) });
     expect(ctx.store.row?.id).toBe(id);
+  });
+
+  it("logs callback persistence failures before mapping them to SAMO-CALENDAR-500", async () => {
+    const ctx = setup();
+    ctx.store.save = async () => { throw new Error("database save failed"); };
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const started = await ctx.service.start({ userId: "user", tenantId: "tenant", ip: "ip" });
+      if (!started.ok) throw new Error("start failed");
+      const cookie = started.setCookie.match(/^[^=]+=([^;]+)/)?.[1] ?? "";
+      const state = new URL(started.authorizationUrl).searchParams.get("state")!;
+
+      expect(await ctx.service.callback({ userId: "user", tenantId: "tenant", ip: "ip", stateCookie: cookie, params: new URLSearchParams({ code: "code", state }) })).toEqual({ ok: false, code: "SAMO-CALENDAR-500" });
+      expect(error).toHaveBeenCalledWith("SAMO-CALENDAR-500 Calendar callback failed:", "database save failed");
+    } finally {
+      error.mockRestore();
+    }
   });
 
   it("disconnect is idempotent and deletes locally despite revocation failure", async () => {
