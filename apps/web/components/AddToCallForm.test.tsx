@@ -23,6 +23,23 @@ describe("AddToCallForm — the dashboard's single primary action", () => {
     expect(getByText("Add samograph to a call")).toBeDefined();
     expect((getByLabelText("Meeting link") as HTMLInputElement).tagName).toBe("INPUT");
     expect(getByRole("button", { name: "Add to call" })).toBeDefined();
+    expect(getByRole("button", { name: "Add to call" }).classList.contains("samograph-btn")).toBe(true);
+    expect(getByRole("button", { name: "Add to call" }).classList.contains("samograph-btn--primary")).toBe(true);
+  });
+
+  it("marks the Add to call button busy and disabled while creating", async () => {
+    const client = createFakeAppApiClient();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const original = client.createCall.bind(client);
+    client.createCall = async (input) => { await pending; return original(input); };
+    const { container, getByLabelText, getByRole } = render(<AddToCallForm client={client} />);
+    fireEvent.change(getByLabelText("Meeting link"), { target: { value: "https://meet.google.com/abc-defg-hij" } });
+    submit(container);
+    const button = getByRole("button", { name: "Add to call" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    release();
   });
 
   it("rejects an empty submit without calling the client", () => {
@@ -31,6 +48,10 @@ describe("AddToCallForm — the dashboard's single primary action", () => {
     submit(container);
     expect(client.requests).toEqual([]);
     expect(getByText(REJECT_MESSAGE)).toBeDefined();
+    const alert = getByText(REJECT_MESSAGE);
+    expect(alert.getAttribute("role")).toBe("alert");
+    expect(alert.classList.contains("samograph-alert")).toBe(true);
+    expect(alert.classList.contains("samograph-alert--error")).toBe(true);
   });
 
   it("rejects whitespace-only input without calling the client", () => {

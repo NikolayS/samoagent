@@ -1,0 +1,22 @@
+Slice 2 — Controls red-test baseline
+
+Command:
+  cd apps/web && bun test 2>&1 | tail -60
+
+Result:
+  461 pass
+  47 fail
+  1012 expect() calls
+  508 tests across 45 files
+
+Representative expected failures:
+  - Send magic link class: expected "samograph-btn", received "".
+  - Pending Send magic link aria-busy: expected "true", received null.
+  - Magic-link error class: expected "samograph-alert samograph-alert--error", received "".
+  - Check-your-email information role: expected "status", received null.
+  - Calendar confirmation tests cannot find an accessible dialog named for Disconnect because the component still uses window.confirm.
+  - Calendar failure feedback cannot be found with role="alert" because failures currently use role="status".
+  - CSS primitive guards fail because the Slice 2 button, alert, field, action, and textarea rules are not yet defined.
+  - Native-confirm scan reports components/CalendarConnectionCard.tsx.
+
+These failures are intentional for the RED phase; production components and globals.css were not changed.

@@ -64,9 +64,12 @@ describe("Settings Calendar connection", () => {
 
   it("disconnects only after confirmation and refreshes to not connected", async () => {
     const client = createFakeAppApiClient({ googleCalendarEnabled: true, seedCalendarStatus: { provider: "google", state: "connected", connectedAt: "2026-08-20T18:30:00Z", lastSyncAt: "2026-08-20T18:35:00Z", lastSyncErrorAt: null } });
-    window.confirm = () => true;
     const view = render(<SettingsPage client={client} redirect={() => {}} />);
     fireEvent.click(await view.findByRole("button", { name: "Disconnect" }));
+    const dialog = await view.findByRole("dialog", { name: /disconnect/i });
+    const confirm = [...dialog.querySelectorAll("button")].find((button) => button.textContent === "Disconnect");
+    if (!confirm) throw new Error("missing in-dialog Disconnect button");
+    fireEvent.click(confirm);
     await waitFor(() => expect(client.requests.some((r) => r.path === "/calendar/connection" && r.method === "DELETE")).toBe(true));
     expect(await view.findByRole("button", { name: "Connect Google Calendar" })).toBeDefined();
   });
@@ -76,14 +79,62 @@ describe("Settings Calendar connection", () => {
       seedCalendarStatus: { provider: "google", state: "broken", connectedAt: "2026-08-20T18:30:00Z", lastSyncAt: null, lastSyncErrorAt: "2026-08-20T18:35:00Z" },
       failStartCalendarConnectWith: { code: "unexpected", message: "failed" },
     });
-    window.confirm = () => true;
     const view = render(<CalendarConnectionCard client={client} onAuthFailure={() => {}} />);
 
     fireEvent.click(await view.findByRole("button", { name: "Reconnect" }));
     expect((await view.findByRole("status")).textContent).toBe("Google Calendar couldn’t be connected. Please try again.");
     fireEvent.click(view.getByRole("button", { name: "Disconnect" }));
+    const dialog = await view.findByRole("dialog", { name: /disconnect/i });
+    const confirm = [...dialog.querySelectorAll("button")].find((button) => button.textContent === "Disconnect");
+    if (!confirm) throw new Error("missing in-dialog Disconnect button");
+    fireEvent.click(confirm);
 
     expect(await view.findByRole("button", { name: "Connect Google Calendar" })).toBeDefined();
     expect(view.queryByText("Google Calendar couldn’t be connected. Please try again.")).toBeNull();
+  });
+
+  it("uses an accessible in-page disconnect confirmation with focus, Escape, and focus return", async () => {
+    const confirmSpy = mock(() => true);
+    window.confirm = confirmSpy;
+    const client = createFakeAppApiClient({ seedCalendarStatus: { provider: "google", state: "connected", connectedAt: "2026-08-20T18:30:00Z", lastSyncAt: null, lastSyncErrorAt: null } });
+    const view = render(<CalendarConnectionCard client={client} onAuthFailure={() => {}} />);
+    const trigger = await view.findByRole("button", { name: "Disconnect" }) as HTMLButtonElement;
+    fireEvent.click(trigger);
+
+    const dialog = await view.findByRole("dialog", { name: /disconnect/i });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(confirmSpy).toHaveBeenCalledTimes(0);
+    const cancel = [...dialog.querySelectorAll("button")].find((button) => button.textContent === "Cancel");
+    const confirm = [...dialog.querySelectorAll("button")].find((button) => button.textContent === "Disconnect");
+    expect(cancel?.className).toContain("samograph-btn--secondary");
+    expect(confirm?.className).toContain("samograph-btn--danger");
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(view.queryByRole("dialog", { name: /disconnect/i })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(client.requests.some((r) => r.path === "/calendar/connection" && r.method === "DELETE")).toBe(false);
+    expect(confirmSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("gives calendar actions their variants", async () => {
+    const client = createFakeAppApiClient({ seedCalendarStatus: { provider: "google", state: "broken", connectedAt: "2026-08-20T18:30:00Z", lastSyncAt: null, lastSyncErrorAt: "2026-08-20T18:35:00Z" } });
+    const view = render(<CalendarConnectionCard client={client} onAuthFailure={() => {}} />);
+    expect((await view.findByRole("button", { name: "Reconnect" })).className).toContain("samograph-btn--secondary");
+    expect(view.getByRole("button", { name: "Disconnect" }).className).toContain("samograph-btn--danger");
+  });
+
+  it("uses error alert semantics for failure and success status semantics for success", async () => {
+    window.history.replaceState({}, "", "/?calendar_error=SAMO-AUTH-001");
+    const failed = render(<CalendarConnectionCard client={createFakeAppApiClient()} onAuthFailure={() => {}} />);
+    const alert = await failed.findByRole("alert");
+    expect(alert.className).toContain("samograph-alert samograph-alert--error");
+    failed.unmount();
+
+    window.history.replaceState({}, "", "/?calendar=connected");
+    const succeeded = render(<CalendarConnectionCard client={createFakeAppApiClient()} onAuthFailure={() => {}} />);
+    const status = await succeeded.findByRole("status");
+    expect(status.textContent).toBe("Google Calendar connected.");
+    expect(status.className).toContain("samograph-alert samograph-alert--success");
   });
 });

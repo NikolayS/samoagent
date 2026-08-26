@@ -46,6 +46,8 @@ describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", ()
     act(() => stream.emitLine({ seq: 1, ts: TS, speaker: "Alice", text: "owner hears this", final: true }));
     expect(getByText(`[${TS}] Alice: owner hears this`)).toBeDefined();
     expect(getByRole("button", { name: "Share" })).toBeDefined();
+    expect(getByRole("button", { name: "Share" }).className).toContain("samograph-btn--secondary");
+    expect(getByRole("button", { name: "Delete" }).className).toContain("samograph-btn--danger");
   });
 
   it("opens the Share modal from the Share button", async () => {
@@ -60,6 +62,7 @@ describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", ()
     expect(queryByRole("button", { name: "Try again" })).toBeNull();
     act(() => stream.emitStatus("COULD_NOT_JOIN"));
     const tryAgain = await findByRole("button", { name: "Try again" });
+    expect(tryAgain.className).toContain("samograph-btn--secondary");
     fireEvent.click(tryAgain);
     expect(redirected).toEqual([
       `/dashboard?url=${encodeURIComponent(MEETING_URL)}`,
@@ -81,11 +84,23 @@ describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", ()
 
   // ── Delete a call (SPEC §5.14 GDPR per-call erasure) ────────────────────────
   it("Delete requires confirmation: the first click does NOT hit the endpoint", async () => {
-    const { app, getByRole, findByText } = renderOwner();
+    const { app, getByRole, findByRole, findByText } = renderOwner();
     fireEvent.click(getByRole("button", { name: "Delete" }));
+    expect((await findByRole("button", { name: "Cancel" })).className).toContain("samograph-btn--secondary");
+    expect(getByRole("button", { name: "Confirm delete" }).className).toContain("samograph-btn--danger");
     // A confirmation prompt appears; no DELETE has been sent yet.
     expect(await findByText(/can.t be undone/i)).toBeDefined();
     expect(app.requests.some((r) => r.method === "DELETE")).toBe(false);
+  });
+
+  it("marks Confirm delete busy and disabled while deleting", async () => {
+    const rendered = renderOwner();
+    rendered.app.deleteCall = () => new Promise(() => {});
+    fireEvent.click(rendered.getByRole("button", { name: "Delete" }));
+    const confirm = await rendered.findByRole("button", { name: "Confirm delete" }) as HTMLButtonElement;
+    fireEvent.click(confirm);
+    expect(confirm.disabled).toBe(true);
+    expect(confirm.getAttribute("aria-busy")).toBe("true");
   });
 
   it("Cancel dismisses the confirmation without deleting", async () => {
@@ -110,5 +125,15 @@ describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", ()
       app.requests.some((r) => r.path === "/calls/call_1" && r.method === "DELETE"),
     ).toBe(true);
     expect(redirected).toEqual(["/dashboard"]);
+  });
+
+  it("styles call deletion failures as error alerts", async () => {
+    const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const app = createFakeAppApiClient({ failDeleteCallWith: { code: "SAMO-CALL", message: "no", status: 500 } });
+    const view = render(<OwnerCallView streamClient={stream} shareClient={createFakeShareApiClient()} appClient={app} callId="call_1" meetingUrl={MEETING_URL} redirect={() => {}} />);
+    fireEvent.click(view.getByRole("button", { name: "Delete" }));
+    fireEvent.click(await view.findByRole("button", { name: "Confirm delete" }));
+    const alert = await view.findByRole("alert");
+    expect(alert.className).toContain("samograph-alert samograph-alert--error");
   });
 });

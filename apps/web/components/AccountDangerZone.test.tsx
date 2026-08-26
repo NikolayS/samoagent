@@ -30,6 +30,9 @@ describe("AccountDangerZone — delete-account danger zone (SPEC §5.14 GDPR)", 
     }) as HTMLButtonElement;
     const input = getByRole("textbox") as HTMLInputElement;
 
+    expect(button.className).toContain("samograph-btn");
+    expect(button.className).toContain("samograph-btn--danger");
+
     // Disabled up front, and while the typed text does not match exactly.
     expect(button.disabled).toBe(true);
     fireEvent.change(input, { target: { value: "delete" } }); // wrong case
@@ -88,6 +91,19 @@ describe("AccountDangerZone — delete-account danger zone (SPEC §5.14 GDPR)", 
       );
     });
     expect(await findByRole("alert")).toBeDefined();
+    const alert = await findByRole("alert");
+    expect(alert.className).toContain("samograph-alert samograph-alert--error");
     expect(redirected).toEqual([]);
+  });
+
+  it("marks Permanently delete account busy while deletion is pending", () => {
+    const app = createFakeAppApiClient();
+    app.deleteAccount = () => new Promise(() => {});
+    const view = render(<AccountDangerZone client={app} redirect={() => {}} />);
+    fireEvent.change(view.getByRole("textbox"), { target: { value: ACCOUNT_DELETE_CONFIRM_PHRASE } });
+    const button = view.getByRole("button", { name: "Permanently delete account" }) as HTMLButtonElement;
+    fireEvent.click(button);
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
   });
 });

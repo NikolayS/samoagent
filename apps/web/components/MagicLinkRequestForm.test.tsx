@@ -22,6 +22,19 @@ describe("MagicLinkRequestForm", () => {
     expect(input.tagName).toBe("INPUT");
     expect(input.type).toBe("email");
     expect(getByRole("button", { name: "Send magic link" })).toBeDefined();
+    expect(getByRole("button", { name: "Send magic link" }).className).toContain("samograph-btn");
+    expect(getByRole("button", { name: "Send magic link" }).className).toContain("samograph-btn--primary");
+  });
+
+  it("marks Send magic link busy and disabled while sending", () => {
+    const client = createFakeAppApiClient();
+    client.requestMagicLink = () => new Promise(() => {});
+    const { container, getByLabelText, getByRole } = render(<MagicLinkRequestForm client={client} />);
+    fireEvent.change(getByLabelText("Email"), { target: { value: "dev@samograph.dev" } });
+    submit(container);
+    const button = getByRole("button", { name: "Send magic link" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
   });
 
   it("rejects an empty submit without calling the client", () => {
@@ -32,6 +45,9 @@ describe("MagicLinkRequestForm", () => {
     submit(container);
     expect(client.requests).toEqual([]);
     expect(getByText("Enter your email address.")).toBeDefined();
+    const alert = getByText("Enter your email address.");
+    expect(alert.getAttribute("role")).toBe("alert");
+    expect(alert.className).toContain("samograph-alert samograph-alert--error");
   });
 
   it("POSTs the email to /auth/magic-link and shows the check-your-email state", async () => {
@@ -58,6 +74,11 @@ describe("MagicLinkRequestForm", () => {
     expect(
       await findByText("We sent a sign-in link to dev@samograph.dev."),
     ).toBeDefined();
+    const info = await findByText("We sent a sign-in link to dev@samograph.dev.");
+    expect(info.getAttribute("role")).toBe("status");
+    expect(info.className).toContain("samograph-alert--info");
+    expect(getByRole("button", { name: "Resend link" }).className).toContain("samograph-btn--secondary");
+    expect(getByRole("button", { name: "Use a different email" }).className).toContain("samograph-btn--secondary");
   });
 
   it("offers a resend affordance that re-POSTs the same email (SPEC §10 #7)", async () => {

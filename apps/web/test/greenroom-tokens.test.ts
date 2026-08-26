@@ -108,6 +108,35 @@ const STATE_TOKENS = [
 ];
 
 describe("Refined design tokens — globals.css contract (issue #241)", () => {
+  describe("Slice 2 controls and feedback primitives", () => {
+    it("does not give every bare button or label a margin-top", () => {
+      expect(/(?:^|\})\s*button\s*\{[^}]*margin-top\s*:/m.test(CSS_NO_COMMENTS)).toBe(false);
+      expect(/(?:^|\})\s*label\s*\{[^}]*margin-top\s*:/m.test(CSS_NO_COMMENTS)).toBe(false);
+    });
+
+    for (const selector of [
+      ".samograph-btn", ".samograph-btn--primary", ".samograph-btn--secondary",
+      ".samograph-btn--danger", ".samograph-btn[disabled]",
+      '.samograph-btn[aria-busy="true"]', ".samograph-alert",
+      ".samograph-alert--error", ".samograph-alert--warn",
+      ".samograph-alert--success", ".samograph-alert--info", ".samograph-field",
+      ".samograph-field-hint", ".samograph-actions",
+    ]) {
+      it(`defines ${selector}`, () => {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        expect(new RegExp(`${escaped}\\s*\\{`).test(CSS_NO_COMMENTS)).toBe(true);
+      });
+    }
+
+    it("uses the mono font for textarea controls", () => {
+      expect(/textarea\s*\{[^}]*font-family\s*:\s*var\(--font-mono\)/m.test(CSS_NO_COMMENTS)).toBe(true);
+    });
+
+    it("has no bare role=alert selector", () => {
+      expect(/\[role=["']?alert["']?\]\s*\{/.test(CSS_NO_COMMENTS)).toBe(false);
+    });
+  });
+
   describe("(a) :root defines the full Refined token set", () => {
     const root = baseRootBody();
 
