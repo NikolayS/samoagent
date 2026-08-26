@@ -6,7 +6,7 @@ import { installDom } from "../test/setup.tsx";
 installDom();
 
 /** Visible text with a space at every element boundary, so adjacent inline
- *  elements ("[00:12:04]" + "Dana:") never merge into a single "word". */
+ *  elements never merge into a single "word". */
 function visibleText(node: Node): string {
   if (node.nodeType === 3) return node.textContent ?? "";
   return Array.from(node.childNodes, visibleText).join(" ");
@@ -75,16 +75,15 @@ describe("Landing (simplified)", () => {
     }
   });
 
-  it("shows a four-line transcript glimpse in [time] Speaker: text form", () => {
-    const { getByRole } = render(<Landing />);
-    const glimpse = getByRole("list", { name: "Transcript format" });
-    const rows = Array.from(glimpse.querySelectorAll("li"), visibleText);
-    expect(rows).toEqual([
-      "[00:12:04] Dana: P99 climbed after the canary rollout.",
-      "[00:12:11] Morgan: Same three retries as last week.",
-      "[00:12:19] Jamie: Check idempotency and error rates.",
-      "[00:12:27] Dana: Pausing the rollout now.",
-    ]);
+  it("carries no sample transcript: no fake speakers, timestamps, or list", () => {
+    const { container, queryByRole } = render(<Landing />);
+    const text = container.textContent ?? "";
+    for (const gone of ["Dana", "Morgan", "Jamie", "00:12"]) {
+      expect(text).not.toContain(gone);
+    }
+    expect(queryByRole("list", { name: "Transcript format" })).toBeNull();
+    expect(container.querySelector(".samograph-glimpse")).toBeNull();
+    expect(container.querySelectorAll("ol, ul, time").length).toBe(0);
   });
 
   it("keeps everything above the footer under 60 visible words", () => {
@@ -92,8 +91,8 @@ describe("Landing (simplified)", () => {
     const main = container.querySelector("main.samograph-landing")!;
     expect(main.querySelector("footer")).toBeNull();
     const words = wordCount(visibleText(main));
-    expect(words).toBe(55);
-    expect(words).toBeLessThanOrEqual(60);
+    expect(words).toBe(26);
+    expect(words).toBeLessThanOrEqual(30);
   });
 
   it("keeps the skip link first and focusable before the nav", () => {
