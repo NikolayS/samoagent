@@ -18,6 +18,8 @@ describe("MagicLinkCallback", () => {
     expect(client.requests).toEqual([
       { path: "/auth/callback", method: "GET", body: { token: "abc" } },
     ]);
+    const loading = document.querySelector('[aria-busy="true"].samograph-skeleton');
+    expect(loading).not.toBeNull();
   });
 
   it("shows the signed-in state when verification succeeds", async () => {
@@ -134,5 +136,8 @@ describe("MagicLinkCallback", () => {
     );
     const link = (await findByText("Request a new link")) as HTMLAnchorElement;
     expect(link.getAttribute("href")).toBe("/auth");
+    const alert = link.closest(".samograph-auth")?.querySelector('[role="alert"]');
+    expect(alert).not.toBeNull();
+    expect(alert!.className).toContain("samograph-alert samograph-alert--error");
   });
 });
