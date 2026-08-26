@@ -595,7 +595,9 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 }
 
 .samograph-status-chip[data-kind="joining"] { color: var(--state-joining); }
-.samograph-status-chip[data-kind="live"] { color: var(--state-live); }
+/* The mint `--state-live` is instrument-only and fails AA as text on the page
+   ground; the live DOT keeps the mint, the label takes the readable green. */
+.samograph-status-chip[data-kind="live"] { color: var(--success-ink); }
 .samograph-status-chip[data-kind="ended"] { color: var(--state-ended); }
 .samograph-status-chip[data-kind="error"] { color: var(--state-error); }
 

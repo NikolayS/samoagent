@@ -103,3 +103,29 @@ describe("alert contrast", () => {
     }
   }
 });
+
+// Status chips are unfilled text on the page ground, so the chip colour IS the
+// text colour. `accent-live` mint is the classic failure here.
+const chips = [
+  { name: "default", selector: /\.samograph-status-chip\s*\{([^}]*)\}/ },
+  ...["joining", "live", "ended", "error"].map((kind) => ({
+    name: kind,
+    selector: new RegExp(`\\.samograph-status-chip\\[data-kind="${kind}"\\]\\s*\\{([^}]*)\\}`),
+  })),
+];
+
+describe("status chip contrast", () => {
+  for (const chip of chips) {
+    for (const theme of ["light", "dark"] as const) {
+      it(`.samograph-status-chip ${chip.name} clears ${MIN_CONTRAST}:1 in ${theme} mode`, () => {
+        const body = css.match(chip.selector)?.[1];
+        expect(body).toBeDefined();
+        const fg = body!.match(/(?:^|;)\s*color\s*:\s*([^;]+);/)?.[1]?.trim();
+        expect(fg).toBeDefined();
+        const tokens = themes[theme];
+        const ratio = contrast(color(fg!, tokens), color("var(--ground)", tokens));
+        expect(Number(ratio.toFixed(2))).toBeGreaterThanOrEqual(MIN_CONTRAST);
+      });
+    }
+  }
+});
