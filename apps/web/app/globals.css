@@ -580,11 +580,12 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   align-items: center;
   justify-self: start;
   gap: var(--space-1);
-  padding: 0 var(--space-2);
+  padding: 2px var(--space-2);
   color: var(--state-pending);
   border: 1px solid currentColor;
   border-radius: var(--radius-pill);
   font-size: var(--text-xs);
+  line-height: var(--leading-tight);
 }
 
 .samograph-status-chip[data-kind="joining"] { color: var(--state-joining); }
@@ -648,7 +649,12 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 }
 
 .samograph-upcoming-meetings { margin-block: var(--space-6); }
-.samograph-meeting-title { font-weight: 650; }
+.samograph-meeting-title {
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .samograph-meeting-item[data-declined="true"] { opacity: 0.65; }
 .samograph-btn--sm { height: 28px; padding-inline: var(--space-3); font-size: var(--text-xs); }
 

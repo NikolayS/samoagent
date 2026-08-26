@@ -50,6 +50,18 @@ describe("Dashboard upcoming meetings", () => {
     expect(title.closest(".samograph-empty-state")).not.toBeNull();
   });
 
+  it("truncates a long meeting title but keeps the full text in its title attribute", async () => {
+    const long = "Quarterly planning sync with the whole platform + data + SRE org";
+    const client = createFakeAppApiClient({ seedCalendarMeetings: {
+      connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "1", title: long, startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: null, meetingProvider: null, organizerEmail: null, attendeeResponse: "accepted" },
+      ],
+    } });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    const title = await view.findByText(long);
+    expect(title.getAttribute("title")).toBe(long);
+  });
+
   it("renders meeting row typography and a small secondary Join button", async () => {
     const client = createFakeAppApiClient({ seedCalendarMeetings: {
       connectionState: "connected", lastSyncAt: null, meetings: [

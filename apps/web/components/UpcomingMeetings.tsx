@@ -52,7 +52,7 @@ export function UpcomingMeetings({ client, onAuthFailure, locale, timeZone }: Up
         const meetingUrl = safeExternalUrl(meeting.meetingUrl);
         return <li key={meeting.id} data-declined={declined ? "true" : undefined} className="samograph-meeting-item">
           <span className="samograph-meeting-body">
-            <span className="samograph-meeting-title">{meeting.title}</span>
+            <span className="samograph-meeting-title" title={meeting.title}>{meeting.title}</span>
             <span className="samograph-meeting-meta">{meeting.allDay ? "All day" : formatDateTime(meeting.startsAt, { locale, timeZone })} · {minutes} min{meeting.meetingProvider ? ` · ${meeting.meetingProvider === "google_meet" ? "Google Meet" : "Zoom"}` : ""}</span>
           </span>
           {declined ? <span className="samograph-meeting-meta">Declined</span> : meetingUrl ? <a className="samograph-btn samograph-btn--secondary samograph-btn--sm" href={meetingUrl} target="_blank" rel="noopener noreferrer" aria-label={`Join ${meeting.title}`}>Join</a> : null}
