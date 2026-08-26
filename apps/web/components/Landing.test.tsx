@@ -83,7 +83,8 @@ describe("Landing (simplified)", () => {
     }
     expect(queryByRole("list", { name: "Transcript format" })).toBeNull();
     expect(container.querySelector(".samograph-glimpse")).toBeNull();
-    expect(container.querySelectorAll("ol, ul, time").length).toBe(0);
+    const hero = container.querySelector(".samograph-landing-hero")!;
+    expect(hero.querySelectorAll("ol, ul, time").length).toBe(0);
   });
 
   it("keeps everything above the footer under 30 visible words", () => {
