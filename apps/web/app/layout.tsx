@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={jetBrainsMono.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         the no-flash theme script intentionally sets its data-theme before React
         hydrates. Real mismatches inside the app still surface.
       */}
-      <body className={jetBrainsMono.variable} suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
