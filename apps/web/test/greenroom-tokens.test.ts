@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -134,6 +134,30 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
 
     it("has no bare role=alert selector", () => {
       expect(/\[role=["']?alert["']?\]\s*\{/.test(CSS_NO_COMMENTS)).toBe(false);
+    });
+
+    it("defines a filled danger button modifier", () => {
+      expect(/\.samograph-btn--danger\.samograph-btn--solid\s*\{/.test(CSS_NO_COMMENTS)).toBe(true);
+    });
+
+    it("styles every JSX role=alert as a samograph error alert", () => {
+      const roots = [join(import.meta.dir, "..", "components"), join(import.meta.dir, "..", "app")];
+      const files: string[] = [];
+      const visit = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const path = join(dir, entry.name);
+          if (entry.isDirectory()) visit(path);
+          else if (entry.name.endsWith(".tsx") && !entry.name.endsWith(".test.tsx")) files.push(path);
+        }
+      };
+      roots.forEach(visit);
+      const offenders = files.flatMap((file) => {
+        const source = readFileSync(file, "utf8");
+        return [...source.matchAll(/<[^>]*role=["']alert["'][^>]*>/gs)]
+          .filter(([tag]) => !/className=["'][^"']*samograph-alert--error[^"']*["']/.test(tag))
+          .map(() => file);
+      });
+      expect(offenders).toEqual([]);
     });
   });
 

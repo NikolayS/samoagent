@@ -88,6 +88,7 @@ describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", ()
     fireEvent.click(getByRole("button", { name: "Delete" }));
     expect((await findByRole("button", { name: "Cancel" })).className).toContain("samograph-btn--secondary");
     expect(getByRole("button", { name: "Confirm delete" }).className).toContain("samograph-btn--danger");
+    expect(getByRole("button", { name: "Confirm delete" }).className).toContain("samograph-btn--solid");
     // A confirmation prompt appears; no DELETE has been sent yet.
     expect(await findByText(/can.t be undone/i)).toBeDefined();
     expect(app.requests.some((r) => r.method === "DELETE")).toBe(false);

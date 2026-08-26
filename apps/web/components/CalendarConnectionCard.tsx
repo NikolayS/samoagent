@@ -20,6 +20,8 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
   const [messageKind, setMessageKind] = useState<"error" | "success">(initialCalendarError ? "error" : "success");
   const [confirming, setConfirming] = useState(false);
   const disconnectTrigger = useRef<HTMLButtonElement>(null);
+  const card = useRef<HTMLElement>(null);
+  const restoreFocusAfterDisconnect = useRef(false);
   const { busy: connectBusy, error: connectError, connect, clearError: clearConnectError } = useCalendarConnect({
     client,
     onAuthFailure,
@@ -47,10 +49,21 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
     }
   }, []);
+  useEffect(() => {
+    if (!confirming && restoreFocusAfterDisconnect.current) {
+      restoreFocusAfterDisconnect.current = false;
+      (disconnectTrigger.current ?? card.current)?.focus();
+    }
+  }, [confirming]);
 
   async function disconnect() {
     setDisconnectBusy(true); setMessage(null); clearConnectError();
-    try { await client.disconnectCalendar(); setConfirming(false); await load(); }
+    try {
+      await client.disconnectCalendar();
+      await load();
+      restoreFocusAfterDisconnect.current = true;
+      setConfirming(false);
+    }
     catch (error) { handleError(error, "Google Calendar couldn’t be disconnected. Try again."); }
     finally { setDisconnectBusy(false); }
   }
@@ -60,18 +73,16 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     disconnectTrigger.current?.focus();
   }
 
-  return <section aria-label="Google Calendar" className="samograph-signin samograph-calendar-card">
+  return <section ref={card} tabIndex={-1} aria-label="Google Calendar" className="samograph-signin samograph-calendar-card">
     <h2>Google Calendar</h2>
     {connectError || message ? (() => {
       const failure = Boolean(connectError) || messageKind === "error";
       const copy = connectError ?? message;
-      return <p role={failure ? "alert" : "status"} className={`samograph-alert samograph-alert--${failure ? "error" : "success"}`}>
-        {failure ? <span role="status">{copy}</span> : copy}
-      </p>;
+      return <p role={failure ? "alert" : "status"} className={`samograph-alert samograph-alert--${failure ? "error" : "success"}`}>{copy}</p>;
     })() : null}
     {!status ? <p aria-busy="true">Loading Google Calendar…</p> : status.state === "not_connected" ? <>
       <p>Show upcoming meetings from your calendar.</p>
-      <button type="button" className="samograph-btn samograph-btn--primary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>
+      <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>
     </> : status.state === "broken" ? <>
       <p>Google Calendar needs to be reconnected.</p>
       <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>Reconnect</button>{" "}

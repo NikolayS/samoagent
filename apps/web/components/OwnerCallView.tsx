@@ -120,7 +120,7 @@ export function OwnerCallView({
           >
             Cancel
           </button>
-          <button type="button" className="samograph-btn samograph-btn--danger" onClick={confirmDelete} disabled={deleting} aria-busy={deleting}>
+          <button type="button" className="samograph-btn samograph-btn--danger samograph-btn--solid" onClick={confirmDelete} disabled={deleting} aria-busy={deleting}>
             Confirm delete
           </button>
         </div>

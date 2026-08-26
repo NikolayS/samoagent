@@ -13,3 +13,12 @@ Verification:
 - git diff --check: clean.
 
 Deferred contract items: none.
+
+Fix round 1 — RED/GREEN summary
+
+RED:
+- Focused regression run: 92 pass, 7 fail across 4 files. Failures covered the missing focus restoration, secondary calendar action, solid danger confirms/CSS, and repository-wide alert styling.
+
+GREEN:
+- cd apps/web && bun test: 511 pass, 0 fail across 45 files.
+- bunx tsc --noEmit -p apps/web/tsconfig.json: clean.

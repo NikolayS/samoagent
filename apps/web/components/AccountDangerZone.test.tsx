@@ -32,6 +32,7 @@ describe("AccountDangerZone — delete-account danger zone (SPEC §5.14 GDPR)", 
 
     expect(button.className).toContain("samograph-btn");
     expect(button.className).toContain("samograph-btn--danger");
+    expect(button.className).toContain("samograph-btn--solid");
 
     // Disabled up front, and while the typed text does not match exactly.
     expect(button.disabled).toBe(true);

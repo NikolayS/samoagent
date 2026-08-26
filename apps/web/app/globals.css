@@ -466,6 +466,8 @@ button:hover {
 .samograph-btn--secondary:hover { color: var(--ink); border-color: var(--ink); }
 .samograph-btn--danger { color: var(--crit); background: transparent; border: 1px solid var(--crit); }
 .samograph-btn--danger:hover { color: white; background: var(--crit); border-color: var(--crit); }
+.samograph-btn--danger.samograph-btn--solid { color: white; background: var(--crit); border-color: var(--crit); }
+.samograph-btn--danger.samograph-btn--solid:hover { background: color-mix(in srgb, var(--crit) 88%, black); border-color: color-mix(in srgb, var(--crit) 88%, black); }
 .samograph-btn--ghost { border: 0; background: transparent; }
 .samograph-btn[disabled] { opacity: .5; cursor: not-allowed; }
 .samograph-btn--primary[disabled]:hover { color: var(--ground); background: var(--ink); border-color: var(--ink); }

@@ -92,7 +92,7 @@ export function AccountDangerZone({ client, redirect }: AccountDangerZoneProps) 
       ) : null}
       <button
         type="button"
-        className="samograph-danger-delete samograph-btn samograph-btn--danger"
+        className="samograph-danger-delete samograph-btn samograph-btn--danger samograph-btn--solid"
         onClick={onDelete}
         disabled={!armed || deleting}
         aria-busy={deleting}
