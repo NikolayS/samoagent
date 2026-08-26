@@ -25,12 +25,12 @@ const themeBootScript = `(function(){try{var t=localStorage.getItem("samograph-t
 export const metadata: Metadata = {
   title: "samograph — live transcripts for your calls",
   description:
-    "Zero-setup live transcripts for your Zoom and Google Meet calls. Sign in, add a meeting link, watch it stream live, then share read-only or download.",
+    "An agent that joins your Zoom or Google Meet call and transcribes it live.",
   icons: { icon: "/robot-mark.png" },
   openGraph: {
     title: "samograph — live transcripts for your calls",
     description:
-      "Zero-setup live transcripts for your Zoom and Google Meet calls. Sign in, add a meeting link, watch it stream live, then share read-only or download.",
+      "An agent that joins your Zoom or Google Meet call and transcribes it live.",
     type: "website",
   },
 };

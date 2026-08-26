@@ -10,7 +10,7 @@ installDom();
 const fixture = join(import.meta.dir, "__fixtures__", "landing.baseline.html");
 
 describe("Landing DOM baseline", () => {
-  it("preserves the pre-refactor rendered markup exactly", () => {
+  it("renders the simplified landing markup exactly", () => {
     const { container } = render(<Landing />);
     if (process.env.LANDING_BASELINE_WRITE === "1") {
       writeFileSync(fixture, container.innerHTML);
