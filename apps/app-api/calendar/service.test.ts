@@ -78,19 +78,50 @@ describe("CalendarService", () => {
     expect(ctx.store.row?.id).toBe(id);
   });
 
-  it("logs callback persistence failures before mapping them to SAMO-CALENDAR-500", async () => {
+  async function expectCallbackPersistenceFailure(ctx: ReturnType<typeof setup>, thrown: unknown) {
+    ctx.store.save = async () => { throw thrown; };
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    const started = await ctx.service.start({ userId: "user", tenantId: "tenant", ip: "ip" });
+    if (!started.ok) throw new Error("start failed");
+    const cookie = started.setCookie.match(/^[^=]+=([^;]+)/)?.[1] ?? "";
+    const state = new URL(started.authorizationUrl).searchParams.get("state")!;
+
+    const result = await ctx.service.callback({ userId: "user", tenantId: "tenant", ip: "ip", stateCookie: cookie, params: new URLSearchParams({ code: "code", state }) });
+    return { error, result };
+  }
+
+  it("logs a valid SQLSTATE for callback persistence failures", async () => {
     const ctx = setup();
     const persistenceError = Object.assign(new Error("database save failed with encrypted credential material"), { code: "23505" });
-    ctx.store.save = async () => { throw persistenceError; };
-    const error = spyOn(console, "error").mockImplementation(() => {});
+    const { error, result } = await expectCallbackPersistenceFailure(ctx, persistenceError);
     try {
-      const started = await ctx.service.start({ userId: "user", tenantId: "tenant", ip: "ip" });
-      if (!started.ok) throw new Error("start failed");
-      const cookie = started.setCookie.match(/^[^=]+=([^;]+)/)?.[1] ?? "";
-      const state = new URL(started.authorizationUrl).searchParams.get("state")!;
+      expect(result).toEqual({ ok: false, code: "SAMO-CALENDAR-500" });
+      expect(error).toHaveBeenCalledWith("SAMO-CALENDAR-500 calendar callback failed", { sqlstate: "23505" });
+    } finally {
+      error.mockRestore();
+    }
+  });
 
-      expect(await ctx.service.callback({ userId: "user", tenantId: "tenant", ip: "ip", stateCookie: cookie, params: new URLSearchParams({ code: "code", state }) })).toEqual({ ok: false, code: "SAMO-CALENDAR-500" });
-      expect(error).toHaveBeenCalledWith("SAMO-CALENDAR-500", "Error", "23505");
+  it("does not log error messages, constructor names, or invalid SQLSTATE values", async () => {
+    const ctx = setup();
+    const persistenceError = { message: "SECRET message", constructor: { name: "SECRET constructor" }, code: "ab!de" };
+    const { error, result } = await expectCallbackPersistenceFailure(ctx, persistenceError);
+    try {
+      expect(result).toEqual({ ok: false, code: "SAMO-CALENDAR-500" });
+      expect(error).toHaveBeenCalledWith("SAMO-CALENDAR-500 calendar callback failed", { sqlstate: null });
+      expect(JSON.stringify(error.mock.calls)).not.toContain("SECRET");
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("contains throwing SQLSTATE getters and still maps the callback failure", async () => {
+    const ctx = setup();
+    const persistenceError = Object.defineProperty({}, "code", { get() { throw new Error("getter failed"); } });
+    const { error, result } = await expectCallbackPersistenceFailure(ctx, persistenceError);
+    try {
+      expect(result).toEqual({ ok: false, code: "SAMO-CALENDAR-500" });
+      expect(error).toHaveBeenCalledWith("SAMO-CALENDAR-500 calendar callback failed", { sqlstate: null });
     } finally {
       error.mockRestore();
     }
