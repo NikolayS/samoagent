@@ -6,6 +6,8 @@ import type { AppApiClient } from "../lib/appApiClient.ts";
 import { AccountEmail } from "./AccountEmail.tsx";
 import { LogoutButton } from "./LogoutButton.tsx";
 import { ThemeSwitcher } from "./ThemeSwitcher.tsx";
+import { ShortcutHint } from "./ShortcutHint.tsx";
+import { useShortcuts } from "./useShortcuts.tsx";
 
 export interface AppShellProps {
   client?: AppApiClient;
@@ -17,13 +19,22 @@ export interface AppShellProps {
 
 export function AppShell({
   client,
-  redirect = () => {},
+  redirect,
   variant = "app",
   pageClassName,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  useShortcuts({
+    navigate: (path) => {
+      if (variant !== "app") return;
+      if (redirect) redirect(path);
+      else window.location.assign(path);
+    },
+    onHelp: () => { if (variant === "app") setShowShortcuts(true); },
+  });
 
   useEffect(() => {
     if (variant !== "app" || !client) return;
@@ -54,13 +65,14 @@ export function AppShell({
           <div className="samograph-app-nav-right">
             {variant === "app" ? <AccountEmail email={accountEmail} /> : null}
             <ThemeSwitcher />
-            {variant === "app" ? <LogoutButton client={client!} redirect={redirect} /> : null}
+            {variant === "app" ? <LogoutButton client={client!} redirect={redirect ?? (() => {})} /> : null}
           </div>
         </div>
       </header>
       <main id="main" className={`samograph-page${pageClassName ? ` ${pageClassName}` : ""}`} tabIndex={-1}>
         {children}
       </main>
+      {showShortcuts ? <ShortcutHint onClose={() => setShowShortcuts(false)} /> : null}
     </>
   );
 }
