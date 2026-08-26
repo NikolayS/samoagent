@@ -74,4 +74,18 @@ describe("AppShell", () => {
     expect(client.requests).toContainEqual({ path: "/auth/logout", method: "POST", body: {} });
     expect(seen).toEqual(["/auth"]);
   });
+
+  it("opens keyboard shortcut help only in the app variant and closes it with Escape", () => {
+    const client = createFakeAppApiClient();
+    const app = render(<AppShell client={client}><p>App</p></AppShell>);
+    fireEvent.keyDown(document, { key: "?", shiftKey: true });
+    expect(app.getByRole("dialog", { name: /keyboard shortcuts/i })).toBeDefined();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(app.queryByRole("dialog", { name: /keyboard shortcuts/i })).toBeNull();
+    app.unmount();
+
+    const publicView = render(<AppShell client={client} variant="public"><p>Public</p></AppShell>);
+    fireEvent.keyDown(document, { key: "?", shiftKey: true });
+    expect(publicView.queryByRole("dialog", { name: /keyboard shortcuts/i })).toBeNull();
+  });
 });
