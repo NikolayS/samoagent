@@ -2,6 +2,7 @@ import type { SQL } from "bun";
 import { randomUUID } from "node:crypto";
 import { tenantActive } from "../auth/owner-session.ts";
 import { setTenant } from "../../../packages/shared/db/client.ts";
+import { toPgTextArray } from "../../../packages/shared/db/text-array.ts";
 import type { CalendarConnection, CalendarConnectionStore, CalendarMeeting, CalendarMeetingsSnapshot } from "./service.ts";
 import type { BrokenReason, CalendarSyncStore, NormalizedCalendarEvent, SyncConnection } from "./sync.ts";
 
@@ -21,7 +22,7 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
   }
   async save(r: CalendarConnection) {
     await this.sql`INSERT INTO calendar_connections (id,user_id,tenant_id,provider,encrypted_refresh_token,refresh_token_iv,refresh_token_tag,encryption_key_version,granted_scopes,status,broken_reason,connected_at,updated_at,last_sync_at,last_sync_error_at)
-      VALUES (${r.id},${r.userId},${r.tenantId},'google',${r.encryptedRefreshToken},${r.refreshTokenIv},${r.refreshTokenTag},${r.encryptionKeyVersion},${r.grantedScopes},'connected',NULL,${r.connectedAt},${r.connectedAt},NULL,NULL)
+      VALUES (${r.id},${r.userId},${r.tenantId},'google',${r.encryptedRefreshToken},${r.refreshTokenIv},${r.refreshTokenTag},${r.encryptionKeyVersion},${toPgTextArray(r.grantedScopes)}::text[],'connected',NULL,${r.connectedAt},${r.connectedAt},NULL,NULL)
       ON CONFLICT (user_id,provider) DO UPDATE SET tenant_id=EXCLUDED.tenant_id, encrypted_refresh_token=EXCLUDED.encrypted_refresh_token, refresh_token_iv=EXCLUDED.refresh_token_iv, refresh_token_tag=EXCLUDED.refresh_token_tag, encryption_key_version=EXCLUDED.encryption_key_version, granted_scopes=EXCLUDED.granted_scopes, status='connected', broken_reason=NULL, connected_at=EXCLUDED.connected_at, updated_at=EXCLUDED.updated_at, last_sync_at=NULL, last_sync_error_at=NULL, sync_seq=calendar_connections.sync_seq+1, committed_sync_seq=calendar_connections.sync_seq+1`;
   }
   async delete(userId: string, tenantId: string) { await this.sql`DELETE FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'`; }
