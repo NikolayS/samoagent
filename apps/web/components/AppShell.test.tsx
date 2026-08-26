@@ -1,8 +1,11 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
 import { act, fireEvent, render } from "@testing-library/react";
 import { AppShell } from "./AppShell.tsx";
 import { createFakeAppApiClient } from "../lib/fakeAppApiClient.ts";
 import { installDom } from "../test/setup.tsx";
+
+let pathname = "/dashboard";
+mock.module("next/navigation", () => ({ usePathname: () => pathname }));
 
 installDom();
 const redirect = () => {};
@@ -15,7 +18,9 @@ describe("AppShell", () => {
     );
     expect(getByRole("banner")).toBeDefined();
     expect(getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/dashboard");
+    expect(getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBe("page");
     expect(getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
+    expect(getByRole("link", { name: "Settings" }).getAttribute("aria-current")).toBeNull();
     expect(getByRole("link", { name: "samograph" }).getAttribute("href")).toBe("/dashboard");
     expect(getByRole("group", { name: "Theme" })).toBeDefined();
     expect(getByRole("button", { name: "Log out" })).toBeDefined();
@@ -39,10 +44,20 @@ describe("AppShell", () => {
     expect(queryByRole("link", { name: "Settings" })).toBeNull();
     expect(queryByRole("button", { name: "Log out" })).toBeNull();
     expect(getByRole("link", { name: "samograph" })).toBeDefined();
+    expect(getByRole("link", { name: "samograph" }).getAttribute("href")).toBe("/");
     expect(getByRole("group", { name: "Theme" })).toBeDefined();
     const main = getByRole("main");
     expect(main.className.split(/\s+/)).toEqual(["samograph-page", "samograph-page--form"]);
     expect(main.textContent).toContain("Public child");
+  });
+
+  it("marks Settings as the current route", () => {
+    pathname = "/settings";
+    const client = createFakeAppApiClient();
+    const { getByRole } = render(<AppShell client={client}><p>Settings</p></AppShell>);
+    expect(getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBeNull();
+    expect(getByRole("link", { name: "Settings" }).getAttribute("aria-current")).toBe("page");
+    pathname = "/dashboard";
   });
 
   it("logs out through the shell and redirects to /auth", async () => {

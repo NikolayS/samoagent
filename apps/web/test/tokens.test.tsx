@@ -1,6 +1,12 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { render } from "@testing-library/react";
+import { createElement } from "react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { Landing } from "../components/Landing.tsx";
+import { installDom } from "./setup.tsx";
+
+installDom();
 
 const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
 const clean = css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -74,31 +80,43 @@ describe("Slice 1 reset and shell CSS", () => {
 });
 
 describe("Slice 1 typography regressions", () => {
+  let style: HTMLStyleElement;
+
+  beforeEach(() => {
+    style = document.createElement("style");
+    style.textContent = css;
+    document.head.append(style);
+  });
+
+  afterEach(() => style.remove());
+
   it("keeps the landing on the mono stack", () =>
     expect(rule(/\.samograph-landing(?![-\w])/)).toMatch(/font-family\s*:\s*var\(--font-mono\)/));
 
   it("overrides the global heading family after the global heading rule", () => {
-    const landingHeadings = rule(/\.samograph-landing h1\s*,\s*\.samograph-landing h2\s*,\s*\.samograph-landing h3/);
+    const landingHeadings = rule(/:where\(\.samograph-landing\) h1\s*,\s*:where\(\.samograph-landing\) h2\s*,\s*:where\(\.samograph-landing\) h3/);
     expect(landingHeadings).toMatch(/font-family\s*:\s*var\(--font-mono\)/);
 
     const globalHeadingIndex = clean.search(/h1\s*,\s*h2\s*,\s*h3\s*\{/);
-    const landingHeadingIndex = clean.search(/\.samograph-landing h1\s*,\s*\.samograph-landing h2\s*,\s*\.samograph-landing h3\s*\{/);
+    const landingHeadingIndex = clean.search(/:where\(\.samograph-landing\) h1\s*,\s*:where\(\.samograph-landing\) h2\s*,\s*:where\(\.samograph-landing\) h3\s*\{/);
     expect(globalHeadingIndex).toBeGreaterThanOrEqual(0);
     expect(landingHeadingIndex).toBeGreaterThan(globalHeadingIndex);
   });
 
-  it("keeps the landing's historical inherited line height", () =>
-    expect(rule(/\.samograph-landing(?![-\w])/)).toMatch(/line-height\s*:\s*1\.5/));
+  it("keeps the landing's historical inherited line height", () => {
+    const { container } = render(createElement(Landing));
+    const heritageHeading = container.querySelector<HTMLElement>(".samograph-heritage h2")!;
+    expect(getComputedStyle(heritageHeading).lineHeight).toBe("1.25");
+  });
 
   it("keeps the heritage heading's historical letter spacing", () =>
     expect(rule(/\.samograph-heritage h2/)).toMatch(/letter-spacing\s*:\s*normal/));
 
   it("pins the landing heading weight and historical line heights", () => {
-    const landingHeadings = rule(/\.samograph-landing h1\s*,\s*\.samograph-landing h2\s*,\s*\.samograph-landing h3/);
-    expect(landingHeadings).toMatch(/font-weight\s*:\s*700/);
-    expect(landingHeadings).toMatch(/line-height\s*:\s*1\.2/);
-    expect(rule(/\.samograph-hero-copy h1/)).toMatch(/line-height\s*:\s*1\.14/);
-    expect(rule(/\.samograph-heritage h2/)).toMatch(/line-height\s*:\s*1\.25/);
+    const { container } = render(createElement(Landing));
+    const heroHeading = container.querySelector<HTMLElement>(".samograph-hero-copy h1")!;
+    expect(getComputedStyle(heroHeading).fontWeight).toBe("700");
+    expect(getComputedStyle(heroHeading).lineHeight).toBe("1.14");
   });
 
   for (const selector of [/\.samograph-call-url/, /\.samograph-account-email/, /\.samograph-keyterms/]) {

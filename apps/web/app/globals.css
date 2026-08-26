@@ -270,9 +270,9 @@ h3 {
   font-weight: 600;
 }
 
-.samograph-landing h1,
-.samograph-landing h2,
-.samograph-landing h3 {
+:where(.samograph-landing) h1,
+:where(.samograph-landing) h2,
+:where(.samograph-landing) h3 {
   font-family: var(--font-mono);
   font-weight: 700;
   line-height: 1.2;
