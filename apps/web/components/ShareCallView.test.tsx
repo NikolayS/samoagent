@@ -23,6 +23,14 @@ function detail(over: Partial<CallDetail> = {}): CallDetail {
 }
 
 describe("ShareCallView — read-only shared transcript (SPEC §4.1, §5.7, Stories 2/6)", () => {
+  it("renders the same transcript instrument panel as the owner view", () => {
+    const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const { container } = render(
+      <ShareCallView streamClient={stream} shareToken="shr_abc" />,
+    );
+    expect(container.querySelectorAll(".samograph-instrument")).toHaveLength(1);
+  });
+
   it("renders the read-only header and a Story-6 disclosure note", () => {
     const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
     const { getByText } = render(

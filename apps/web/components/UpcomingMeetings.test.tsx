@@ -7,6 +7,78 @@ import { installDom } from "../test/setup.tsx";
 installDom();
 
 describe("Dashboard upcoming meetings", () => {
+  it("shows one primary Connect CTA in the available-calendar empty state", async () => {
+    const client = createFakeAppApiClient({
+      googleCalendarEnabled: true,
+      seedCalendarMeetings: { connectionState: "not_connected", lastSyncAt: null, meetings: [] },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    const title = await view.findByText("No calendar connected.");
+    const empty = title.closest(".samograph-empty-state");
+    expect(title.classList.contains("samograph-empty-title")).toBe(true);
+    expect(empty).not.toBeNull();
+    expect(empty?.querySelectorAll("a, button")).toHaveLength(1);
+    const connect = view.getByRole("button", { name: "Connect Google Calendar" });
+    expect(empty?.contains(connect)).toBe(true);
+    expect(connect.classList.contains("samograph-btn")).toBe(true);
+    expect(connect.classList.contains("samograph-btn--primary")).toBe(true);
+    expect(view.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
+  });
+
+  it("shows one secondary Settings CTA when calendar capability is unavailable", async () => {
+    const client = createFakeAppApiClient({
+      googleCalendarEnabled: false,
+      seedCalendarMeetings: { connectionState: "not_connected", lastSyncAt: null, meetings: [] },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    const title = await view.findByText("No calendar connected.");
+    const empty = title.closest(".samograph-empty-state");
+    expect(empty).not.toBeNull();
+    expect(empty?.querySelectorAll("a, button")).toHaveLength(1);
+    const settings = view.getByRole("link", { name: "Manage in Settings" });
+    expect(settings.classList.contains("samograph-btn")).toBe(true);
+    expect(settings.classList.contains("samograph-btn--secondary")).toBe(true);
+  });
+
+  it("renders the connected no-meetings empty state", async () => {
+    const client = createFakeAppApiClient({
+      seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [] },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    const title = await view.findByText("No upcoming meetings.");
+    expect(title.classList.contains("samograph-empty-title")).toBe(true);
+    expect(title.closest(".samograph-empty-state")).not.toBeNull();
+  });
+
+  it("truncates a long meeting title but keeps the full text in its title attribute", async () => {
+    const long = "Quarterly planning sync with the whole platform + data + SRE org";
+    const client = createFakeAppApiClient({ seedCalendarMeetings: {
+      connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "1", title: long, startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: null, meetingProvider: null, organizerEmail: null, attendeeResponse: "accepted" },
+      ],
+    } });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    const title = await view.findByText(long);
+    expect(title.getAttribute("title")).toBe(long);
+  });
+
+  it("renders meeting row typography and a small secondary Join button", async () => {
+    const client = createFakeAppApiClient({ seedCalendarMeetings: {
+      connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted" },
+      ],
+    } });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    const title = await view.findByText("Planning");
+    const item = title.closest("li.samograph-meeting-item");
+    expect(title.classList.contains("samograph-meeting-title")).toBe(true);
+    expect(item?.querySelector("span.samograph-meeting-meta")).not.toBeNull();
+    const join = view.getByRole("link", { name: "Join Planning" });
+    expect(join.classList.contains("samograph-btn")).toBe(true);
+    expect(join.classList.contains("samograph-btn--secondary")).toBe(true);
+    expect(join.classList.contains("samograph-btn--sm")).toBe(true);
+  });
+
   it("starts Google Calendar connect from the dashboard when the capability is available", async () => {
     const assign = mock(() => {});
     Object.defineProperty(window.location, "assign", { configurable: true, value: assign });
@@ -25,6 +97,20 @@ describe("Dashboard upcoming meetings", () => {
     await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
     expect(assign).toHaveBeenCalledWith(authorizationUrl);
     expect(client.requests.filter((request) => request.path === "/calendar/connect/start" && request.method === "POST")).toHaveLength(1);
+  });
+
+  it("marks the Connect Google Calendar button busy while connect is pending", async () => {
+    const client = createFakeAppApiClient({
+      googleCalendarEnabled: true,
+      seedCalendarMeetings: { connectionState: "not_connected", lastSyncAt: null, meetings: [] },
+    });
+    client.startCalendarConnect = () => new Promise(() => {});
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Connect Google Calendar" }));
+
+    const connecting = await view.findByRole("button", { name: "Connecting…" });
+    expect(connecting.getAttribute("aria-busy")).toBe("true");
   });
 
   it("shows the guarded connect error inline and does not navigate for javascript URLs", async () => {
