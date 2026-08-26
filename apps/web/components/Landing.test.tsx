@@ -86,7 +86,7 @@ describe("Landing (simplified)", () => {
     expect(container.querySelectorAll("ol, ul, time").length).toBe(0);
   });
 
-  it("keeps everything above the footer under 60 visible words", () => {
+  it("keeps everything above the footer under 30 visible words", () => {
     const { container } = render(<Landing />);
     const main = container.querySelector("main.samograph-landing")!;
     expect(main.querySelector("footer")).toBeNull();
