@@ -32,6 +32,7 @@ describe("ShareModal — owner share-link control (SPEC §4.1, §5.7, Story 2)",
       <ShareModal shareClient={client} callId="call_1" onClose={() => {}} />,
     );
     const create = await findByText("Create share link");
+    expect(create.className).toContain("samograph-btn samograph-btn--primary");
     await act(async () => {
       fireEvent.click(create);
     });
@@ -46,6 +47,16 @@ describe("ShareModal — owner share-link control (SPEC §4.1, §5.7, Story 2)",
       <ShareModal shareClient={client} callId="call_1" onClose={() => {}} />,
     );
     expect(await findByText("/c/shr_1")).toBeDefined();
+  });
+
+  it("styles all active-link actions as secondary", async () => {
+    const client = createFakeShareApiClient();
+    await client.mintShare("call_1");
+    const view = render(<ShareModal shareClient={client} callId="call_1" onClose={() => {}} />);
+    await view.findByText("/c/shr_1");
+    for (const name of ["Close", "Copy link", "Rotate", "Revoke"]) {
+      expect(view.getByRole("button", { name }).className).toContain("samograph-btn--secondary");
+    }
   });
 
   it("copies the link to the clipboard and confirms 'Copied'", async () => {
@@ -100,6 +111,17 @@ describe("ShareModal — owner share-link control (SPEC §4.1, §5.7, Story 2)",
     );
     fireEvent.click(await findByText("Create share link"));
     expect(await findByRole("alert")).toBeDefined();
+    expect((await findByRole("alert")).className).toContain("samograph-alert samograph-alert--error");
+  });
+
+  it("marks Create share link busy and disabled while minting", async () => {
+    const client = createFakeShareApiClient();
+    client.mintShare = () => new Promise(() => {});
+    const view = render(<ShareModal shareClient={client} callId="call_1" onClose={() => {}} />);
+    const create = await view.findByRole("button", { name: "Create share link" }) as HTMLButtonElement;
+    fireEvent.click(create);
+    expect(create.disabled).toBe(true);
+    expect(create.getAttribute("aria-busy")).toBe("true");
   });
 
   it("closes via the close affordance", async () => {

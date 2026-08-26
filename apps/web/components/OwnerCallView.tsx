@@ -67,12 +67,13 @@ export function OwnerCallView({
         callId={callId}
         controls={({ view }) => (
           <div className="samograph-owner-controls">
-            <button type="button" onClick={() => setShareOpen(true)}>
+            <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => setShareOpen(true)}>
               Share
             </button>
             {view.showTryAgain ? (
               <button
                 type="button"
+                className="samograph-btn samograph-btn--secondary"
                 onClick={() =>
                   redirect(`/dashboard?url=${encodeURIComponent(meetingUrl)}`)
                 }
@@ -80,7 +81,7 @@ export function OwnerCallView({
                 Try again
               </button>
             ) : null}
-            <button type="button" onClick={() => setConfirmingDelete(true)}>
+            <button type="button" className="samograph-btn samograph-btn--danger" onClick={() => setConfirmingDelete(true)}>
               Delete
             </button>
           </div>
@@ -104,12 +105,13 @@ export function OwnerCallView({
             its recording. This can&rsquo;t be undone.
           </p>
           {deleteError ? (
-            <p className="samograph-delete-error" role="alert">
+            <p className="samograph-delete-error samograph-alert samograph-alert--error" role="alert">
               {deleteError}
             </p>
           ) : null}
           <button
             type="button"
+            className="samograph-btn samograph-btn--secondary"
             onClick={() => {
               setConfirmingDelete(false);
               setDeleteError(null);
@@ -118,7 +120,7 @@ export function OwnerCallView({
           >
             Cancel
           </button>
-          <button type="button" onClick={confirmDelete} disabled={deleting}>
+          <button type="button" className="samograph-btn samograph-btn--danger samograph-btn--solid" onClick={confirmDelete} disabled={deleting} aria-busy={deleting}>
             Confirm delete
           </button>
         </div>

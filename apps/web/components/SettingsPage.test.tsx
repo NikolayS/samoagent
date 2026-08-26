@@ -52,9 +52,13 @@ describe("SettingsPage — hosted per-tenant settings (§5.12)", () => {
     });
     fireEvent.change(await findByLabelText(/chime/i), { target: { value: "glass" } });
 
-    fireEvent.click(getByRole("button", { name: /save/i }));
+    const save = getByRole("button", { name: "Save settings" });
+    expect(save.className).toContain("samograph-btn samograph-btn--primary");
+    fireEvent.click(save);
 
-    await findByText(/saved/i);
+    const saved = await findByText("Settings saved.");
+    expect(saved.getAttribute("role")).toBe("status");
+    expect(saved.className).toContain("samograph-alert samograph-alert--success");
     const put = client.requests.find((r) => r.method === "PUT" && r.path === "/settings");
     expect(put).toBeDefined();
     expect(put!.body).toEqual({
@@ -63,6 +67,27 @@ describe("SettingsPage — hosted per-tenant settings (§5.12)", () => {
       language: "de",
       chime: "glass",
     });
+  });
+
+  it("marks Save settings busy and disabled while saving", async () => {
+    const client = createFakeAppApiClient();
+    client.saveSettings = () => new Promise(() => {});
+    const view = render(<SettingsPage client={client} redirect={() => {}} />);
+    const save = await view.findByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+    fireEvent.click(save);
+    expect(save.disabled).toBe(true);
+    expect(save.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("styles save failures as error alerts", async () => {
+    const client = createFakeAppApiClient({
+      failSaveSettingsWith: { code: "SAMO-SETTINGS", message: "Could not save.", status: 500 },
+    });
+    const view = render(<SettingsPage client={client} redirect={() => {}} />);
+    fireEvent.click(await view.findByRole("button", { name: "Save settings" }));
+    const alert = await view.findByRole("alert");
+    expect(alert.textContent).toBe("Could not save.");
+    expect(alert.className).toContain("samograph-alert samograph-alert--error");
   });
 
   it("redirects to sign-in when loading settings 401s", async () => {

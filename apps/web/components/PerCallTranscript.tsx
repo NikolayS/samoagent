@@ -349,7 +349,7 @@ export function PerCallTranscript({
       </div>
 
       {fatalError ? (
-        <div role="alert" className="samograph-stream-error">
+        <div role="alert" className="samograph-stream-error samograph-alert samograph-alert--error">
           <p>{streamErrorCopy(fatalError.code, fatalError.message)}</p>
         </div>
       ) : (

@@ -39,13 +39,13 @@ export function UpcomingMeetings({ client, onAuthFailure, locale, timeZone }: Up
 
   return <section aria-label="Upcoming meetings" className="samograph-upcoming-meetings">
     <h2>Upcoming meetings</h2>
-    {error ? <p role="alert">{error}</p> : !snapshot ? <p aria-busy="true">Loading upcoming meetings…</p> : snapshot.connectionState === "not_connected" ? <>
+    {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : !snapshot ? <p aria-busy="true">Loading upcoming meetings…</p> : snapshot.connectionState === "not_connected" ? <>
       <p>Connect Google Calendar to see upcoming meetings.</p>
       {calendarAvailable === true ? <p>
         <button type="button" disabled={busy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>{" "}
         <a href="/settings">Manage in Settings</a>
       </p> : <p><a href="/settings">Manage in Settings</a></p>}
-      {connectError ? <p role="alert">{connectError}</p> : null}
+      {connectError ? <p role="alert" className="samograph-alert samograph-alert--error">{connectError}</p> : null}
     </> : snapshot.connectionState === "broken" ? <p>Google Calendar needs to be reconnected. <a href="/settings">Reconnect in Settings</a>.</p> : snapshot.meetings.length === 0 ? <p>No upcoming meetings.</p> : <ul className="samograph-meeting-list">
       {snapshot.meetings.slice(0, 20).map((meeting) => {
         const minutes = Math.max(0, Math.round((Date.parse(meeting.endsAt) - Date.parse(meeting.startsAt)) / 60000));
