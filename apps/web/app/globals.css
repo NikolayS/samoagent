@@ -56,6 +56,9 @@
   --good: var(--accent-live);
   --warn: #8a5a00;
   --crit: #a63a3a;
+  /* Success COPY ink. `--accent-live` mint is an instrument colour and fails
+     WCAG AA as body text on the light surface, so alert text uses this. */
+  --success-ink: #1d6b47;
 
   /* Foregrounds for filled accents */
   --on-green: var(--panel-ground);
@@ -177,6 +180,7 @@
     --line-strong: #45433d;
     --warn: #e2b45a;
     --crit: #ff7a7a;
+    --success-ink: var(--accent-live);
     /* Google's approved DARK button set (#209) — not our palette to tune. */
     --google-btn-bg: #131314;
     --google-btn-border: #8e918f;
@@ -197,6 +201,7 @@
   --line-strong: #b9b4a6;
   --warn: #8a5a00;
   --crit: #a63a3a;
+  --success-ink: #1d6b47;
   /* Google's approved LIGHT button set (#209). */
   --google-btn-bg: #ffffff;
   --google-btn-border: #747775;
@@ -215,6 +220,7 @@
   --line-strong: #45433d;
   --warn: #e2b45a;
   --crit: #ff7a7a;
+  --success-ink: var(--accent-live);
   /* Google's approved DARK button set (#209). */
   --google-btn-bg: #131314;
   --google-btn-border: #8e918f;
@@ -483,7 +489,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 .samograph-alert { border: 1px solid currentColor; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
 .samograph-alert--error { color: var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
 .samograph-alert--warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
-.samograph-alert--success { color: var(--state-live); background: color-mix(in srgb, var(--state-live) 8%, var(--surface)); }
+.samograph-alert--success { color: var(--success-ink); background: color-mix(in srgb, var(--success-ink) 8%, var(--surface)); }
 .samograph-alert--info { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
 .samograph-danger-zone { border-top: var(--border-strong) solid var(--crit); padding-top: var(--space-5); }
 .samograph-danger-zone-title { color: var(--crit); }
