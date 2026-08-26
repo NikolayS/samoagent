@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import {
   formatRenderLine,
   initialTranscriptState,
@@ -347,6 +347,11 @@ export function PerCallTranscript({
     transcript?.scrollTo?.({ top: transcript.scrollHeight });
   }, [state.lines.length, state.partial?.text, isPinnedToBottom]);
 
+  // A terminal failure with nothing captured replaces the empty list with the
+  // failure card; once lines exist the transcript stays and the header keeps
+  // the copy, so §5.16 is never dropped.
+  const statusMessageMovedToCard = !fatalError && !hasLines && view.kind === "error";
+
   const jumpToLive = () => {
     const transcript = transcriptRef.current;
     transcript?.scrollTo?.({ top: transcript.scrollHeight, behavior: "smooth" });
@@ -367,13 +372,15 @@ export function PerCallTranscript({
             {formatElapsed(elapsedSeconds)}
           </span>
         </div>
-        {view.kind !== "error" ? <p className="samograph-status-message">{view.message}</p> : null}
+        {/* The error card below carries this copy only when it stands in for an
+            empty transcript; otherwise the header keeps it (§5.16). */}
+        {statusMessageMovedToCard ? null : <p className="samograph-status-message">{view.message}</p>}
         {view.code ? <small className="samograph-status-code">{view.code}</small> : null}
       </header>
 
       <DegradedBanner degraded={state.degraded} />
 
-      {fatalError || (!hasLines && view.kind === "error") ? (
+      {fatalError || statusMessageMovedToCard ? (
         <div role="alert" className="samograph-stream-error samograph-alert samograph-alert--error">
           <p>{fatalError ? streamErrorCopy(fatalError.code, fatalError.message) : view.message}</p>
         </div>
@@ -401,7 +408,7 @@ export function PerCallTranscript({
                 <b
                   className="samograph-line-speaker"
                   aria-hidden="true"
-                  style={{ "--speaker-index": speakerIndex(l.speaker) } as CSSProperties}
+                  data-speaker-index={speakerIndex(l.speaker)}
                 >{l.speaker}{l.kind === "chat" ? " (chat)" : ""}:</b>
                 <span className="samograph-line-utterance" aria-hidden="true">{l.text}</span>
               </li>
@@ -416,7 +423,7 @@ export function PerCallTranscript({
               <span className="samograph-visually-hidden">{formatRenderLine(state.partial)}</span>
               <span className="samograph-line-number" aria-hidden="true">{state.partial.seq}</span>
               <time className="samograph-line-time" aria-hidden="true">{state.partial.ts}</time>
-              <b className="samograph-line-speaker" aria-hidden="true" style={{ "--speaker-index": speakerIndex(state.partial.speaker) } as CSSProperties}>{state.partial.speaker}:</b>
+              <b className="samograph-line-speaker" aria-hidden="true" data-speaker-index={speakerIndex(state.partial.speaker)}>{state.partial.speaker}:</b>
               <span className="samograph-line-utterance" aria-hidden="true">{state.partial.text}</span>
             </li>
           ) : null}

@@ -1101,7 +1101,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 }
 
 .samograph-instrument-meta,
-.samograph-instrument-state,
+.samograph-percall .samograph-instrument-state,
 .samograph-share-state,
 .samograph-owner-controls,
 .samograph-transcript-actions {
@@ -1202,11 +1202,11 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   font-weight: 500;
 }
 
-.samograph-line-speaker[style*="--speaker-index: 1"] { color: var(--speaker-1); }
-.samograph-line-speaker[style*="--speaker-index: 2"] { color: var(--speaker-2); }
-.samograph-line-speaker[style*="--speaker-index: 3"] { color: var(--speaker-3); }
-.samograph-line-speaker[style*="--speaker-index: 4"] { color: var(--speaker-4); }
-.samograph-line-speaker[style*="--speaker-index: 5"] { color: var(--speaker-5); }
+.samograph-line-speaker[data-speaker-index="1"] { color: var(--speaker-1); }
+.samograph-line-speaker[data-speaker-index="2"] { color: var(--speaker-2); }
+.samograph-line-speaker[data-speaker-index="3"] { color: var(--speaker-3); }
+.samograph-line-speaker[data-speaker-index="4"] { color: var(--speaker-4); }
+.samograph-line-speaker[data-speaker-index="5"] { color: var(--speaker-5); }
 
 .samograph-line-utterance {
   min-width: 0;
@@ -1224,7 +1224,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   height: 1.05em;
   margin-left: 0.15em;
   vertical-align: text-bottom;
-  background: var(--signal-magenta);
+  background: var(--signal);
   animation: samograph-caret 1s steps(1, end) infinite;
 }
 

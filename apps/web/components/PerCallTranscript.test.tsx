@@ -142,6 +142,26 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     expect(row?.querySelector(".samograph-line-utterance")?.textContent).toBe("columns");
   });
 
+  it("hangs the speaker colour off a data attribute the stylesheet can select", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ seq: 1, speaker: "Bob", text: "hue" })));
+    act(() => client.emitLine(line({ seq: 2, speaker: "Bob", text: "same hue" })));
+    act(() => client.emitLine(line({ seq: 3, speaker: "Alice", text: "other hue" })));
+    const indexes = [...container.querySelectorAll(".samograph-line-speaker")].map((el) =>
+      el.getAttribute("data-speaker-index"),
+    );
+    // Stable per speaker, in range, and never smuggled through an inline style
+    // (a `[style*=…]` hook depends on CSSOM serialising with a space).
+    expect(indexes).toHaveLength(3);
+    expect(indexes[0]).toBe(indexes[1]);
+    expect(indexes[0]).not.toBe(indexes[2]);
+    for (const index of indexes) expect(["0", "1", "2", "3", "4", "5"]).toContain(index);
+    expect(container.querySelector(".samograph-line-speaker")?.getAttribute("style")).toBeNull();
+  });
+
   it("shows the degraded banner on emitDegraded(true) and clears it on recovery", () => {
     const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
     const { getByText, queryByText } = render(
@@ -213,6 +233,18 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     // The stream is closed: a late line is NOT delivered.
     act(() => client.emitLine(line({ seq: 9, text: "after terminal" })));
     expect(queryByText(/after terminal/)).toBeNull();
+  });
+
+  it("still surfaces the §5.16 terminal copy when the call already has lines", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { getByText } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ seq: 1, text: "said something first" })));
+    act(() => client.emitStatus("BOT_REMOVED"));
+    // The transcript stays readable, and the failure copy must not vanish with it.
+    expect(getByText(/said something first/, { selector: ".samograph-visually-hidden" })).toBeDefined();
+    expect(getByText("The bot was removed from the call.")).toBeDefined();
   });
 
   it("renders NO owner controls when the controls slot is omitted", () => {
