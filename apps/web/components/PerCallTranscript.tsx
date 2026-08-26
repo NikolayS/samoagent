@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { useEffect, useReducer, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   formatRenderLine,
   initialTranscriptState,
@@ -53,6 +53,8 @@ export interface PerCallTranscriptProps {
   auth: StreamAuth;
   /** The call this view streams. For a share, the WS-hub resolves the call from the token. */
   callId: string;
+  /** Owner-visible meeting URL. Omitted by the capability-token share view. */
+  meetingUrl?: string;
   /** Recall failure reason surfaced in the `COULD_NOT_JOIN` copy (§5.16). */
   recallReason?: string;
   /**
@@ -97,6 +99,7 @@ export function PerCallTranscript({
   streamClient,
   auth,
   callId,
+  meetingUrl,
   recallReason,
   controls,
   statusPollIntervalMs = STATUS_POLL_INTERVAL_MS,
@@ -105,6 +108,9 @@ export function PerCallTranscript({
     initialTranscriptState(),
   );
   const [fatalError, setFatalError] = useState<AppApiError | null>(null);
+  const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const transcriptRef = useRef<HTMLOListElement | null>(null);
   // §5.16 error detail (`calls.status_reason`) from the /calls/:id header —
   // stream frames never carry it, so the REST fetch is its only source.
   const [fetchedReason, setFetchedReason] = useState<string | undefined>(undefined);
@@ -240,7 +246,11 @@ export function PerCallTranscript({
           break;
         case "line":
           streamEventArrived = true;
-          if (lastSeq === undefined || event.seq > lastSeq) lastSeq = event.seq;
+          // A partial is not safely replayed past: reconnecting with its seq as
+          // the cursor can make the server omit the finalized replacement.
+          if (event.final && (lastSeq === undefined || event.seq > lastSeq)) {
+            lastSeq = event.seq;
+          }
           dispatch(event);
           break;
         case "status":
@@ -314,70 +324,130 @@ export function PerCallTranscript({
 
   // An explicit prop wins; otherwise the reason fetched from /calls/:id applies.
   const view = statusView(state.status, { recallReason: recallReason ?? fetchedReason });
+  const hasLines = state.lines.length > 0 || state.partial !== null;
+  const emptyCopy = view.kind === "pending"
+    ? "Waiting for the bot to join…"
+    : view.kind === "joining"
+      ? "Joining the meeting…"
+      : view.kind === "live"
+        ? "Connected — waiting for the first words."
+        : view.isTerminal
+          ? "No transcript was captured."
+          : null;
+
+  useEffect(() => {
+    if (view.kind !== "live") return;
+    const timer = setInterval(() => setElapsedSeconds((seconds) => seconds + 1), 1_000);
+    return () => clearInterval(timer);
+  }, [view.kind]);
+
+  useEffect(() => {
+    if (!isPinnedToBottom) return;
+    const transcript = transcriptRef.current;
+    transcript?.scrollTo?.({ top: transcript.scrollHeight });
+  }, [state.lines.length, state.partial?.text, isPinnedToBottom]);
+
+  const jumpToLive = () => {
+    const transcript = transcriptRef.current;
+    transcript?.scrollTo?.({ top: transcript.scrollHeight, behavior: "smooth" });
+    setIsPinnedToBottom(true);
+  };
 
   return (
-    <section aria-live="polite" aria-label="Live transcript" className="samograph-percall">
-      <header className="samograph-status" data-status-kind={view.kind}>
-        <span className="samograph-status-label">{view.label}</span>
-        <p className="samograph-status-message">{view.message}</p>
+    <section aria-live="polite" aria-label="Live transcript" className="samograph-percall samograph-instrument">
+      <header className="samograph-status samograph-instrument-head" data-status-kind={view.kind}>
+        <div className="samograph-instrument-meta">
+          {auth.kind === "session" ? <strong>call / {callId.slice(0, 8)}</strong> : <strong>shared transcript</strong>}
+          {auth.kind === "session" && meetingUrl ? <><i aria-hidden="true">|</i><span>{meetingUrl}</span></> : null}
+          {auth.kind === "session" ? <><i aria-hidden="true">|</i><span>dictionary: account default</span></> : null}
+        </div>
+        <div className="samograph-instrument-state">
+          <span className="samograph-status-label">{view.label}</span>
+          <span className="samograph-status-elapsed" aria-hidden="true">
+            {formatElapsed(elapsedSeconds)}
+          </span>
+        </div>
+        {view.kind !== "error" ? <p className="samograph-status-message">{view.message}</p> : null}
         {view.code ? <small className="samograph-status-code">{view.code}</small> : null}
       </header>
 
       <DegradedBanner degraded={state.degraded} />
 
-      <div className="samograph-transcript-actions">
-        {/* Story 3 + #197: the transcript as a plain-text download, offered two
-            ways — the FULL call (speech + typed chat comments) and a SPEECH-ONLY
-            variant (`?comments=exclude`, filtered server-side on the `kind`
-            column). In share mode each href carries the `share` token so an
-            anonymous viewer downloads exactly what they can read. Same origin —
-            Caddy routes it to ws-hub. */}
-        <a
-          className="samograph-download-transcript"
-          href={transcriptDownloadHref(callId, auth)}
-          download
-        >
-          Download transcript
-        </a>
-        <a
-          className="samograph-download-transcript-speech"
-          href={transcriptDownloadHref(callId, auth, { excludeComments: true })}
-          download
-        >
-          Download (speech only)
-        </a>
-      </div>
-
-      {fatalError ? (
+      {fatalError || (!hasLines && view.kind === "error") ? (
         <div role="alert" className="samograph-stream-error">
-          <p>{streamErrorCopy(fatalError.code, fatalError.message)}</p>
+          <p>{fatalError ? streamErrorCopy(fatalError.code, fatalError.message) : view.message}</p>
         </div>
       ) : (
-        <ol className="samograph-transcript" aria-label="Transcript">
+        <ol
+          ref={transcriptRef}
+          className="samograph-transcript samograph-instrument-lines"
+          aria-label="Transcript"
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            setIsPinnedToBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
+          }}
+        >
+          {!hasLines && emptyCopy && view.kind !== "error" ? <li className="samograph-transcript-empty">{emptyCopy}</li> : null}
           {state.lines.map((l) =>
             l.speaker === SAMOGRAPH_WARNING_SPEAKER ? (
               <li key={l.seq}>
                 <WarningLine line={l} />
               </li>
             ) : (
-              <li key={l.seq} className="samograph-line">
-                {formatRenderLine(l)}
+              <li key={l.seq} className="samograph-line samograph-transcript-row">
+                <span className="samograph-visually-hidden">{formatRenderLine(l)}</span>
+                <span className="samograph-line-number" aria-hidden="true">{l.seq}</span>
+                <time className="samograph-line-time" aria-hidden="true">{l.ts}</time>
+                <b
+                  className="samograph-line-speaker"
+                  aria-hidden="true"
+                  style={{ "--speaker-index": speakerIndex(l.speaker) } as CSSProperties}
+                >{l.speaker}{l.kind === "chat" ? " (chat)" : ""}:</b>
+                <span className="samograph-line-utterance" aria-hidden="true">{l.text}</span>
               </li>
             ),
           )}
           {state.partial ? (
             <li
               key={`partial-${state.partial.seq}`}
-              className="samograph-line samograph-line-partial"
+              className="samograph-line samograph-line-partial samograph-transcript-row"
               aria-busy="true"
             >
-              {formatRenderLine(state.partial)}
+              <span className="samograph-visually-hidden">{formatRenderLine(state.partial)}</span>
+              <span className="samograph-line-number" aria-hidden="true">{state.partial.seq}</span>
+              <time className="samograph-line-time" aria-hidden="true">{state.partial.ts}</time>
+              <b className="samograph-line-speaker" aria-hidden="true" style={{ "--speaker-index": speakerIndex(state.partial.speaker) } as CSSProperties}>{state.partial.speaker}:</b>
+              <span className="samograph-line-utterance" aria-hidden="true">{state.partial.text}</span>
             </li>
           ) : null}
         </ol>
       )}
 
-      {controls ? <div className="samograph-controls">{controls({ view })}</div> : null}
+      {!isPinnedToBottom && hasLines ? <button type="button" className="samograph-jump-live" aria-label="Jump to live" onClick={jumpToLive}>Jump to live</button> : null}
+
+      <footer className="samograph-controls samograph-instrument-foot">
+        <div className="samograph-transcript-actions">
+          <a className="samograph-download-transcript" href={transcriptDownloadHref(callId, auth)} download>Download transcript</a>
+          <a className="samograph-download-transcript-speech" href={transcriptDownloadHref(callId, auth, { excludeComments: true })} download>Download (speech only)</a>
+        </div>
+        <div className="samograph-share-state">
+          <span>{auth.kind === "share" ? "Read-only shared link" : "Share link · owner controls"}</span>
+          {controls ? controls({ view }) : null}
+        </div>
+      </footer>
     </section>
   );
+}
+
+function speakerIndex(speaker: string): number {
+  let hash = 0;
+  for (const char of speaker) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return hash % 6;
+}
+
+function formatElapsed(seconds: number): string {
+  const hours = Math.floor(seconds / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  const remainder = seconds % 60;
+  return [hours, minutes, remainder].map((part) => String(part).padStart(2, "0")).join(":");
 }

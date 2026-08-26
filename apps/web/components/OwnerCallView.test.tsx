@@ -41,6 +41,18 @@ function renderOwner(
 }
 
 describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", () => {
+  it("renders exactly one h1 and a Dashboard back link", () => {
+    const { getAllByRole, getByRole } = renderOwner();
+    expect(getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(getAllByRole("heading", { level: 1 })[0]?.textContent).toBe(MEETING_URL);
+    expect(getByRole("link", { name: /dashboard/i }).getAttribute("href")).toBe("/dashboard");
+  });
+
+  it("renders the transcript as the shared instrument panel", () => {
+    const { container } = renderOwner();
+    expect(container.querySelectorAll(".samograph-instrument")).toHaveLength(1);
+  });
+
   it("renders the live transcript + status with an owner Share control", () => {
     const { stream, getByText, getByRole } = renderOwner();
     act(() => stream.emitLine({ seq: 1, ts: TS, speaker: "Alice", text: "owner hears this", final: true }));

@@ -25,6 +25,39 @@ function detail(over: Partial<CallDetail> = {}): CallDetail {
 }
 
 describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, §5.10)", () => {
+  for (const [status, copy] of [
+    ["PENDING", "Waiting for the bot to join…"],
+    ["JOINING", "Joining the meeting…"],
+    ["IN_CALL", "Connected — waiting for the first words."],
+  ] as const) {
+    it(`renders the exact empty state for ${status}`, async () => {
+      const client = createFakeTranscriptStreamClient({
+        callDetail: detail({ status }),
+      });
+      const { findByText } = render(
+        <PerCallTranscript
+          streamClient={client}
+          auth={{ kind: "session" }}
+          callId="call_1"
+        />,
+      );
+      expect(await findByText(copy)).toBeDefined();
+    });
+  }
+
+  it("removes the live empty state when the first line event arrives", async () => {
+    const client = createFakeTranscriptStreamClient({
+      callDetail: detail({ status: "IN_CALL" }),
+    });
+    const { findByText, queryByText } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    const copy = "Connected — waiting for the first words.";
+    expect(await findByText(copy)).toBeDefined();
+    act(() => client.emitLine(line({ text: "first words" })));
+    expect(queryByText(copy)).toBeNull();
+  });
+
   it("renders a deterministic PENDING header before the stream connects (clean hydration)", () => {
     const client = createFakeTranscriptStreamClient({ callDetail: detail() });
     const { getByText } = render(
@@ -32,6 +65,16 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     );
     // initialTranscriptState() is PENDING → the first paint is stable, no effect needed.
     expect(getByText("Starting")).toBeDefined();
+  });
+
+  it("keeps the ticking elapsed timer out of the live-region accessibility tree", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    expect(
+      container.querySelector(".samograph-status-elapsed")?.getAttribute("aria-hidden"),
+    ).toBe("true");
   });
 
   it("updates the status header as the stream reports JOINING → IN_CALL", () => {
@@ -70,10 +113,10 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
       <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
     );
     act(() => client.emitLine(line({ seq: 7, text: "partial then final", final: false })));
-    expect(getAllByText(/partial then final/)).toHaveLength(1);
+    expect(getAllByText(/partial then final/, { selector: ".samograph-visually-hidden" })).toHaveLength(1);
     act(() => client.emitLine(line({ seq: 7, text: "partial then final", final: true })));
     // The partial for seq 7 is cleared as it finalizes — still exactly one rendered line.
-    expect(getAllByText(/partial then final/)).toHaveLength(1);
+    expect(getAllByText(/partial then final/, { selector: ".samograph-visually-hidden" })).toHaveLength(1);
   });
 
   it("renders finalized lines in the canonical [ts] Speaker: text format", () => {
@@ -83,6 +126,20 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     );
     act(() => client.emitLine(line({ seq: 1, speaker: "Bob", text: "first" })));
     expect(getByText(`[${TS}] Bob: first`)).toBeDefined();
+  });
+
+  it("renders transcript lines with explicit grid column classes", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ seq: 3, speaker: "Bob", text: "columns" })));
+    const row = container.querySelector(".samograph-transcript-row");
+    expect(row).toBeDefined();
+    expect(row?.querySelector(".samograph-line-number")?.textContent).toBe("3");
+    expect(row?.querySelector(".samograph-line-time")?.textContent).toBe(TS);
+    expect(row?.querySelector(".samograph-line-speaker")?.textContent).toContain("Bob");
+    expect(row?.querySelector(".samograph-line-utterance")?.textContent).toBe("columns");
   });
 
   it("shows the degraded banner on emitDegraded(true) and clears it on recovery", () => {
@@ -127,6 +184,15 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     act(() => client.emitClose());
     await waitFor(() => expect(client.connects).toHaveLength(2));
     expect(client.connects[1]?.sinceSeq).toBe(5);
+  });
+
+  it("does not advance the replay cursor past a non-final partial", async () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    render(<PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />);
+    act(() => client.emitLine(line({ seq: 5, text: "still partial", final: false })));
+    act(() => client.emitClose());
+    await waitFor(() => expect(client.connects).toHaveLength(2));
+    expect(client.connects[1]?.sinceSeq).toBeUndefined();
   });
 
   it("renders the §5.16 terminal copy on COULD_NOT_JOIN, closes the stream, but keeps controls", () => {

@@ -60,11 +60,16 @@ export function OwnerCallView({
   }
 
   return (
-    <>
+    <section className="samograph-call-view">
+      <div className="samograph-call-view-heading">
+        <a href="/dashboard" className="samograph-call-back">← Dashboard</a>
+        <h1>{meetingUrl || `Call ${callId.slice(0, 8)}`}</h1>
+      </div>
       <PerCallTranscript
         streamClient={streamClient}
         auth={{ kind: "session" }}
         callId={callId}
+        meetingUrl={meetingUrl}
         controls={({ view }) => (
           <div className="samograph-owner-controls">
             <button type="button" onClick={() => setShareOpen(true)}>
@@ -123,6 +128,6 @@ export function OwnerCallView({
           </button>
         </div>
       ) : null}
-    </>
+    </section>
   );
 }
