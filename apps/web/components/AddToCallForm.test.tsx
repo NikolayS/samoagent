@@ -15,16 +15,53 @@ function submit(container: HTMLElement) {
 const REJECT_MESSAGE = "That doesn't look like a Zoom or Google Meet meeting link.";
 
 describe("AddToCallForm — the dashboard's single primary action", () => {
-  it("renders the heading, paste input, and submit button", () => {
+  it("renders a level-2 heading or label, paste input, and submit button without an h1", () => {
     const client = createFakeAppApiClient();
-    const { getByText, getByLabelText, getByRole } = render(
+    const { getByText, getByLabelText, getByRole, queryByRole } = render(
       <AddToCallForm client={client} />,
     );
     expect(getByText("Add samograph to a call")).toBeDefined();
+    expect(queryByRole("heading", { level: 1 })).toBeNull();
+    const levelTwoHeading = queryByRole("heading", {
+      level: 2,
+      name: "Add samograph to a call",
+    });
+    expect(levelTwoHeading ?? getByText("Add samograph to a call")).toBeDefined();
     expect((getByLabelText("Meeting link") as HTMLInputElement).tagName).toBe("INPUT");
     expect(getByRole("button", { name: "Add to call" })).toBeDefined();
     expect(getByRole("button", { name: "Add to call" }).classList.contains("samograph-btn")).toBe(true);
     expect(getByRole("button", { name: "Add to call" }).classList.contains("samograph-btn--primary")).toBe(true);
+  });
+
+  it("focuses the meeting-link input on mount when autoFocus is true", () => {
+    const client = createFakeAppApiClient();
+    const { getByPlaceholderText } = render(
+      <AddToCallForm client={client} autoFocus />,
+    );
+    const input = getByPlaceholderText("Paste a Zoom or Google Meet link");
+    expect(document.activeElement === input).toBe(true);
+  });
+
+  it("does not focus the meeting-link input when autoFocus is omitted", () => {
+    const client = createFakeAppApiClient();
+    const { getByPlaceholderText } = render(<AddToCallForm client={client} />);
+    const input = getByPlaceholderText("Paste a Zoom or Google Meet link");
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it("lays out the mono input and primary submit button in the hero form row", () => {
+    const client = createFakeAppApiClient();
+    const { getByPlaceholderText, getByRole } = render(<AddToCallForm client={client} />);
+    const input = getByPlaceholderText("Paste a Zoom or Google Meet link");
+    const button = getByRole("button", { name: "Add to call" });
+    const row = input.closest(".samograph-hero-form");
+    expect(
+      input.classList.contains("samograph-field-input--mono") || row !== null,
+    ).toBe(true);
+    expect(row).not.toBeNull();
+    expect(row?.contains(button)).toBe(true);
+    expect(button.classList.contains("samograph-btn")).toBe(true);
+    expect(button.classList.contains("samograph-btn--primary")).toBe(true);
   });
 
   it("marks the Add to call button busy and disabled while creating", async () => {
