@@ -5,6 +5,10 @@ mock.module("next/font/local", () => ({
   default: () => ({ variable: "mock-jetbrains-mono" }),
 }));
 
+mock.module("next/font/google", () => ({
+  Inter: () => ({ variable: "mock-inter-sans" }),
+}));
+
 const { default: RootLayout } = await import("./layout.tsx");
 
 /**
@@ -69,6 +73,7 @@ describe("RootLayout — next/font variable class placement", () => {
 
   it("attaches the font variable class to <html> so :root font tokens resolve", () => {
     expect(tree.props.className ?? "").toContain("mock-jetbrains-mono");
+    expect(tree.props.className ?? "").toContain("mock-inter-sans");
   });
 
   it("does not rely on <body> for the variable class", () => {

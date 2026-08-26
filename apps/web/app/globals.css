@@ -82,19 +82,56 @@
   --google-btn-border: #747775;
   --google-btn-ink: #1f1f1f;
 
-  /* Type.
-     The var() fallback ("JetBrains Mono") keeps these tokens valid even if
-     --font-jetbrains is not visible at :root — an undefined var() inside a
-     declaration makes the whole declaration invalid at computed-value time,
-     which once collapsed the entire site to the browser default serif. */
-  --font-body: var(--font-jetbrains, "JetBrains Mono"), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-display: var(--font-jetbrains, "JetBrains Mono"), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-mono: var(--font-jetbrains, "JetBrains Mono"), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Type */
+  --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-body: var(--font-sans);
+  --font-display: var(--font-sans);
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+  --leading-tight: 1.2;
+  --leading-normal: 1.55;
+  --leading-prose: 1.7;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 56px;
+  --space-16: 80px;
+
+  /* Shape and layout */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-strong: 2px;
+  --width-app: 1120px;
+  --width-prose: 720px;
+  --width-form: 480px;
+  --gutter: var(--space-8);
+
+  /* Interaction */
+  --focus-ring: var(--ink);
+  --hover-surface: color-mix(in srgb, var(--ink) 5%, var(--surface));
+  --control-border: var(--line-strong);
 }
 
 /* Refined public landing (issue #241). */
-body:has(.samograph-landing) { padding: 0; }
-.samograph-landing { max-width: none; width: 100%; overflow: hidden; }
+.samograph-landing { max-width: none; width: 100%; overflow: hidden; font-family: var(--font-mono); line-height: 1.5; }
 .samograph-landing *, .samograph-landing *::before, .samograph-landing *::after { box-sizing: border-box; }
 .samograph-landing a { color: inherit; text-decoration: none; }
 .samograph-landing a:hover { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
@@ -115,8 +152,8 @@ body:has(.samograph-landing) { padding: 0; }
 .samograph-instrument-foot { border-top: 1px solid var(--panel-line); font-size: .66rem; }.samograph-instrument-foot b { padding: 2px 8px; border: 1px solid var(--panel-line); }.samograph-instrument-foot i { margin: 0 3px; }
 .samograph-rule { height: 1px; background: var(--line); }.samograph-section { display: flex; flex-direction: column; gap: 36px; }.samograph-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }.samograph-section-head h2 { margin: 0; font-size: 1.05rem; letter-spacing: -.02em; }.samograph-section-head > span, .samograph-section > small { color: var(--faint); font-size: .7rem; letter-spacing: .06em; }
 .samograph-differentiators { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 34px; }.samograph-differentiators article { display: flex; flex-direction: column; gap: 12px; }.samograph-differentiators span { color: var(--faint); font-size: .7rem; }.samograph-differentiators i { height: 1px; background: var(--line-strong); }.samograph-differentiators h3, .samograph-differentiators p { margin: 0; }.samograph-differentiators h3 { font-size: .85rem; letter-spacing: -.02em; }.samograph-differentiators p, .samograph-steps p, .samograph-heritage p { color: var(--muted); font-size: .775rem; line-height: 1.68; }
-.samograph-steps { list-style: none; margin: 0; padding: 0; }.samograph-steps li { display: grid; grid-template-columns: 64px 300px minmax(0,1fr); gap: 24px; align-items: baseline; padding: 13px 0; border-top: 1px solid var(--line); }.samograph-steps li:last-child { border-bottom: 1px solid var(--line); }.samograph-steps span { color: var(--faint); font-size: .72rem; }.samograph-steps h3, .samograph-steps p { margin: 0; }.samograph-steps h3 { font-size: .85rem; }
-.samograph-heritage { max-width: none; margin: 0; padding: 56px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 64px; background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }.samograph-heritage > div { display: flex; flex-direction: column; gap: 20px; }.samograph-label { color: var(--muted); font-size: .7rem; letter-spacing: .09em; }.samograph-heritage h2, .samograph-heritage p { margin: 0; }.samograph-heritage h2 { font-size: 1.35rem; line-height: 1.25; }.samograph-repo { display: flex; gap: 14px; align-items: center; }.samograph-repo a { color: var(--ink-soft) !important; border-bottom: 1px solid var(--line-strong); }.samograph-cli { display: flex; flex-direction: column; gap: 9px; padding: 20px 22px; border: 1px solid var(--line-strong); background: var(--ground); }.samograph-cli code { display: flex; gap: 10px; color: var(--ink-soft); font-size: .755rem; white-space: pre-wrap; }.samograph-cli b { color: var(--accent-live); }.samograph-heritage aside { padding: 18px 22px; border: 1px dashed var(--line-strong); }.samograph-heritage aside span { color: var(--faint); font-size: .65rem; letter-spacing: .08em; }
+.samograph-steps { list-style: none; margin: 0; padding: 0; }.samograph-steps li { display: grid; grid-template-columns: 64px 300px minmax(0,1fr); gap: 24px; align-items: baseline; padding: 13px 0; border-top: 1px solid var(--line); }.samograph-steps li:last-child { border-bottom: 1px solid var(--line); }.samograph-steps span { color: var(--faint); font-size: .72rem; }.samograph-steps h3, .samograph-steps p { margin: 0; }.samograph-steps h3 { font-size: .85rem; letter-spacing: normal; }
+.samograph-heritage { max-width: none; margin: 0; padding: 56px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 64px; background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }.samograph-heritage > div { display: flex; flex-direction: column; gap: 20px; }.samograph-label { color: var(--muted); font-size: .7rem; letter-spacing: .09em; }.samograph-heritage h2, .samograph-heritage p { margin: 0; }.samograph-heritage h2 { font-size: 1.35rem; line-height: 1.25; letter-spacing: normal; }.samograph-repo { display: flex; gap: 14px; align-items: center; }.samograph-repo a { color: var(--ink-soft) !important; border-bottom: 1px solid var(--line-strong); }.samograph-cli { display: flex; flex-direction: column; gap: 9px; padding: 20px 22px; border: 1px solid var(--line-strong); background: var(--ground); }.samograph-cli code { display: flex; gap: 10px; color: var(--ink-soft); font-size: .755rem; white-space: pre-wrap; }.samograph-cli b { color: var(--accent-live); }.samograph-heritage aside { padding: 18px 22px; border: 1px dashed var(--line-strong); }.samograph-heritage aside span { color: var(--faint); font-size: .65rem; letter-spacing: .08em; }
 .samograph-closing { max-width: none; margin: 0; padding: 32px 56px; display: flex; align-items: center; justify-content: space-between; gap: 32px; border-bottom: 1px solid var(--line); font-size: .88rem; }.samograph-site-footer { padding: 40px 56px 48px; display: flex; flex-direction: column; align-items: center; gap: 18px; color: var(--muted); font-size: .73rem; text-align: center; }.samograph-site-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }.samograph-site-footer nav span { display: flex; gap: 12px; }.samograph-site-footer i, .samograph-site-footer small { color: var(--faint); font-style: normal; }
 .samograph-site-footer nav a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; }
 @keyframes samograph-refined-caret { 0%,100% { opacity: 1; } 50% { opacity: 0; } } @keyframes samograph-refined-pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
@@ -188,10 +225,17 @@ body:has(.samograph-landing) { padding: 0; }
  * Base elements
  * ========================================================================== */
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  padding: 2rem;
-  line-height: 1.5;
+  padding: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   font-family: var(--font-body);
   background: var(--ground);
   color: var(--ink);
@@ -199,20 +243,39 @@ body {
 
 main,
 section {
-  max-width: 32rem;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
-h1,
-h2,
-h3 {
+h1, h2, h3 {
   font-family: var(--font-display);
   color: var(--ink);
-  line-height: 1.2;
 }
 
 h1 {
-  letter-spacing: -0.02em;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: var(--leading-tight);
+}
+
+h2 {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.samograph-landing h1,
+.samograph-landing h2,
+.samograph-landing h3 {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 a {
@@ -225,8 +288,10 @@ a:hover {
 
 a:focus-visible,
 button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--green);
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -237,7 +302,9 @@ label {
   color: var(--ink);
 }
 
-input {
+input,
+select,
+textarea {
   display: block;
   width: 100%;
   margin-top: 0.25rem;
@@ -249,12 +316,15 @@ input {
   border-radius: 8px;
 }
 
+.samograph-keyterms {
+  font-family: var(--font-mono);
+}
+
 input:focus-visible {
   border-color: var(--green);
 }
 
 button {
-  margin-top: 1rem;
   padding: 0.5rem 1rem;
   font: inherit;
   font-weight: 600;
@@ -271,6 +341,70 @@ button {
 button:hover {
   background: var(--green-soft);
   border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+}
+
+.samograph-page {
+  max-width: var(--width-app);
+  margin: 0 auto;
+  padding: var(--space-8) var(--gutter) var(--space-16);
+}
+
+.samograph-page--form {
+  max-width: var(--width-form);
+}
+
+.samograph-app-nav {
+  border-bottom: var(--border) solid var(--line);
+  background: var(--surface);
+}
+
+.samograph-app-nav-inner {
+  max-width: var(--width-app);
+  min-height: 64px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.samograph-app-nav-links,
+.samograph-app-nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.samograph-app-nav-right {
+  margin-left: auto;
+}
+
+.samograph-app-brand {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.samograph-skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ground);
+  background: var(--ink);
+  transform: translateY(-200%);
+}
+
+.samograph-skip-link:focus {
+  color: var(--ground);
+  transform: translateY(0);
+}
+
+@media (max-width: 40rem) {
+  :root { --gutter: var(--space-5); }
+  .samograph-app-nav-inner { flex-wrap: wrap; }
+  .samograph-app-nav-right { width: 100%; margin-left: 0; }
 }
 
 /* Compact segmented theme control; each hit target remains 44px tall. */
@@ -407,216 +541,6 @@ button:hover {
 }
 
 /* =============================================================================
- * Landing — the "Greenroom" hero (SPEC §3 Story 1, issue #182)
- *
- * A two-column hero: honest value prop + the four-step v1 flow + the single
- * primary CTA on the left, an illustrative product-preview panel on the right.
- * Wider than the default `main` (32rem) so the two columns breathe; collapses
- * to one column on narrow viewports. All color via Greenroom tokens.
- * ========================================================================== */
-
-.samograph-landing {
-  max-width: none;
-}
-
-.samograph-hero {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2rem;
-  align-items: center;
-  margin-top: 0.5rem;
-}
-
-@media (min-width: 60rem) {
-  .samograph-hero {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    gap: 3rem;
-  }
-}
-
-/* --- Left column: copy, steps, CTA --- */
-
-.samograph-wordmark {
-  margin: 0 0 0.75rem;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
-  color: var(--green-deep);
-}
-
-.samograph-hero-headline {
-  margin: 0 0 1rem;
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 3rem);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.samograph-hero-subhead {
-  margin: 0 0 1.5rem;
-  max-width: 44ch;
-  font-size: 1.05rem;
-  color: var(--muted);
-}
-
-/* Four-step flow as a styled sequence: green numbered pills instead of raw
-   list markers. Ordered (`<ol>`) so the sequence is meaningful to AT. */
-.samograph-hero-steps {
-  list-style: none;
-  counter-reset: samograph-hero-step;
-  margin: 0 0 1.75rem;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.samograph-hero-steps > li {
-  counter-increment: samograph-hero-step;
-  position: relative;
-  padding-left: 2.4rem;
-  line-height: 1.5;
-  color: var(--ink);
-}
-
-.samograph-hero-steps > li::before {
-  content: counter(samograph-hero-step);
-  position: absolute;
-  left: 0;
-  top: 0.05em;
-  width: 1.6rem;
-  height: 1.6rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--green-deep);
-  background: var(--green-soft);
-  border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));
-  border-radius: 999px;
-}
-
-/* The single primary call-to-action into the magic-link sign-in: one filled,
-   green control (not a plain link). Focus/hover states are visible. */
-.samograph-hero-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.7rem 1.5rem;
-  font-weight: 700;
-  font-size: 1.02rem;
-  color: var(--on-green);
-  background: var(--green-deep);
-  border: 1px solid transparent;
-  border-radius: 12px;
-  text-decoration: none;
-  transition:
-    background-color 120ms ease,
-    transform 120ms ease;
-}
-
-.samograph-hero-cta:hover {
-  color: var(--on-green);
-  background: var(--green);
-  transform: translateY(-1px);
-}
-
-.samograph-hero-cta:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 2px;
-}
-
-/* --- Right column: illustrative product-preview panel ---
-   Echoes the live-transcript look (mono lines, live dot, presence pill,
-   streaming partial caret) with clearly-labeled SAMPLE data. */
-.samograph-hero-preview {
-  margin: 0;
-  padding: 1rem 1.1rem 1.25rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--ink) 10%, transparent);
-}
-
-.samograph-hero-preview-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding-bottom: 0.75rem;
-  margin-bottom: 0.75rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.samograph-hero-preview-bar .samograph-presence {
-  margin: 0;
-}
-
-.samograph-hero-preview-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--green-deep);
-}
-
-.samograph-hero-live-dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: var(--green);
-  animation: samograph-live-pulse 1.6s ease-out infinite;
-}
-
-.samograph-hero-transcript {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.samograph-hero-transcript > li {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.5;
-  color: var(--ink);
-  word-break: break-word;
-}
-
-/* Streaming partial line: muted text + the rationed pink caret at the live
-   edge — the same "bot speaks / live edge" pink used in the real transcript. */
-.samograph-hero-line-partial {
-  color: var(--muted);
-}
-
-.samograph-hero-line-partial::after {
-  content: "";
-  display: inline-block;
-  width: 0.5ch;
-  height: 1.05em;
-  margin-left: 0.15em;
-  vertical-align: text-bottom;
-  background: var(--pink);
-  border-radius: 1px;
-  animation: samograph-caret 1s steps(1, end) infinite;
-}
-
-.samograph-hero-preview-note {
-  margin-top: 0.85rem;
-  font-size: 0.78rem;
-  font-style: italic;
-  color: var(--muted);
-}
-
-/* =============================================================================
  * Dashboard — call list (SPEC §3 Story 1). Each row is a whole-row link into
  * its per-call transcript page; it must *read* as tappable.
  * ========================================================================== */
@@ -667,6 +591,7 @@ button:hover {
 }
 
 .samograph-call-url {
+  font-family: var(--font-mono);
   font-weight: 600;
   word-break: break-all;
 }
@@ -994,6 +919,7 @@ button:hover {
 
 .samograph-account-email {
   color: var(--muted);
+  font-family: var(--font-mono);
   font-size: 0.9rem;
   /* An address is data, not prose — never let it be re-flowed or re-wrapped
      mid-token into something that reads as a different address. */
@@ -1045,53 +971,17 @@ button:hover {
 }
 
 /* =============================================================================
- * Presence pills — forward-looking hook for a per-participant / bot presence
- * indicator. Not yet mounted in apps/web (the bot-camera presence page is
- * `src/presence.ts`, out of scope for #178); tokenized here so it lands styled.
- * ========================================================================== */
-
-.samograph-presence {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.5rem 0;
-}
-
-.samograph-presence-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--green-deep);
-  background: var(--green-soft);
-  border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));
-  border-radius: 999px;
-}
-
-/* Pink is rationed to the speaking state, matching the transcript caret. */
-.samograph-presence-pill[data-state="speaking"] {
-  color: var(--pink);
-  background: var(--pink-soft);
-  border-color: color-mix(in srgb, var(--pink) 35%, var(--line));
-}
-
-/* =============================================================================
  * Motion
  * ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
   .samograph-call-row,
-  .samograph-call-cta-arrow,
-  .samograph-hero-cta {
+  .samograph-call-cta-arrow {
     transition: none;
   }
   .samograph-call-live-dot,
   .samograph-status[data-status-kind="live"] .samograph-status-label::before,
-  .samograph-transcript > li.samograph-line-partial::after,
-  .samograph-hero-live-dot,
-  .samograph-hero-line-partial::after {
+  .samograph-transcript > li.samograph-line-partial::after {
     animation: none;
   }
 }

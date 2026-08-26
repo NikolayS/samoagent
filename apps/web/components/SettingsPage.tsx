@@ -178,6 +178,7 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
         <div className="samograph-field">
           <label htmlFor={keytermsId}>Custom keyterms (one per line)</label>
           <textarea
+            className="samograph-keyterms"
             key={loadNonce}
             id={keytermsId}
             ref={keytermsRef}

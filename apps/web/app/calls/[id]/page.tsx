@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { OwnerCallView } from "../../../components/OwnerCallView.tsx";
+import { AppShell } from "../../../components/AppShell.tsx";
 import { createHttpTranscriptStreamClient } from "../../../lib/transcriptStreamClient.ts";
 import { createHttpShareApiClient } from "../../../lib/shareApiClient.ts";
 import { createHttpAppApiClient } from "../../../lib/appApiClient.ts";
@@ -34,13 +35,14 @@ function OwnerCallInner({ callId }: { callId: string }) {
 
 export default function CallPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const callId = typeof params.id === "string" ? params.id : "";
   return (
-    <main>
+    <AppShell client={appClient} redirect={(path) => router.push(path)}>
       {/* useSearchParams requires a Suspense boundary (App Router CSR bailout). */}
       <Suspense fallback={<p>Loading…</p>}>
         <OwnerCallInner callId={callId} />
       </Suspense>
-    </main>
+    </AppShell>
   );
 }

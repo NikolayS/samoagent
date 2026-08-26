@@ -37,6 +37,8 @@ The transcript is an instrument, not an ordinary themed surface. These tokens ar
 
 JetBrains Mono is the only typeface, with the mono fallback stack `ui-monospace, SFMono-Regular, Menlo, monospace`. Load only weights 400, 500, and 700.
 
+Post-v1 app typography uses the dual sans/mono stack recorded in [SPEC.amendments.md](./SPEC.amendments.md#s5-4-typography--dual-sansmono-stack--deviation-post-v1).
+
 - Hero headline: `2.65rem / 1.14`, weight 700.
 - Major numeric or CTA headline: `1.8rem`, weight 700.
 - Section headline: `1.05rem`, weight 700.

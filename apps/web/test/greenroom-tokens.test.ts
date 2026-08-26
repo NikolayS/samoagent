@@ -176,11 +176,12 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
       expect(CSS_NO_COMMENTS.match(/var\(--signal\)/g)?.length ?? 0).toBe(2);
     });
 
-    it("uses JetBrains Mono for every font role", () => {
+    it("uses the Slice 1 dual sans/mono font roles", () => {
       const root = baseRootBody();
-      for (const token of ["font-body", "font-display", "font-mono"]) {
-        expect(valueOf(root, token)).toContain('"JetBrains Mono"');
-      }
+      expect(valueOf(root, "font-sans")).toContain('"Inter"');
+      expect(valueOf(root, "font-mono")).toContain('"JetBrains Mono"');
+      expect(valueOf(root, "font-body")).toBe("var(--font-sans)");
+      expect(valueOf(root, "font-display")).toBe("var(--font-sans)");
     });
   });
 

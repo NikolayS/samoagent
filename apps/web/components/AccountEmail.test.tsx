@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { render, waitFor } from "@testing-library/react";
 import { AccountEmail } from "./AccountEmail.tsx";
 import { Dashboard } from "./Dashboard.tsx";
+import { AppShell } from "./AppShell.tsx";
 import { SettingsPage } from "./SettingsPage.tsx";
 import { createFakeAppApiClient, type FakeAppApiClient } from "../lib/fakeAppApiClient.ts";
 import type { AppApiClient } from "../lib/appApiClient.ts";
@@ -68,11 +69,11 @@ describe("AccountEmail — the shared 'Signed in as …' chip", () => {
   });
 });
 
-describe("Dashboard — shows which account you are signed in as (#238)", () => {
+describe("AppShell — shows which account you are signed in as (#238)", () => {
   it("renders the account email in the header, beside Log out", async () => {
     const client = createFakeAppApiClient({ seedAccountEmail: "nik@samograph.test" });
     const { container, findByRole } = render(
-      <Dashboard client={client} redirect={noopRedirect} />,
+      <AppShell client={client} redirect={noopRedirect}><Dashboard client={client} redirect={noopRedirect} /></AppShell>,
     );
     await findByRole("button", { name: /log out/i });
     await waitFor(() => {
@@ -86,7 +87,7 @@ describe("Dashboard — shows which account you are signed in as (#238)", () => 
   it("shows no 'undefined' and keeps the header's line while the address is pending", async () => {
     const client = withPendingSettings(createFakeAppApiClient());
     const { container, findByRole } = render(
-      <Dashboard client={client} redirect={noopRedirect} />,
+      <AppShell client={client} redirect={noopRedirect}><Dashboard client={client} redirect={noopRedirect} /></AppShell>,
     );
     await findByRole("button", { name: /log out/i });
     const chip = container.querySelector("header .samograph-account-email");
@@ -100,7 +101,7 @@ describe("Dashboard — shows which account you are signed in as (#238)", () => 
       failGetSettingsWith: { code: "INTERNAL", message: "boom", status: 500 },
     });
     const { container, findByText } = render(
-      <Dashboard client={client} redirect={noopRedirect} />,
+      <AppShell client={client} redirect={noopRedirect}><Dashboard client={client} redirect={noopRedirect} /></AppShell>,
     );
     // The dashboard itself is unharmed; the chip simply never fills in.
     expect(await findByText(/No calls yet/)).toBeDefined();

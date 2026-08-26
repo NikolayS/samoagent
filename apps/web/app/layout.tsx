@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 const jetBrainsMono = localFont({
@@ -10,6 +11,12 @@ const jetBrainsMono = localFont({
     { path: "./fonts/jetbrains-mono-700-latin.woff2", weight: "700", style: "normal" },
   ],
   variable: "--font-jetbrains",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -30,7 +37,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={jetBrainsMono.variable}>
+    <html lang="en" suppressHydrationWarning className={`${jetBrainsMono.variable} ${inter.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>

@@ -1345,3 +1345,29 @@ The stable Calendar errors added to §5.16 are:
 | `SAMO-CALENDAR-500` | 500 JSON or 302 query | Unexpected internal Calendar failure | “Something went wrong connecting Google Calendar.” |
 
 **Why:** Upcoming meetings are useful before auto-join is enabled and provide a smaller, reviewable first slice of the §5.12 Calendar feature. Keeping consent incremental preserves the S5-1 security and verification boundary around ordinary sign-in; choosing the narrower event-only scope and minimizing the cache reduces retained personal data. Auto-join remains separate because it introduces independent scheduling, cost, eligibility, idempotency, and per-event-control requirements.
+
+---
+
+### S5-4. Typography — dual sans/mono stack — *Deviation (post-v1)*
+
+**Amends:** `DESIGN.md` §Typography, which specifies JetBrains Mono as the only typeface.
+
+**What differs:** App chrome and prose use Inter through `--font-sans`; body and display roles resolve to that stack. JetBrains Mono remains the `--font-mono` data face for transcripts, timestamps, identifiers, URLs, commands, and keyterms.
+
+**Why:** A sans face makes dense app chrome and prose easier to scan while preserving mono where its data-oriented character and alignment are useful.
+
+### S5-5. Layout — wider app, prose, and form columns — *Deviation (post-v1)*
+
+**Amends:** The legacy blanket 32rem application column.
+
+**What differs:** Application pages use `--width-app: 1120px`, prose uses `--width-prose: 720px`, and narrow forms use `--width-form: 480px`.
+
+**Why:** Calls and transcripts need horizontal room, while prose and forms retain purpose-specific readable measures instead of sharing one restrictive width.
+
+### S5-6. Interaction color — instrument-only live accent — *Deviation (post-v1)*
+
+**Amends:** `DESIGN.md` §Color tokens and §Interaction and accessibility where `accent-live` had also supplied general focus and hover color.
+
+**What differs:** `accent-live` is restricted to the transcript instrument. General focus and hover treatments are achromatic through `--focus-ring` and `--hover-surface`. These tokens land in Slice 1; adoption across controls follows in Slices 2–6.
+
+**Why:** Reserving green for live state protects its meaning, while ink-based interaction states provide stronger contrast in both themes.
