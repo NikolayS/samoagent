@@ -225,8 +225,11 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
       for (const [token, value] of Object.entries(INSTRUMENT)) {
         expect(valueOf(baseRootBody(), token)).toBe(value);
       }
-      // One compatibility alias declaration plus one actual use: the streaming caret.
-      expect(CSS_NO_COMMENTS.match(/var\(--signal\)/g)?.length ?? 0).toBe(2);
+      // One compatibility alias declaration plus the streaming caret — drawn
+      // twice now: the landing's instrument sample and the real transcript
+      // (Slice 3). The signal magenta stays a ONE-ELEMENT accent.
+      expect(CSS_NO_COMMENTS.match(/var\(--signal\)/g)?.length ?? 0).toBe(3);
+      expect(CSS_NO_COMMENTS.match(/background: var\(--signal\)/g)?.length ?? 0).toBe(2);
     });
 
     it("uses the Slice 1 dual sans/mono font roles", () => {
