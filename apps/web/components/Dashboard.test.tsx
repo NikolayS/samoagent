@@ -72,6 +72,108 @@ describe("Dashboard — fetches and renders the tenant's calls (SPEC §3 Story 1
   });
 });
 
+describe("Dashboard — Slice 4 information hierarchy", () => {
+  it("renders exactly one h1 named 'Your calls'", async () => {
+    const client = createFakeAppApiClient({ seedCalls: SEED });
+    const view = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await view.findByText("https://zoom.us/j/2");
+    const headings = view.getAllByRole("heading", { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]?.textContent).toBe("Your calls");
+  });
+
+  it("puts the samograph hero paste form in the first section", async () => {
+    const client = createFakeAppApiClient({ seedCalls: SEED });
+    const { container, findByText, getByPlaceholderText } = render(
+      <Dashboard client={client} redirect={noopRedirect} />,
+    );
+    await findByText("https://zoom.us/j/2");
+    const sections = Array.from(container.querySelectorAll("section"));
+    const form = getByPlaceholderText("Paste a Zoom or Google Meet link").closest("form");
+    const hero = form?.closest("section") ?? null;
+    expect(hero).toBe(sections[0]);
+    expect(hero?.classList.contains("samograph-dash-hero")).toBe(true);
+    const upcoming = container.querySelector('section[aria-label="Upcoming meetings"]');
+    const firstCallList = container.querySelector(".samograph-call-list");
+    expect(hero!.compareDocumentPosition(upcoming!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hero!.compareDocumentPosition(firstCallList!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("puts the danger zone after every call list", async () => {
+    const client = createFakeAppApiClient({ seedCalls: SEED });
+    const { container, findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await findByText("https://zoom.us/j/2");
+    const sections = Array.from(container.querySelectorAll("section"));
+    const danger = container.querySelector(".samograph-danger-zone");
+    const upcoming = container.querySelector('section[aria-label="Upcoming meetings"]');
+    const callSections = Array.from(container.querySelectorAll(".samograph-call-list"),
+      (list) => list.closest("section"));
+    expect(danger).toBe(sections.at(-1) ?? null);
+    expect(upcoming?.parentElement).toBe(danger?.parentElement ?? null);
+    for (const section of callSections) {
+      expect(section?.parentElement).toBe(danger?.parentElement ?? null);
+    }
+    for (const list of container.querySelectorAll(".samograph-call-list")) {
+      expect(list.compareDocumentPosition(danger!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it("keeps the no-calls message in the dashboard empty-state", async () => {
+    const client = createFakeAppApiClient();
+    const { findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    const message = await findByText("No calls yet.");
+    expect(message.closest(".samograph-empty-state")).not.toBeNull();
+  });
+
+  it("autofocuses the paste input when the dashboard has no calls", async () => {
+    const client = createFakeAppApiClient();
+    const { findByPlaceholderText } = render(
+      <Dashboard client={client} redirect={noopRedirect} />,
+    );
+    const input = await findByPlaceholderText("Paste a Zoom or Google Meet link");
+    expect(document.activeElement === input).toBe(true);
+  });
+});
+
+describe("Dashboard — Slice 4 call rows", () => {
+  it("renders status chips with the exact state copy and kind", async () => {
+    const calls: Call[] = [
+      { id: "live", meetingUrl: "https://zoom.us/j/live", provider: "zoom", status: "IN_CALL" },
+      { id: "joining", meetingUrl: "https://zoom.us/j/joining", provider: "zoom", status: "JOINING" },
+      { id: "pending", meetingUrl: "https://zoom.us/j/pending", provider: "zoom", status: "PENDING" },
+      { id: "ended", meetingUrl: "https://zoom.us/j/ended", provider: "zoom", status: "ENDED" },
+      { id: "failed", meetingUrl: "https://zoom.us/j/failed", provider: "zoom", status: "COULD_NOT_JOIN" },
+    ];
+    const client = createFakeAppApiClient({ seedCalls: calls });
+    const { container, findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await findByText("https://zoom.us/j/live");
+    const expected = [
+      ["live", "Live"], ["joining", "Joining"], ["pending", "Starting"],
+      ["ended", "Ended"], ["error", "Couldn't join"],
+    ];
+    const chips = Array.from(container.querySelectorAll(".samograph-status-chip"));
+    expect(chips).toHaveLength(expected.length);
+    expect(chips.map((chip) => [chip.getAttribute("data-kind"), chip.textContent])).toEqual(expected);
+    for (const item of container.querySelectorAll("li.samograph-call-item")) {
+      expect(item.querySelector(":scope > a.samograph-call-row")).not.toBeNull();
+    }
+    const endedRow = container.querySelector('[aria-label*="https://zoom.us/j/ended"]');
+    expect(endedRow?.querySelector(".samograph-call-cta-open")).not.toBeNull();
+  });
+
+  it("preserves the full meeting URL in the URL title and row accessible name", async () => {
+    const url = "https://meet.google.com/a-very-long-meeting-code?authuser=person%40example.com";
+    const client = createFakeAppApiClient({
+      seedCalls: [{ id: "long", meetingUrl: url, provider: "google_meet", status: "ENDED" }],
+    });
+    const { findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    const urlSpan = await findByText(url);
+    expect(urlSpan.classList.contains("samograph-call-url")).toBe(true);
+    expect(urlSpan.getAttribute("title")).toBe(url);
+    expect(urlSpan.closest("a.samograph-call-row")?.getAttribute("aria-label")).toContain(url);
+  });
+});
+
 describe("Dashboard — failed calls display their error reason (SPEC §5.16, Story 4)", () => {
   const FAILED: Call[] = [
     {
@@ -169,8 +271,10 @@ describe("Dashboard — each call row is an obvious transcript link (affordance)
     );
     // The live cue invites opening the transcript to watch in real time.
     expect(await findByText(/live — watch transcript/i)).toBeDefined();
-    // A live indicator dot is present (styled as the pulsing "●").
-    expect(container.querySelector(".samograph-call-live-dot")).not.toBeNull();
+    // The sole live indicator dot belongs to the status chip, not the CTA.
+    expect(container.querySelectorAll(".samograph-call-live-dot")).toHaveLength(1);
+    expect(container.querySelector(".samograph-status-chip > .samograph-call-live-dot")).not.toBeNull();
+    expect(container.querySelector(".samograph-call-cta > .samograph-call-live-dot")).toBeNull();
     // The row still links into the per-call page.
     const row = (await findByText("https://zoom.us/j/live")).closest("a");
     expect(row?.getAttribute("href")).toBe(

@@ -33,7 +33,7 @@ export interface ShareCallViewProps {
 export function ShareCallView({ streamClient, shareToken }: ShareCallViewProps) {
   const callId = callIdFromShareToken(shareToken) ?? shareToken;
   return (
-    <section className="samograph-share-page" aria-label="Shared transcript">
+    <section className="samograph-share-page samograph-call-view" aria-label="Shared transcript">
       <header className="samograph-share-page-header">
         <h1>{SHARE_HEADER_COPY}</h1>
         {/* Story 6: viewers see the same in-call recording disclosure the bot posts. */}
