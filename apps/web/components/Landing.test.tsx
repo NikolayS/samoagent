@@ -35,10 +35,11 @@ describe("Landing (Refined redesign)", () => {
     expect(transcript.classList.contains("samograph-transcript")).toBe(false);
   });
 
-  it("renders all approved pricing tier names and prices", () => {
-    const { getByRole } = render(<Landing />);
-    const pricing = getByRole("region", { name: "Pricing" });
-    for (const text of ["Free", "$0", "Individual", "$20/mo", "Team", "$25/user/mo"]) expect(pricing.textContent).toContain(text);
+  it("does not render a pricing section or tier prices", () => {
+    const { container, queryByRole } = render(<Landing />);
+    expect(queryByRole("region", { name: "Pricing" })).toBeNull();
+    for (const text of ["$0", "$20/mo", "$25/user/mo"]) expect(container.textContent).not.toContain(text);
+    expect(container.querySelector(".samograph-pricing-grid")).toBeNull();
   });
 
   it("renders the centered footer link set", () => {
