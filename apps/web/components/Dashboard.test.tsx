@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { render, fireEvent, act } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import { Dashboard } from "./Dashboard.tsx";
 import { createFakeAppApiClient } from "../lib/fakeAppApiClient.ts";
 import type { Call } from "../lib/appApiClient.ts";
@@ -50,18 +50,14 @@ describe("Dashboard — fetches and renders the tenant's calls (SPEC §3 Story 1
     expect(await findByText("https://meet.google.com/abc-defg-hij")).toBeDefined();
   });
 
-  it("renders a 'Log out' button that clears the session and redirects to /auth", async () => {
-    const client = createFakeAppApiClient({ seedCalls: SEED });
-    const seen: string[] = [];
-    const { findByRole } = render(
-      <Dashboard client={client} redirect={(p) => seen.push(p)} />,
+  it("leaves account identity and logout controls to AppShell", async () => {
+    const client = createFakeAppApiClient({ seedCalls: SEED, seedAccountEmail: "person@example.com" });
+    const { findByText, queryByRole, queryByText } = render(
+      <Dashboard client={client} redirect={noopRedirect} />,
     );
-    const button = await findByRole("button", { name: /log out/i });
-    await act(async () => {
-      fireEvent.click(button);
-    });
-    expect(seen).toEqual(["/auth"]);
-    expect(client.requests.some((r) => r.path === "/auth/logout" && r.method === "POST")).toBe(true);
+    await findByText("https://zoom.us/j/2");
+    expect(queryByRole("button", { name: /log out/i })).toBeNull();
+    expect(queryByText("Signed in as person@example.com")).toBeNull();
   });
 
   it("redirects an anonymous visitor (401 on GET /calls) to /auth", async () => {

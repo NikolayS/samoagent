@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AccountEmail } from "./AccountEmail.tsx";
 import { AddToCallForm } from "./AddToCallForm.tsx";
-import { LogoutButton } from "./LogoutButton.tsx";
 import { AccountDangerZone } from "./AccountDangerZone.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { AppApiError, type AppApiClient, type Call } from "../lib/appApiClient.ts";
@@ -108,9 +106,6 @@ function CallRow({ call }: { call: Call }) {
 export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
   const [status, setStatus] = useState<Status>("loading");
   const [calls, setCalls] = useState<Call[]>([]);
-  // `null` = not known yet (or never answered). The header renders regardless —
-  // see AccountEmail for why the unknown state still occupies its line.
-  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const calendarAuthFailure = useCallback(() => {
     setStatus("redirecting");
     redirect("/auth");
@@ -137,27 +132,6 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
     void load();
   }, [load]);
 
-  // Which account is this? (#238). `GET /settings` already serves the
-  // authoritative `signin.email`, so this reuses it rather than adding a `/me`.
-  // It is deliberately SEPARATE from `load`: the dashboard's reason to exist is
-  // the call list, and a settings read that 401s, 404s or breaks must cost the
-  // user nothing more than an unfilled chip — never a redirect (`load` owns the
-  // auth gate) and never an empty dashboard.
-  useEffect(() => {
-    let active = true;
-    client
-      .getSettings()
-      .then((snap) => {
-        if (active) setAccountEmail(snap.signin.email || null);
-      })
-      .catch(() => {
-        if (active) setAccountEmail(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [client]);
-
   if (status === "loading") {
     return (
       <section aria-live="polite" aria-busy="true">
@@ -182,10 +156,6 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
 
   return (
     <>
-      <header className="samograph-app-header">
-        <AccountEmail email={accountEmail} />
-        <LogoutButton client={client} redirect={redirect} />
-      </header>
       <AddToCallForm client={client} initialUrl={initialUrl} onCreated={() => void load()} />
       <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} />
       {calls.length === 0 ? (

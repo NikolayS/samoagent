@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { AccountEmail } from "./AccountEmail.tsx";
 import { CalendarConnectionCard } from "./CalendarConnectionCard.tsx";
 import {
   AppApiError,
@@ -156,10 +155,6 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
   return (
     <section aria-label="Settings" className="samograph-settings">
       <h1>Settings</h1>
-      {/* Which account these settings belong to (#238) — stated at the top, so it
-          is answered before the reader scrolls to the Sign-in block below (where
-          the same address appears as the magic-link method's destination). */}
-      <AccountEmail email={signin?.email ?? null} />
       <form onSubmit={onSubmit}>
         <div className="samograph-field">
           <label htmlFor={presetId}>Dictionary preset</label>
@@ -178,6 +173,7 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
         <div className="samograph-field">
           <label htmlFor={keytermsId}>Custom keyterms (one per line)</label>
           <textarea
+            className="samograph-keyterms"
             key={loadNonce}
             id={keytermsId}
             ref={keytermsRef}
