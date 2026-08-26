@@ -80,7 +80,8 @@ describe("CalendarService", () => {
 
   it("logs callback persistence failures before mapping them to SAMO-CALENDAR-500", async () => {
     const ctx = setup();
-    ctx.store.save = async () => { throw new Error("database save failed"); };
+    const persistenceError = Object.assign(new Error("database save failed with encrypted credential material"), { code: "23505" });
+    ctx.store.save = async () => { throw persistenceError; };
     const error = spyOn(console, "error").mockImplementation(() => {});
     try {
       const started = await ctx.service.start({ userId: "user", tenantId: "tenant", ip: "ip" });
@@ -89,7 +90,7 @@ describe("CalendarService", () => {
       const state = new URL(started.authorizationUrl).searchParams.get("state")!;
 
       expect(await ctx.service.callback({ userId: "user", tenantId: "tenant", ip: "ip", stateCookie: cookie, params: new URLSearchParams({ code: "code", state }) })).toEqual({ ok: false, code: "SAMO-CALENDAR-500" });
-      expect(error).toHaveBeenCalledWith("SAMO-CALENDAR-500 Calendar callback failed:", "database save failed");
+      expect(error).toHaveBeenCalledWith("SAMO-CALENDAR-500", "Error", "23505");
     } finally {
       error.mockRestore();
     }

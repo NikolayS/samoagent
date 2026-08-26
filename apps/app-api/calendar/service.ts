@@ -73,7 +73,11 @@ export class CalendarService {
       await this.#deps.immediateSync?.(row.id).catch(() => {});
       return { ok: true as const };
     } catch (error) {
-      console.error("SAMO-CALENDAR-500 Calendar callback failed:", error instanceof Error ? error.message : String(error));
+      const errorName = error?.constructor?.name ?? "Unknown";
+      const candidateSqlstate = error && typeof error === "object"
+        ? ["code", "errno"].map((key) => Reflect.get(error, key)).find((value) => typeof value === "string" && value.length === 5)
+        : undefined;
+      console.error("SAMO-CALENDAR-500", errorName, ...(candidateSqlstate ? [candidateSqlstate] : []));
       return { ok: false as const, code: "SAMO-CALENDAR-500" as const };
     }
   }

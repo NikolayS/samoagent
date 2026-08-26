@@ -68,7 +68,7 @@ d("calendar_events migration", () => {
     const row = await owner(); const store = new PostgresCalendarConnectionStore(sql);
     const stale = await store.startSync(row.connectionId);
     const replacement = await store.get(row.userId, row.tenantId);
-    await store.save({ ...replacement!, encryptedRefreshToken: Buffer.from("replacement"), grantedScopes: "{calendar.readonly}" as unknown as string[], connectedAt: new Date("2026-08-21T12:00:01Z"), lastSyncAt: null, lastSyncErrorAt: null, status: "connected" });
+    await store.save({ ...replacement!, encryptedRefreshToken: Buffer.from("replacement"), grantedScopes: ["calendar.readonly"], connectedAt: new Date("2026-08-21T12:00:01Z"), lastSyncAt: null, lastSyncErrorAt: null, status: "connected" });
 
     await store.markFailure(row.connectionId, { syncSeq: stale!.syncSeq, brokenReason: "invalid_grant", at: new Date("2026-08-21T12:00:02Z") });
     expect(await sql`SELECT status,broken_reason,last_sync_error_at,sync_seq,committed_sync_seq FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ status: "connected", broken_reason: null, last_sync_error_at: null, sync_seq: "2", committed_sync_seq: "2" }]);

@@ -53,5 +53,17 @@ d("PostgresCalendarConnectionStore", () => {
       "scope:calendar.read",
       "scope:calendar.events",
     ]);
+
+    row.grantedScopes = ["scope,comma", 'scope"quote', "scope\\backslash"];
+    await store.save(row);
+    expect((await store.get(userId, tenantId))?.grantedScopes).toEqual([
+      "scope,comma",
+      'scope"quote',
+      "scope\\backslash",
+    ]);
+
+    row.grantedScopes = [];
+    await store.save(row);
+    expect((await store.get(userId, tenantId))?.grantedScopes).toEqual([]);
   });
 });
