@@ -32,7 +32,7 @@ export function LogoutButton({ client, redirect }: LogoutButtonProps) {
   }
 
   return (
-    <button type="button" onClick={() => void onLogout()} disabled={busy}>
+    <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onLogout()} disabled={busy} aria-busy={busy}>
       {busy ? "Logging out…" : "Log out"}
     </button>
   );

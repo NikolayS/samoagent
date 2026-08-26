@@ -66,7 +66,7 @@ export function AccountDangerZone({ client, redirect }: AccountDangerZoneProps) 
       className="samograph-danger-zone"
       aria-labelledby="samograph-danger-zone-title"
     >
-      <h2 id="samograph-danger-zone-title">Danger zone</h2>
+      <h2 id="samograph-danger-zone-title" className="samograph-danger-zone-title">Danger zone</h2>
       <p>
         Permanently delete your account and everything in it — all calls, their
         transcripts, every share link, and the recordings (deleted at our
@@ -86,15 +86,16 @@ export function AccountDangerZone({ client, redirect }: AccountDangerZoneProps) 
         />
       </label>
       {error ? (
-        <p className="samograph-danger-error" role="alert">
+        <p className="samograph-danger-error samograph-alert samograph-alert--error" role="alert">
           {error}
         </p>
       ) : null}
       <button
         type="button"
-        className="samograph-danger-delete"
+        className="samograph-danger-delete samograph-btn samograph-btn--danger"
         onClick={onDelete}
         disabled={!armed || deleting}
+        aria-busy={deleting}
       >
         Permanently delete account
       </button>

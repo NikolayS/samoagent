@@ -82,12 +82,12 @@ export function MagicLinkRequestForm({ client }: MagicLinkRequestFormProps) {
     return (
       <section aria-live="polite">
         <h2>Check your email</h2>
-        <p>We sent a sign-in link to {sentTo}.</p>
+        <p role="status" className="samograph-alert samograph-alert--info">We sent a sign-in link to {sentTo}.</p>
         <p>Didn&apos;t get it?</p>
-        <button type="button" onClick={onResend} disabled={resending}>
+        <button type="button" className="samograph-btn samograph-btn--secondary" onClick={onResend} disabled={resending} aria-busy={resending}>
           Resend link
         </button>
-        <button type="button" onClick={onUseDifferentEmail}>
+        <button type="button" className="samograph-btn samograph-btn--secondary" onClick={onUseDifferentEmail}>
           Use a different email
         </button>
         {devLink ? (
@@ -111,8 +111,8 @@ export function MagicLinkRequestForm({ client }: MagicLinkRequestFormProps) {
         autoComplete="email"
         placeholder="you@example.com"
       />
-      {error ? <p role="alert">{error}</p> : null}
-      <button type="submit" disabled={phase === "sending"}>
+      {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+      <button type="submit" className="samograph-btn samograph-btn--primary" disabled={phase === "sending"} aria-busy={phase === "sending"}>
         Send magic link
       </button>
     </form>

@@ -210,11 +210,11 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
           </select>
         </div>
 
-        {error ? <p role="alert">{error}</p> : null}
-        <button type="submit" disabled={phase === "saving"}>
+        {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+        <button type="submit" className="samograph-btn samograph-btn--primary" disabled={phase === "saving"} aria-busy={phase === "saving"}>
           Save settings
         </button>
-        {saved ? <p role="status">Settings saved.</p> : null}
+        {saved ? <p role="status" className="samograph-alert samograph-alert--success">Settings saved.</p> : null}
       </form>
 
       {/* OUTSIDE the form on purpose — it has no inputs and must never be

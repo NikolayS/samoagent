@@ -52,7 +52,7 @@ describe("MagicLinkRequestForm", () => {
 
   it("POSTs the email to /auth/magic-link and shows the check-your-email state", async () => {
     const client = createFakeAppApiClient();
-    const { container, getByLabelText, findByText } = render(
+    const { container, getByLabelText, findByText, getByRole } = render(
       <MagicLinkRequestForm client={client} />,
     );
     fireEvent.change(getByLabelText("Email"), {

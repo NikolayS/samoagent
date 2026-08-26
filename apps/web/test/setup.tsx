@@ -18,7 +18,7 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 export function installDom(): void {
   beforeAll(() => {
-    GlobalRegistrator.register();
+    GlobalRegistrator.register({ url: "http://localhost/" });
   });
   afterEach(() => {
     cleanup();

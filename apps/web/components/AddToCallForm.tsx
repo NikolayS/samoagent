@@ -82,8 +82,8 @@ export function AddToCallForm({ client, initialUrl = "", onCreated }: AddToCallF
           autoComplete="off"
           placeholder="Paste a Zoom or Google Meet link"
         />
-        {error ? <p role="alert">{error}</p> : null}
-        <button type="submit" disabled={phase === "creating"}>
+        {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+        <button type="submit" className="samograph-btn samograph-btn--primary" disabled={phase === "creating"} aria-busy={phase === "creating"}>
           Add to call
         </button>
       </form>

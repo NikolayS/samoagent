@@ -297,7 +297,6 @@ textarea:focus-visible {
 
 label {
   display: block;
-  margin-top: 1rem;
   font-weight: 600;
   color: var(--ink);
 }
@@ -320,8 +319,10 @@ textarea {
   font-family: var(--font-mono);
 }
 
-input:focus-visible {
-  border-color: var(--green);
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--ink);
 }
 
 button {
@@ -339,8 +340,8 @@ button {
 }
 
 button:hover {
-  background: var(--green-soft);
-  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+  background: var(--hover-surface);
+  border-color: var(--line-strong);
 }
 
 .samograph-page {
@@ -447,9 +448,48 @@ button:hover {
   font-weight: 500;
 }
 
-[role="alert"] {
-  color: var(--crit);
+/* ===== Slice 2 — Controls: buttons, fields, alerts, inline confirm ===== */
+.samograph-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: color 140ms, background-color 140ms, border-color 140ms;
 }
+.samograph-btn--primary { color: var(--ground); background: var(--ink); border-color: var(--ink); }
+.samograph-btn--primary:hover { background: color-mix(in srgb, var(--ink) 88%, var(--surface)); }
+.samograph-btn--secondary { color: var(--muted); background: transparent; border: 1px solid var(--control-border); }
+.samograph-btn--secondary:hover { color: var(--ink); border-color: var(--ink); }
+.samograph-btn--danger { color: var(--crit); background: transparent; border: 1px solid var(--crit); }
+.samograph-btn--danger:hover { color: white; background: var(--crit); border-color: var(--crit); }
+.samograph-btn--ghost { border: 0; background: transparent; }
+.samograph-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.samograph-btn--primary[disabled]:hover { color: var(--ground); background: var(--ink); border-color: var(--ink); }
+.samograph-btn--secondary[disabled]:hover { color: var(--muted); background: transparent; border-color: var(--control-border); }
+.samograph-btn--danger[disabled]:hover { color: var(--crit); background: transparent; border-color: var(--crit); }
+.samograph-btn[aria-busy="true"] { cursor: progress; }
+.samograph-field { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
+.samograph-field > label, .samograph-field > input, .samograph-field > select, .samograph-field > textarea { margin-top: 0; }
+.samograph-field-hint { margin: 0; color: var(--muted); font-size: var(--text-xs); }
+.samograph-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-5); }
+input, select, textarea { background: var(--surface); border-color: var(--control-border); }
+textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
+.samograph-alert { border: 1px solid currentColor; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
+.samograph-alert--error { color: var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
+.samograph-alert--warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.samograph-alert--success { color: var(--state-live); background: color-mix(in srgb, var(--state-live) 8%, var(--surface)); }
+.samograph-alert--info { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
+.samograph-danger-zone { border-top: var(--border-strong) solid var(--crit); padding-top: var(--space-5); }
+.samograph-danger-zone-title { color: var(--crit); }
+.samograph-danger-confirm { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
+.samograph-danger-delete { margin-top: var(--space-5); }
+.samograph-danger-error, .samograph-delete-error { color: var(--crit); }
+.samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
+/* ===== end Slice 2 ===== */
 
 /* =============================================================================
  * Sign-in page — "Continue with Google" + the divider above the magic-link form

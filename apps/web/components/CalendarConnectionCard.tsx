@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { InlineConfirm } from "./InlineConfirm.tsx";
 import { AppApiError, type AppApiClient, type CalendarStatus } from "../lib/appApiClient.ts";
 import { authErrorMessage, isAuthErrorCode } from "../lib/authErrors.ts";
 import { formatDateTime, type DateTimeFormatOptions } from "../lib/formatDateTime.ts";
@@ -9,9 +10,16 @@ import { useCalendarConnect } from "../lib/useCalendarConnect.ts";
 type CalendarConnectionCardProps = DateTimeFormatOptions & { client: AppApiClient; onAuthFailure: () => void };
 
 export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone }: CalendarConnectionCardProps) {
+  const initialParams = new URLSearchParams(window.location.search);
+  const initialCalendarError = initialParams.get("calendar_error");
   const [status, setStatus] = useState<CalendarStatus | null>(null);
   const [disconnectBusy, setDisconnectBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(() => initialCalendarError
+    ? authErrorMessage(initialCalendarError)
+    : initialParams.get("calendar") === "connected" ? "Google Calendar connected." : null);
+  const [messageKind, setMessageKind] = useState<"error" | "success">(initialCalendarError ? "error" : "success");
+  const [confirming, setConfirming] = useState(false);
+  const disconnectTrigger = useRef<HTMLButtonElement>(null);
   const { busy: connectBusy, error: connectError, connect, clearError: clearConnectError } = useCalendarConnect({
     client,
     onAuthFailure,
@@ -21,6 +29,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
 
   const handleError = useCallback((error: unknown, fallback: string) => {
     if (error instanceof AppApiError && error.status === 401) { onAuthFailure(); return; }
+    setMessageKind("error");
     setMessage(error instanceof AppApiError && isAuthErrorCode(error.code) ? authErrorMessage(error.code) : fallback);
   }, [onAuthFailure]);
 
@@ -32,10 +41,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const error = params.get("calendar_error");
-    if (error) setMessage(authErrorMessage(error));
-    else if (params.get("calendar") === "connected") setMessage("Google Calendar connected.");
-    if (error || params.has("calendar")) {
+    if (params.has("calendar_error") || params.has("calendar")) {
       params.delete("calendar_error"); params.delete("calendar");
       const query = params.toString();
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
@@ -43,27 +49,38 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
   }, []);
 
   async function disconnect() {
-    if (!window.confirm("Disconnect Google Calendar? Upcoming meetings will be removed.")) return;
     setDisconnectBusy(true); setMessage(null); clearConnectError();
-    try { await client.disconnectCalendar(); await load(); }
+    try { await client.disconnectCalendar(); setConfirming(false); await load(); }
     catch (error) { handleError(error, "Google Calendar couldn’t be disconnected. Try again."); }
     finally { setDisconnectBusy(false); }
   }
 
+  function closeConfirm() {
+    setConfirming(false);
+    disconnectTrigger.current?.focus();
+  }
+
   return <section aria-label="Google Calendar" className="samograph-signin samograph-calendar-card">
     <h2>Google Calendar</h2>
-    {connectError || message ? <p role="status">{connectError ?? message}</p> : null}
+    {connectError || message ? (() => {
+      const failure = Boolean(connectError) || messageKind === "error";
+      const copy = connectError ?? message;
+      return <p role={failure ? "alert" : "status"} className={`samograph-alert samograph-alert--${failure ? "error" : "success"}`}>
+        {failure ? <span role="status">{copy}</span> : copy}
+      </p>;
+    })() : null}
     {!status ? <p aria-busy="true">Loading Google Calendar…</p> : status.state === "not_connected" ? <>
       <p>Show upcoming meetings from your calendar.</p>
-      <button type="button" disabled={busy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>
+      <button type="button" className="samograph-btn samograph-btn--primary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>
     </> : status.state === "broken" ? <>
       <p>Google Calendar needs to be reconnected.</p>
-      <button type="button" disabled={busy} onClick={() => void connect()}>Reconnect</button>{" "}
-      <button type="button" disabled={busy} onClick={() => void disconnect()}>Disconnect</button>
+      <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>Reconnect</button>{" "}
+      <button ref={disconnectTrigger} type="button" className="samograph-btn samograph-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>Disconnect</button>
     </> : <>
       <p><strong>Connected</strong></p>
       {status.lastSyncAt ? <p className="samograph-field-hint">Last synced {formatDateTime(status.lastSyncAt, { locale, timeZone })}</p> : null}
-      <button type="button" disabled={busy} onClick={() => void disconnect()}>Disconnect</button>
+      <button ref={disconnectTrigger} type="button" className="samograph-btn samograph-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>Disconnect</button>
     </>}
+    {confirming ? <InlineConfirm title="Disconnect Google Calendar?" confirmLabel="Disconnect" busy={disconnectBusy} onCancel={closeConfirm} onConfirm={() => void disconnect()}>Upcoming meetings will be removed.</InlineConfirm> : null}
   </section>;
 }

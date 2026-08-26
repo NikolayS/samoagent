@@ -139,7 +139,7 @@ export function ShareModal({ shareClient, callId, onClose }: ShareModalProps) {
     >
       <header className="samograph-share-header">
         <h2>Share read-only link</h2>
-        <button type="button" onClick={onClose} aria-label="Close">
+        <button type="button" className="samograph-btn samograph-btn--secondary" onClick={onClose} aria-label="Close">
           ×
         </button>
       </header>
@@ -149,12 +149,12 @@ export function ShareModal({ shareClient, callId, onClose }: ShareModalProps) {
         control the bot, mint tokens, or see your other calls.
       </p>
 
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
 
       {phase === "loading" ? <p>Loading share status…</p> : null}
 
       {phase === "empty" ? (
-        <button type="button" onClick={() => void onCreate()} disabled={busy}>
+        <button type="button" className="samograph-btn samograph-btn--primary" onClick={() => void onCreate()} disabled={busy} aria-busy={busy}>
           Create share link
         </button>
       ) : null}
@@ -170,14 +170,14 @@ export function ShareModal({ shareClient, callId, onClose }: ShareModalProps) {
             </p>
           ) : null}
           <div className="samograph-share-actions">
-            <button type="button" onClick={() => void onCopy()}>
+            <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onCopy()}>
               Copy link
             </button>
             {copied ? <span role="status">Copied</span> : null}
-            <button type="button" onClick={() => void onRotate()} disabled={busy}>
+            <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onRotate()} disabled={busy} aria-busy={busy}>
               Rotate
             </button>
-            <button type="button" onClick={() => void onRevoke()} disabled={busy}>
+            <button type="button" className="samograph-btn samograph-btn--secondary" onClick={() => void onRevoke()} disabled={busy} aria-busy={busy}>
               Revoke
             </button>
           </div>

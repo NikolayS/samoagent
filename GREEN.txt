@@ -1,0 +1,15 @@
+Slice 2 — Controls GREEN summary
+
+Implemented:
+- Added token-based button variants, fields/actions, form controls, alerts, danger-zone, and inline-confirm primitives in the delimited Slice 2 CSS section.
+- Applied control variants, pending aria-busy states, and alert/status semantics across the requested components.
+- Replaced the Google Calendar native confirmation with an accessible inline modal dialog supporting initial focus, Escape cancellation, and trigger focus restoration.
+- Initialized Happy DOM with a localhost origin for the RED calendar query-string tests and fixed their missing render-helper destructure.
+
+Verification:
+- cd apps/web && bun test: 508 pass, 0 fail.
+- bunx tsc --noEmit -p apps/web/tsconfig.json: clean.
+- repo root bun test: 1947 pass, 372 skip, 0 fail.
+- git diff --check: clean.
+
+Deferred contract items: none.
