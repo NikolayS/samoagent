@@ -17,8 +17,16 @@ import { cmdServe } from "./commands/serve.ts";
 import { cmdDoctor } from "./commands/doctor.ts";
 import { cmdNotes } from "./commands/notes.ts";
 import { cmdPresence } from "./commands/presence.ts";
+import { cmdWhisper, WHISPER_SINK_NAMES } from "./commands/whisper.ts";
+import { cmdCue } from "./commands/cue.ts";
 import { cmdChimes } from "./commands/chimes.ts";
 import { chimeNames, isChimeName, normalizeChimeName } from "./chime.ts";
+import {
+  CUE_SEMANTICS,
+  WHISPER_PRIORITIES,
+  normalizeCueSemantic,
+  normalizeWhisperPriority,
+} from "./whisper.ts";
 
 const USAGE = `usage: samograph <command> [options]
 
@@ -38,6 +46,8 @@ commands:
   intro [--intro-text TEXT] [--context] [--bot-id ID]
   chimes
   presence <listening|thinking|speaking|acting|idle> [message]
+  whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud]
+  cue <confirm|dismiss|next|more>
   transcript [--local] [--file FILE] [--cursor N] [--limit N] [bot_id]
   dicts
   watch
@@ -157,6 +167,48 @@ examples:
   samograph presence thinking "Checking the migration plan"
   samograph presence speaking "Answering in chat"
 `,
+  whisper: `usage: samograph whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud]
+
+Send a private message to the wearer. Unlike 'chat' (posted to the meeting with
+an audible chime) and 'presence' (repainted on the bot camera), a whisper is
+never visible to the meeting: it goes to the wearer's own output sink only.
+
+Every delivered whisper is also appended to the active transcript as a
+SAMOGRAPH-WHISPER control line, so an agent already running 'samograph watch'
+sees it with no new contract. Nothing here needs hardware: 'console' prints to
+stderr, and 'fake-hud' renders the Even Realities G2 screen (576x288 px, 27 px
+lines => 10 lines) as a bounded box so text that does not fit is visible rather
+than silently dropped.
+
+options:
+  --priority P   Delivery priority: low|normal|high (default: normal).
+                 A 'high' whisper preempts the one currently displayed and is
+                 never dropped; 'low' is shed first when the queue is full.
+  --ttl SECONDS  Auto-expire the whisper this many seconds after it was
+                 created (default: it never expires)
+  --sink NAME    Output sink: console|fake-hud (default: console)
+
+examples:
+  samograph whisper "Ask about the index bloat"
+  samograph whisper "Wrap up - 2 min left" --priority high --ttl 30
+  samograph whisper "A longer note for the wearer" --sink fake-hud
+`,
+  cue: `usage: samograph cue <confirm|dismiss|next|more>
+
+Record the wearer's back-channel reply to a whisper. The cue is appended to the
+active transcript as a SAMOGRAPH-CUE control line, so 'samograph watch' relays
+it to the agent on the transcript stream it is already reading.
+
+Cues are semantic, never physical: confirm|dismiss|next|more describe intent,
+so swapping the input device (glasses touchpad, a ring, a keyboard) is a driver
+change and nothing above it moves.
+
+examples:
+  samograph cue confirm
+  samograph cue dismiss
+  samograph cue next
+  samograph cue more
+`,
   notes: `usage: samograph notes <init|point|decision|action|transcript> [options]
 
 Maintain a GitLab-style live meeting doc.
@@ -224,6 +276,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     chat: new Set(["--bot-id", "--chime"]),
     chimes: new Set(),
     presence: new Set(),
+    whisper: new Set(["--priority", "--ttl", "--sink"]),
+    cue: new Set(),
     transcript: new Set(["--cursor", "--file", "--limit"]),
     dicts: new Set(),
     watch: new Set(),
@@ -242,6 +296,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     chat: new Set(["--list-chimes"]),
     chimes: new Set(),
     presence: new Set(),
+    whisper: new Set(),
+    cue: new Set(),
     transcript: new Set(["--local"]),
     dicts: new Set(),
     watch: new Set(),
@@ -439,6 +495,63 @@ export function parseArgs(argv: string[]): ParsedArgs {
       result.message = positionals.slice(1).join(" ") || undefined;
       break;
     }
+    case "whisper": {
+      if (positionals.length < 1) {
+        throw new ArgError("the following arguments are required: text");
+      }
+      // Unquoted words join into one message, like `presence <state> [message]`.
+      result.message = positionals.join(" ");
+      // Eager validation mirrors --variant/--presence-bg: a typo fails at parse
+      // time rather than silently degrading to the default at delivery.
+      const rawPriority = opts["--priority"];
+      if (rawPriority !== undefined) {
+        const priority = normalizeWhisperPriority(rawPriority);
+        if (priority === null) {
+          throw new ArgError(
+            `argument --priority: invalid choice: '${rawPriority}' (choose from ${WHISPER_PRIORITIES.join(", ")})`,
+          );
+        }
+        result.whisper_priority = priority;
+      } else {
+        result.whisper_priority = "normal";
+      }
+      const rawTtl = opts["--ttl"];
+      if (rawTtl !== undefined) {
+        const seconds = Number(rawTtl);
+        if (!Number.isInteger(seconds) || seconds < 1) {
+          throw new ArgError(`argument --ttl: invalid positive integer: '${rawTtl}'`);
+        }
+        result.whisper_ttl_ms = seconds * 1000;
+      } else {
+        result.whisper_ttl_ms = null;
+      }
+      const rawSink = opts["--sink"];
+      if (rawSink !== undefined) {
+        if (!(WHISPER_SINK_NAMES as readonly string[]).includes(String(rawSink))) {
+          throw new ArgError(
+            `argument --sink: invalid choice: '${rawSink}' (choose from ${WHISPER_SINK_NAMES.join(", ")})`,
+          );
+        }
+        result.whisper_sink = String(rawSink);
+      } else {
+        result.whisper_sink = "console";
+      }
+      break;
+    }
+    case "cue": {
+      if (positionals.length < 1) {
+        throw new ArgError("the following arguments are required: semantic");
+      }
+      // Semantic only — a physical event name (tap, double-tap) is rejected
+      // here so no physical vocabulary ever reaches the transcript.
+      if (normalizeCueSemantic(positionals[0]) === null) {
+        throw new ArgError(
+          `argument semantic: invalid choice: '${positionals[0]}' (choose from ${CUE_SEMANTICS.join(", ")})`,
+        );
+      }
+      result.cue = positionals[0];
+      break;
+    }
     case "dicts":
     case "watch":
     case "doctor":
@@ -508,6 +621,10 @@ async function dispatch(args: ParsedArgs): Promise<void> {
       return cmdChimes();
     case "presence":
       return cmdPresence(args);
+    case "whisper":
+      return cmdWhisper(args);
+    case "cue":
+      return cmdCue(args);
     case "frame":
       return cmdFrame(args);
     case "frames":

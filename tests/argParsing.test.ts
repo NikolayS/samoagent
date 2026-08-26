@@ -528,4 +528,107 @@ describe("argParsing", () => {
     expect(args.context).toBe(false);
     expect(args.bot_id).toBeNull();
   });
+
+  it("whisper joins its positional words into the message", () => {
+    const args = parseArgs(["whisper", "Ask", "about", "the", "index"]);
+    expect(args.command).toBe("whisper");
+    expect(args.message).toBe("Ask about the index");
+  });
+
+  it("whisper defaults: normal priority, no ttl, console sink", () => {
+    const args = parseArgs(["whisper", "hi"]);
+    expect(args.whisper_priority).toBe("normal");
+    expect(args.whisper_ttl_ms).toBeNull();
+    expect(args.whisper_sink).toBe("console");
+  });
+
+  it("whisper requires text", () => {
+    expect(() => parseArgs(["whisper"])).toThrow(
+      "the following arguments are required: text",
+    );
+  });
+
+  it("whisper parses --priority, --ttl and --sink", () => {
+    const args = parseArgs([
+      "whisper",
+      "Wrap up",
+      "--priority",
+      "high",
+      "--ttl",
+      "30",
+      "--sink",
+      "fake-hud",
+    ]);
+    expect(args.message).toBe("Wrap up");
+    expect(args.whisper_priority).toBe("high");
+    expect(args.whisper_ttl_ms).toBe(30000);
+    expect(args.whisper_sink).toBe("fake-hud");
+  });
+
+  it("whisper rejects an invalid priority at parse time", () => {
+    expect(() => parseArgs(["whisper", "hi", "--priority", "urgent"])).toThrow(
+      "argument --priority: invalid choice: 'urgent' (choose from low, normal, high)",
+    );
+  });
+
+  it("whisper rejects an invalid sink at parse time", () => {
+    expect(() => parseArgs(["whisper", "hi", "--sink", "hologram"])).toThrow(
+      "argument --sink: invalid choice: 'hologram' (choose from console, fake-hud)",
+    );
+  });
+
+  it("whisper rejects a non-positive or non-numeric ttl", () => {
+    expect(() => parseArgs(["whisper", "hi", "--ttl", "0"])).toThrow(
+      "argument --ttl: invalid positive integer: '0'",
+    );
+    expect(() => parseArgs(["whisper", "hi", "--ttl", "abc"])).toThrow(
+      "argument --ttl: invalid positive integer: 'abc'",
+    );
+  });
+
+  it("cue parses a semantic back-channel event", () => {
+    const args = parseArgs(["cue", "confirm"]);
+    expect(args.command).toBe("cue");
+    expect(args.cue).toBe("confirm");
+  });
+
+  it("cue requires a semantic", () => {
+    expect(() => parseArgs(["cue"])).toThrow(
+      "the following arguments are required: semantic",
+    );
+  });
+
+  it("cue rejects a physical (non-semantic) event at parse time", () => {
+    expect(() => parseArgs(["cue", "double-tap"])).toThrow(
+      "argument semantic: invalid choice: 'double-tap' (choose from confirm, dismiss, next, more)",
+    );
+  });
+
+  it("whisper --help shows command-specific help", () => {
+    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "whisper", "--help"], { cwd: repoRoot });
+    const stdout = new TextDecoder().decode(proc.stdout);
+    expect(proc.exitCode).toBe(0);
+    expect(stdout).toContain("usage: samograph whisper <text>");
+    expect(stdout).toContain("--priority P");
+    expect(stdout).toContain("--ttl SECONDS");
+    expect(stdout).toContain("--sink NAME");
+    expect(stdout).toContain("console|fake-hud");
+    expect(stdout).toContain("examples:");
+  });
+
+  it("cue --help shows command-specific help", () => {
+    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "cue", "--help"], { cwd: repoRoot });
+    const stdout = new TextDecoder().decode(proc.stdout);
+    expect(proc.exitCode).toBe(0);
+    expect(stdout).toContain("usage: samograph cue <confirm|dismiss|next|more>");
+    expect(stdout).toContain("SAMOGRAPH-CUE");
+    expect(stdout).toContain("examples:");
+  });
+
+  it("--help lists the private whisper/cue channel", () => {
+    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "--help"], { cwd: repoRoot });
+    const stdout = new TextDecoder().decode(proc.stdout);
+    expect(stdout).toContain("whisper <text>");
+    expect(stdout).toContain("cue <confirm|dismiss|next|more>");
+  });
 });
