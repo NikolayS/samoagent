@@ -92,11 +92,11 @@ describe("Dashboard — Slice 4 information hierarchy", () => {
     const form = getByPlaceholderText("Paste a Zoom or Google Meet link").closest("form");
     const hero = form?.closest("section") ?? null;
     expect(hero).toBe(sections[0]);
-    expect(hero?.classList.contains("samograph-hero")).toBe(true);
+    expect(hero?.classList.contains("samograph-dash-hero")).toBe(true);
     const upcoming = container.querySelector('section[aria-label="Upcoming meetings"]');
     const firstCallList = container.querySelector(".samograph-call-list");
-    expect(hero?.compareDocumentPosition(upcoming!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(hero?.compareDocumentPosition(firstCallList!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hero!.compareDocumentPosition(upcoming!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hero!.compareDocumentPosition(firstCallList!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("puts the danger zone after every call list", async () => {
@@ -105,7 +105,14 @@ describe("Dashboard — Slice 4 information hierarchy", () => {
     await findByText("https://zoom.us/j/2");
     const sections = Array.from(container.querySelectorAll("section"));
     const danger = container.querySelector(".samograph-danger-zone");
-    expect(danger).toBe(sections.at(-1));
+    const upcoming = container.querySelector('section[aria-label="Upcoming meetings"]');
+    const callSections = Array.from(container.querySelectorAll(".samograph-call-list"),
+      (list) => list.closest("section"));
+    expect(danger).toBe(sections.at(-1) ?? null);
+    expect(upcoming?.parentElement).toBe(danger?.parentElement ?? null);
+    for (const section of callSections) {
+      expect(section?.parentElement).toBe(danger?.parentElement ?? null);
+    }
     for (const list of container.querySelectorAll(".samograph-call-list")) {
       expect(list.compareDocumentPosition(danger!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
@@ -264,8 +271,10 @@ describe("Dashboard — each call row is an obvious transcript link (affordance)
     );
     // The live cue invites opening the transcript to watch in real time.
     expect(await findByText(/live — watch transcript/i)).toBeDefined();
-    // A live indicator dot is present (styled as the pulsing "●").
-    expect(container.querySelector(".samograph-call-live-dot")).not.toBeNull();
+    // The sole live indicator dot belongs to the status chip, not the CTA.
+    expect(container.querySelectorAll(".samograph-call-live-dot")).toHaveLength(1);
+    expect(container.querySelector(".samograph-status-chip > .samograph-call-live-dot")).not.toBeNull();
+    expect(container.querySelector(".samograph-call-cta > .samograph-call-live-dot")).toBeNull();
     // The row still links into the per-call page.
     const row = (await findByText("https://zoom.us/j/live")).closest("a");
     expect(row?.getAttribute("href")).toBe(

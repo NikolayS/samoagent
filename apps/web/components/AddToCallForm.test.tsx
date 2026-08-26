@@ -54,14 +54,23 @@ describe("AddToCallForm — the dashboard's single primary action", () => {
     const { getByPlaceholderText, getByRole } = render(<AddToCallForm client={client} />);
     const input = getByPlaceholderText("Paste a Zoom or Google Meet link");
     const button = getByRole("button", { name: "Add to call" });
-    const row = input.closest(".samograph-hero-form");
-    expect(
-      input.classList.contains("samograph-field-input--mono") || row !== null,
-    ).toBe(true);
+    const row = input.closest(".samograph-dash-hero-form");
+    expect(input.classList.contains("samograph-field-input--mono")).toBe(true);
     expect(row).not.toBeNull();
+    expect(row?.contains(input)).toBe(true);
     expect(row?.contains(button)).toBe(true);
     expect(button.classList.contains("samograph-btn")).toBe(true);
     expect(button.classList.contains("samograph-btn--primary")).toBe(true);
+  });
+
+  it("renders validation errors below, not inside, the input and button row", () => {
+    const client = createFakeAppApiClient();
+    const { container, getByText } = render(<AddToCallForm client={client} />);
+    submit(container);
+    const alert = getByText(REJECT_MESSAGE);
+    const row = container.querySelector(".samograph-dash-hero-form");
+    expect(row?.contains(alert)).toBe(false);
+    expect(alert.previousElementSibling).toBe(row);
   });
 
   it("marks the Add to call button busy and disabled while creating", async () => {

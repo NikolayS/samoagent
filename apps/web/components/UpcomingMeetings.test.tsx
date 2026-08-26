@@ -87,6 +87,20 @@ describe("Dashboard upcoming meetings", () => {
     expect(client.requests.filter((request) => request.path === "/calendar/connect/start" && request.method === "POST")).toHaveLength(1);
   });
 
+  it("marks the Connect Google Calendar button busy while connect is pending", async () => {
+    const client = createFakeAppApiClient({
+      googleCalendarEnabled: true,
+      seedCalendarMeetings: { connectionState: "not_connected", lastSyncAt: null, meetings: [] },
+    });
+    client.startCalendarConnect = () => new Promise(() => {});
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Connect Google Calendar" }));
+
+    const connecting = await view.findByRole("button", { name: "Connecting…" });
+    expect(connecting.getAttribute("aria-busy")).toBe("true");
+  });
+
   it("shows the guarded connect error inline and does not navigate for javascript URLs", async () => {
     const assign = mock(() => {});
     Object.defineProperty(window.location, "assign", { configurable: true, value: assign });

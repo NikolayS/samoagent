@@ -29,9 +29,7 @@ const ALLOWLIST = new Set([
   "samograph-signin-method", "samograph-signin-method-name", "samograph-signin-method-state",
   "samograph-share-modal", "samograph-share-header", "samograph-share-actions", "samograph-share-url",
   "samograph-share-blurb", "samograph-share-active", "samograph-share-rotated", "samograph-share-page",
-  "samograph-call-item",
-  "samograph-call-cta-text", "samograph-line", "samograph-download-transcript-speech", "samograph-theme",
-  "samograph-call-cta-open",
+  "samograph-line", "samograph-download-transcript-speech", "samograph-theme",
 ]);
 
 describe("samograph CSS class coverage", () => {

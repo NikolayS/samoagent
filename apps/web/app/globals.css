@@ -493,6 +493,175 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 .samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
 /* ===== end Slice 2 ===== */
 
+/* ===== Slice 4 — Dashboard ===== */
+.samograph-dash-hero {
+  margin-block: var(--space-5);
+}
+
+.samograph-dash-hero-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.samograph-dash-hero-form label {
+  grid-column: 1 / -1;
+}
+
+.samograph-field-input--mono {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+.samograph-call-list,
+.samograph-meeting-list {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.samograph-call-item,
+.samograph-meeting-item {
+  border-top: 1px solid var(--line);
+}
+
+.samograph-call-item:last-child,
+.samograph-meeting-item:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.samograph-call-row,
+.samograph-meeting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-2);
+}
+
+.samograph-call-row {
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 120ms ease;
+}
+
+.samograph-call-row:hover,
+.samograph-call-row:focus-visible,
+.samograph-meeting-item:hover {
+  background: var(--hover-surface);
+}
+
+.samograph-call-row:focus-visible {
+  outline: var(--border-strong) solid var(--ink);
+  outline-offset: -2px;
+}
+
+.samograph-call-body,
+.samograph-meeting-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.samograph-call-url {
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.samograph-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  color: var(--state-pending);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+
+.samograph-status-chip[data-kind="joining"] { color: var(--state-joining); }
+.samograph-status-chip[data-kind="live"] { color: var(--state-live); }
+.samograph-status-chip[data-kind="ended"] { color: var(--state-ended); }
+.samograph-status-chip[data-kind="error"] { color: var(--state-error); }
+
+.samograph-call-error,
+.samograph-call-hint,
+.samograph-meeting-meta {
+  font-size: var(--text-sm);
+}
+
+.samograph-call-error { color: var(--crit); }
+.samograph-call-hint,
+.samograph-meeting-meta { color: var(--muted); }
+
+.samograph-call-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.samograph-call-cta-live { color: var(--state-live); }
+.samograph-call-cta-retry { color: var(--state-error); }
+.samograph-call-cta-open { color: var(--muted); }
+.samograph-call-cta-text { white-space: nowrap; }
+.samograph-call-cta-arrow { transition: transform 120ms ease; }
+.samograph-call-row:hover .samograph-call-cta-arrow,
+.samograph-call-row:focus-visible .samograph-call-cta-arrow { transform: translateX(2px); }
+
+.samograph-call-live-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--state-live);
+  animation: samograph-live-pulse 1.6s ease-out infinite;
+}
+
+.samograph-empty-state {
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.samograph-empty-title {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.samograph-empty-hint {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.samograph-upcoming-meetings { margin-block: var(--space-6); }
+.samograph-meeting-title { font-weight: 650; }
+.samograph-meeting-item[data-declined="true"] { opacity: 0.65; }
+.samograph-btn--sm { height: 28px; padding-inline: var(--space-3); font-size: var(--text-xs); }
+
+@media (max-width: 40rem) {
+  .samograph-dash-hero-form { grid-template-columns: 1fr; }
+  .samograph-dash-hero-form .samograph-btn { width: 100%; }
+  .samograph-call-row,
+  .samograph-meeting-item { grid-template-columns: minmax(0, 1fr); }
+  .samograph-call-cta,
+  .samograph-meeting-item > .samograph-btn { justify-self: start; }
+}
+/* ===== end Slice 4 ===== */
+
 /* =============================================================================
  * Sign-in page — "Continue with Google" + the divider above the magic-link form
  * (issue #209, SPEC.amendments S5-1)
@@ -582,122 +751,6 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   }
 }
 
-/* =============================================================================
- * Dashboard — call list (SPEC §3 Story 1). Each row is a whole-row link into
- * its per-call transcript page; it must *read* as tappable.
- * ========================================================================== */
-
-.samograph-call-list {
-  list-style: none;
-  padding: 0;
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.samograph-call-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  text-decoration: none;
-  color: var(--ink);
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
-}
-
-.samograph-call-row:hover,
-.samograph-call-row:focus-visible {
-  background: var(--green-soft);
-  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
-}
-
-.samograph-call-row:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 2px;
-}
-
-.samograph-call-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.samograph-call-url {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  word-break: break-all;
-}
-
-.samograph-call-status {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.samograph-call-hint {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.samograph-call-error {
-  font-size: 0.85rem;
-  color: var(--crit);
-}
-
-/* Explicit call-to-action: "View transcript →", "Try again →", or the live cue.
-   The arrow slides on hover to reinforce that the whole row is a link. */
-.samograph-call-cta {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  white-space: nowrap;
-  color: color-mix(in srgb, var(--ink) 72%, transparent);
-}
-
-.samograph-call-row:hover .samograph-call-cta,
-.samograph-call-row:focus-visible .samograph-call-cta {
-  color: var(--ink);
-}
-
-.samograph-call-cta-arrow {
-  transition: transform 120ms ease;
-}
-
-.samograph-call-row:hover .samograph-call-cta-arrow,
-.samograph-call-row:focus-visible .samograph-call-cta-arrow {
-  transform: translateX(2px);
-}
-
-.samograph-call-cta-retry {
-  color: var(--crit);
-}
-
-/* Live cue: a pulsing "●" + "Live — watch transcript", green so it's clearly an
-   active invitation (distinct from the red error/retry treatment). */
-.samograph-call-cta-live {
-  color: var(--green-deep);
-}
-
-.samograph-call-live-dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: var(--green);
-  animation: samograph-live-pulse 1.6s ease-out infinite;
-}
-
 @keyframes samograph-live-pulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 60%, transparent);
@@ -708,25 +761,6 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   100% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 0%, transparent);
   }
-}
-
-/* Empty state */
-.samograph-empty-state {
-  margin-top: 1.5rem;
-  padding: 1.25rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
-.samograph-empty-title {
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.samograph-empty-hint {
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 /* =============================================================================
@@ -977,39 +1011,8 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   margin-bottom: 1rem;
 }
 
-.samograph-calendar-card,
-.samograph-upcoming-meetings {
+.samograph-calendar-card {
   margin-block: 1.5rem;
-}
-
-.samograph-meeting-list {
-  display: grid;
-  gap: 0.65rem;
-  padding: 0;
-  list-style: none;
-}
-
-.samograph-meeting-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.25rem 1rem;
-  align-items: center;
-  padding: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-
-.samograph-meeting-title {
-  font-weight: 650;
-}
-
-.samograph-meeting-item > span:not(.samograph-meeting-title) {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.samograph-meeting-item[data-declined="true"] {
-  opacity: 0.65;
 }
 
 /* =============================================================================

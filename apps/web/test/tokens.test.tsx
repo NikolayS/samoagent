@@ -124,3 +124,11 @@ describe("Slice 1 typography regressions", () => {
       expect(rule(selector)).toMatch(/font-family\s*:\s*var\(--font-mono\)/));
   }
 });
+
+describe("Slice 4 responsive dashboard CSS", () => {
+  it("stacks call and meeting rows into one column under 40rem", () => {
+    const slice4 = css.match(/\/\* ===== Slice 4 — Dashboard ===== \*\/([\s\S]*?)\/\* ===== end Slice 4 ===== \*\//)?.[1] ?? "";
+    const mobile = slice4.match(/@media\s*\(max-width:\s*40rem\)\s*\{([\s\S]*)\}\s*$/)?.[1] ?? "";
+    expect(mobile).toMatch(/\.samograph-call-row\s*,\s*\.samograph-meeting-item\s*\{[^}]*grid-template-columns\s*:\s*minmax\(0\s*,\s*1fr\)/s);
+  });
+});
