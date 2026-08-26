@@ -10,7 +10,7 @@ const client = createHttpAppApiClient();
 export default function SettingsRoute() {
   const router = useRouter();
   return (
-    <AppShell client={client} redirect={(path) => router.replace(path)} pageClassName="samograph-page--form">
+    <AppShell client={client} redirect={(path) => router.replace(path)} pageClassName="samograph-page--prose">
       <SettingsPage client={client} redirect={(path) => router.replace(path)} />
     </AppShell>
   );

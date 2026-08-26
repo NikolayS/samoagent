@@ -354,6 +354,10 @@ button:hover {
   max-width: var(--width-form);
 }
 
+.samograph-page--prose {
+  max-width: var(--width-prose);
+}
+
 .samograph-app-nav {
   border-bottom: var(--border) solid var(--line);
   background: var(--surface);
@@ -615,7 +619,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 .samograph-settings-section {
   max-width: var(--width-prose);
   padding-block: var(--space-5);
-  border-top: 1px solid var(--border-strong);
+  border-top: var(--border-strong) solid var(--line-strong);
 }
 
 .samograph-savebar {
@@ -627,7 +631,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   gap: var(--space-4);
   padding-block: var(--space-3);
   background: var(--surface);
-  border-top: 1px solid var(--border-strong);
+  border-top: var(--border-strong) solid var(--line-strong);
 }
 
 .samograph-savebar-status {
@@ -675,8 +679,8 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   animation: samograph-skeleton-shimmer 1.4s ease-in-out infinite alternate;
 }
 
-.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(2) { width: 70%; }
-.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 85%; }
+.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }
+.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }
 .samograph-skeleton--form { max-width: var(--width-form); }
 .samograph-skeleton--page { max-width: var(--width-prose); }
 
