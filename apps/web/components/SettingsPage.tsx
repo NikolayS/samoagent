@@ -16,6 +16,12 @@ export interface SettingsPageProps {
 }
 
 type Phase = "loading" | "ready" | "saving" | "redirecting";
+type SettingsSnapshot = { preset: string; keyterms: string; language: string; chime: string };
+
+function snapshotsDiffer(current: SettingsSnapshot, baseline: SettingsSnapshot) {
+  return current.preset !== baseline.preset || current.keyterms !== baseline.keyterms ||
+    current.language !== baseline.language || current.chime !== baseline.chime;
+}
 
 /**
  * Greenroom Settings page (SPEC §5.12). Loads the tenant's hosted settings
@@ -42,6 +48,9 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
   const [language, setLanguage] = useState("multi");
   const [chime, setChime] = useState("blip");
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const baselineRef = useRef<SettingsSnapshot>({ preset: "none", keyterms: "", language: "multi", chime: "blip" });
+  const currentRef = useRef<SettingsSnapshot>({ preset: "none", keyterms: "", language: "multi", chime: "blip" });
   const [error, setError] = useState<string | null>(null);
   const [signin, setSignin] = useState<SignInInfo | null>(null);
   // `null` = the /auth/providers probe has not answered yet. Only an explicit
@@ -54,10 +63,22 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
   const keytermsId = useId();
   const languageId = useId();
   const chimeId = useId();
+  const formId = useId();
   const calendarAuthFailure = useCallback(() => {
     setPhase("redirecting");
     redirect("/auth");
   }, [redirect]);
+  const transcriptionHeadingId = useId();
+  const inCallHeadingId = useId();
+  const accountHeadingId = useId();
+  const integrationsHeadingId = useId();
+
+  function updateDirty(next: Partial<SettingsSnapshot>) {
+    const current = { ...currentRef.current, ...next };
+    currentRef.current = current;
+    setDirty(snapshotsDiffer(current, baselineRef.current));
+    setSaved(false);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +90,15 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
       setLoadNonce((n) => n + 1);
       setLanguage(snap.settings.language);
       setChime(snap.settings.chime);
+      const loaded = {
+        preset: snap.settings.dictionaryPreset,
+        keyterms: snap.settings.keyterms.join("\n"),
+        language: snap.settings.language,
+        chime: snap.settings.chime,
+      };
+      baselineRef.current = loaded;
+      currentRef.current = loaded;
+      setDirty(false);
       setPhase("ready");
     } catch (err) {
       if (err instanceof AppApiError && err.status === 401) {
@@ -113,13 +143,31 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
     setPhase("saving");
     // One keyterm per line; trim + drop blanks (the server does the canonical
     // normalization — dedupe, per-term + count caps).
-    const keyterms = (keytermsRef.current?.value ?? "")
+    const submitted: SettingsSnapshot = {
+      ...currentRef.current,
+      keyterms: keytermsRef.current?.value ?? currentRef.current.keyterms,
+    };
+    currentRef.current = submitted;
+    const keyterms = submitted.keyterms
       .split(/\r?\n/)
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
     try {
-      await client.saveSettings({ dictionaryPreset: preset, keyterms, language, chime });
-      setSaved(true);
+      await client.saveSettings({
+        dictionaryPreset: submitted.preset,
+        keyterms,
+        language: submitted.language,
+        chime: submitted.chime,
+      });
+      baselineRef.current = submitted;
+      const current = {
+        ...currentRef.current,
+        keyterms: keytermsRef.current?.value ?? currentRef.current.keyterms,
+      };
+      currentRef.current = current;
+      const stillDirty = snapshotsDiffer(current, submitted);
+      setDirty(stillDirty);
+      setSaved(!stillDirty);
       setPhase("ready");
     } catch (err) {
       if (err instanceof AppApiError && err.status === 401) {
@@ -153,12 +201,14 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
   const chimes = options?.chimes ?? [chime];
 
   return (
-    <section aria-label="Settings" className="samograph-settings">
+    <div className="samograph-settings">
       <h1>Settings</h1>
-      <form onSubmit={onSubmit}>
+      <form id={formId} onSubmit={onSubmit}>
+        <section role="region" aria-labelledby={transcriptionHeadingId} className="samograph-settings-section">
+        <h2 id={transcriptionHeadingId}>Transcription</h2>
         <div className="samograph-field">
           <label htmlFor={presetId}>Dictionary preset</label>
-          <select id={presetId} value={preset} onChange={(e) => setPreset(e.target.value)}>
+          <select id={presetId} value={preset} onChange={(e) => { setPreset(e.target.value); updateDirty({ preset: e.target.value }); }}>
             {presets.map((p) => (
               <option key={p} value={p}>
                 {p}
@@ -180,12 +230,13 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
             defaultValue={initialKeyterms}
             rows={6}
             placeholder="pg_stat_statements&#10;autovacuum"
+            onInput={(e) => updateDirty({ keyterms: e.currentTarget.value })}
           />
         </div>
 
         <div className="samograph-field">
           <label htmlFor={languageId}>Language</label>
-          <select id={languageId} value={language} onChange={(e) => setLanguage(e.target.value)}>
+          <select id={languageId} value={language} onChange={(e) => { setLanguage(e.target.value); updateDirty({ language: e.target.value }); }}>
             {languages.map((l) => (
               <option key={l.code} value={l.code}>
                 {l.label}
@@ -193,10 +244,13 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
             ))}
           </select>
         </div>
+        </section>
 
+        <section role="region" aria-labelledby={inCallHeadingId} className="samograph-settings-section">
+        <h2 id={inCallHeadingId}>In-call</h2>
         <div className="samograph-field">
           <label htmlFor={chimeId}>Chat chime</label>
-          <select id={chimeId} value={chime} onChange={(e) => setChime(e.target.value)}>
+          <select id={chimeId} value={chime} onChange={(e) => { setChime(e.target.value); updateDirty({ chime: e.target.value }); }}>
             {chimes.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -204,19 +258,24 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
             ))}
           </select>
         </div>
+        </section>
 
         {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
-        <button type="submit" className="samograph-btn samograph-btn--primary" disabled={phase === "saving"} aria-busy={phase === "saving"}>
-          Save settings
-        </button>
-        {saved ? <p role="status" className="samograph-alert samograph-alert--success">Settings saved.</p> : null}
       </form>
 
       {/* OUTSIDE the form on purpose — it has no inputs and must never be
           submitted or saved (S5-1 item 8). */}
-      {signin ? <SignInBlock signin={signin} googleAvailable={googleAvailable === true} /> : null}
-      {calendarAvailable ? <CalendarConnectionCard client={client} onAuthFailure={calendarAuthFailure} /> : null}
-    </section>
+      {signin ? <section role="region" aria-labelledby={accountHeadingId} className="samograph-settings-section"><h2 id={accountHeadingId}>Account</h2><SignInBlock signin={signin} googleAvailable={googleAvailable === true} /></section> : null}
+      {calendarAvailable ? <section role="region" aria-labelledby={integrationsHeadingId} className="samograph-settings-section"><h2 id={integrationsHeadingId}>Integrations</h2><CalendarConnectionCard client={client} onAuthFailure={calendarAuthFailure} nested /></section> : null}
+      <div className="samograph-savebar">
+        <div className="samograph-savebar-status">
+          {dirty ? "Unsaved changes" : saved ? <span role="status" className="samograph-alert samograph-alert--success">Settings saved.</span> : null}
+        </div>
+        <button form={formId} type="submit" className="samograph-btn samograph-btn--primary" disabled={!dirty || phase === "saving"} aria-busy={phase === "saving"}>
+          Save settings
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -266,8 +325,8 @@ function SignInBlock({
   const linkedGoogle = signin.identities.find((i) => i.provider === "google");
 
   return (
-    <section aria-label="Sign-in" className="samograph-signin">
-      <h2>Sign-in</h2>
+    <div className="samograph-signin">
+      <h3>Sign-in</h3>
       <p className="samograph-field-hint">
         How you can sign in to this account. Connecting or disconnecting a method isn&apos;t
         available yet.
@@ -288,6 +347,6 @@ function SignInBlock({
           </li>
         ) : null}
       </ul>
-    </section>
+    </div>
   );
 }

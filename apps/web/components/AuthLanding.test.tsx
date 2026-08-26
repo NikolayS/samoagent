@@ -51,6 +51,27 @@ describe("AuthLanding — sign-in page auth gate (SPEC §5.1)", () => {
  * "check your email" state must not be able to put a second `<h1>` on the page.
  */
 describe("AuthLanding — Continue with Google gating (#209)", () => {
+  it("lays out the wordmark, heading, Google button, divider, and email form in order", async () => {
+    const client = createFakeAppApiClient({ ...ANON, googleEnabled: true });
+    const { container, getByRole, getByText } = render(
+      <AuthLanding client={client} redirect={() => {}} />,
+    );
+    await tick();
+    const auth = container.querySelector(".samograph-auth");
+    expect(auth).not.toBeNull();
+    const items = [
+      auth!.querySelector("[data-wordmark]"),
+      getByRole("heading", { level: 1 }),
+      getByRole("link", { name: "Continue with Google" }),
+      getByText("or"),
+      auth!.querySelector("form"),
+    ];
+    expect(items.every(Boolean)).toBe(true);
+    for (let index = 0; index < items.length - 1; index += 1) {
+      expect(items[index]!.compareDocumentPosition(items[index + 1]!) & 4).toBe(4);
+    }
+  });
+
   it("renders the Google button when /auth/providers reports {google:true}", async () => {
     const client = createFakeAppApiClient({ ...ANON, googleEnabled: true });
     const { getByRole } = render(<AuthLanding client={client} redirect={() => {}} />);

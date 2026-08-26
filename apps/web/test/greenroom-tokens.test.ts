@@ -359,3 +359,34 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
     });
   });
 });
+
+/**
+ * Slice 5 — Auth + Settings. `--border-strong` is a *width* token (2px); using it
+ * where a colour belongs makes the whole `border-top` declaration invalid at
+ * parse time, so the Settings section rules and the sticky save bar draw nothing.
+ */
+describe("Slice 5 — Settings section rules and save bar", () => {
+  for (const selector of ["\\.samograph-settings-section", "\\.samograph-savebar"]) {
+    it(`${selector.replace(/\\/g, "")} draws its rule with the width token and a line colour`, () => {
+      const rule = flatBlockBody(selector);
+      expect(rule.length).toBeGreaterThan(0);
+      expect(rule).toContain("border-top: var(--border-strong) solid var(--line-strong);");
+      // A width token can never be a colour — `1px solid 2px` is an invalid declaration.
+      expect(/solid\s+var\(--border-strong\)/.test(rule)).toBe(false);
+    });
+  }
+
+  it("gives the settings route a --width-prose page so the section blocks can breathe", () => {
+    const rule = flatBlockBody("\\.samograph-page--prose");
+    expect(rule).toContain("max-width: var(--width-prose);");
+    const route = readFileSync(join(import.meta.dir, "..", "app", "settings", "page.tsx"), "utf8");
+    expect(route).toContain('pageClassName="samograph-page--prose"');
+    expect(route).not.toContain('pageClassName="samograph-page--form"');
+  });
+
+  it("varies the three visible skeleton bars, not the visually-hidden label", () => {
+    // `.samograph-visually-hidden` is span nth-of-type(1); the bars are 2..4.
+    expect(CSS).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }');
+    expect(CSS).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }');
+  });
+});

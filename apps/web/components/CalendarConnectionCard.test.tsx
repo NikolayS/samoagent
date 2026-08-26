@@ -57,6 +57,7 @@ describe("Settings Calendar connection", () => {
     const client = createFakeAppApiClient({ googleCalendarEnabled: true, seedCalendarStatus: { provider: "google", state: "not_connected", connectedAt: null, lastSyncAt: null, lastSyncErrorAt: null } });
     const view = render(<SettingsPage client={client} redirect={() => {}} />);
     expect(await view.findByText("Show upcoming meetings from your calendar.")).toBeDefined();
+    fireEvent.change(view.getByRole("combobox", { name: /language/i }), { target: { value: "de" } });
     fireEvent.click(view.getByRole("button", { name: "Save settings" }));
     await view.findByText("Settings saved.");
     expect(client.requests.find((r) => r.path === "/settings" && r.method === "PUT")?.body).not.toHaveProperty("calendar");

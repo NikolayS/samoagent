@@ -7,9 +7,9 @@ import { authErrorMessage, isAuthErrorCode } from "../lib/authErrors.ts";
 import { formatDateTime, type DateTimeFormatOptions } from "../lib/formatDateTime.ts";
 import { useCalendarConnect } from "../lib/useCalendarConnect.ts";
 
-type CalendarConnectionCardProps = DateTimeFormatOptions & { client: AppApiClient; onAuthFailure: () => void };
+type CalendarConnectionCardProps = DateTimeFormatOptions & { client: AppApiClient; onAuthFailure: () => void; nested?: boolean };
 
-export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone }: CalendarConnectionCardProps) {
+export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone, nested = false }: CalendarConnectionCardProps) {
   const initialParams = new URLSearchParams(window.location.search);
   const initialCalendarError = initialParams.get("calendar_error");
   const [status, setStatus] = useState<CalendarStatus | null>(null);
@@ -20,7 +20,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
   const [messageKind, setMessageKind] = useState<"error" | "success">(initialCalendarError ? "error" : "success");
   const [confirming, setConfirming] = useState(false);
   const disconnectTrigger = useRef<HTMLButtonElement>(null);
-  const card = useRef<HTMLElement>(null);
+  const card = useRef<HTMLDivElement>(null);
   const restoreFocusAfterDisconnect = useRef(false);
   const { busy: connectBusy, error: connectError, connect, clearError: clearConnectError } = useCalendarConnect({
     client,
@@ -73,7 +73,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     disconnectTrigger.current?.focus();
   }
 
-  return <section ref={card} tabIndex={-1} aria-label="Google Calendar" className="samograph-signin samograph-calendar-card">
+  return <div ref={card} tabIndex={-1} role={nested ? undefined : "region"} aria-label={nested ? undefined : "Google Calendar"} className="samograph-signin samograph-calendar-card">
     <h2>Google Calendar</h2>
     {connectError || message ? (() => {
       const failure = Boolean(connectError) || messageKind === "error";
@@ -93,5 +93,5 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
       <button ref={disconnectTrigger} type="button" className="samograph-btn samograph-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>Disconnect</button>
     </>}
     {confirming ? <InlineConfirm title="Disconnect Google Calendar?" confirmLabel="Disconnect" busy={disconnectBusy} onCancel={closeConfirm} onConfirm={() => void disconnect()}>Upcoming meetings will be removed.</InlineConfirm> : null}
-  </section>;
+  </div>;
 }
