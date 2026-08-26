@@ -90,9 +90,8 @@ describe("Landing (simplified)", () => {
   it("keeps everything above the footer under 60 visible words", () => {
     const { container } = render(<Landing />);
     const main = container.querySelector("main.samograph-landing")!;
-    const clone = main.cloneNode(true) as HTMLElement;
-    clone.querySelector("footer")!.remove();
-    const words = wordCount(visibleText(clone));
+    expect(main.querySelector("footer")).toBeNull();
+    const words = wordCount(visibleText(main));
     expect(words).toBe(55);
     expect(words).toBeLessThanOrEqual(60);
   });
@@ -103,6 +102,8 @@ describe("Landing (simplified)", () => {
     expect(skip.getAttribute("href")).toBe("#main");
     expect(container.querySelectorAll("a[href], button:not([disabled])")[0]).toBe(skip);
     expect(container.querySelector("main.samograph-landing")!.getAttribute("id")).toBe("main");
+    // The footer sits outside <main> so it keeps its contentinfo landmark role.
+    expect(container.querySelector("main footer")).toBeNull();
   });
 
   it("renders a minimal footer", () => {

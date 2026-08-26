@@ -80,8 +80,8 @@ export function Landing() {
             ))}
           </ol>
         </section>
-        <SiteFooter />
       </main>
+      <SiteFooter />
     </>
   );
 }
