@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Dashboard } from "../../components/Dashboard.tsx";
 import { AppShell } from "../../components/AppShell.tsx";
 import { createHttpAppApiClient } from "../../lib/appApiClient.ts";
+import { PageSkeleton } from "../../components/PageSkeleton.tsx";
 
 const client = createHttpAppApiClient();
 
@@ -28,7 +29,7 @@ export default function DashboardPage() {
   return (
     <AppShell client={client} redirect={(path) => router.replace(path)}>
       {/* useSearchParams requires a Suspense boundary (App Router CSR bailout). */}
-      <Suspense fallback={<p>Loading…</p>}>
+      <Suspense fallback={<PageSkeleton variant="page" />}>
         <DashboardInner />
       </Suspense>
     </AppShell>

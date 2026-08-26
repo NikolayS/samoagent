@@ -25,8 +25,6 @@ if (source.includes("samograph-call-cta-${kind}")) {
 
 // shrinks each slice
 const ALLOWLIST = new Set([
-  "samograph-signin", "samograph-signin-methods",
-  "samograph-signin-method", "samograph-signin-method-name", "samograph-signin-method-state",
   "samograph-share-modal", "samograph-share-header", "samograph-share-actions", "samograph-share-url",
   "samograph-share-blurb", "samograph-share-active", "samograph-share-rotated", "samograph-share-page",
   "samograph-call-item",

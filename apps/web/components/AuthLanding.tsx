@@ -66,7 +66,8 @@ export function AuthLanding({ client, redirect, errorCode }: AuthLandingProps) {
   }, [client]);
 
   return (
-    <>
+    <div className="samograph-auth">
+      <p className="samograph-app-brand" data-wordmark>samograph</p>
       <h1>Sign in to samograph</h1>
       {errorCode !== undefined ? (
         isAuthInfoCode(errorCode) ? (
@@ -89,6 +90,6 @@ export function AuthLanding({ client, redirect, errorCode }: AuthLandingProps) {
         </>
       ) : null}
       <MagicLinkRequestForm client={client} />
-    </>
+    </div>
   );
 }

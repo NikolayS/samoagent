@@ -582,6 +582,126 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   }
 }
 
+/* ===== Slice 5 — Auth + Settings ===== */
+.samograph-auth {
+  display: flex;
+  flex-direction: column;
+  max-width: var(--width-form);
+  margin-inline: auto;
+  gap: var(--space-4);
+}
+
+.samograph-auth-sent {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.samograph-auth-sent-message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.samograph-auth-sent-message > svg {
+  flex: none;
+  width: var(--space-6);
+  fill: var(--muted);
+}
+
+.samograph-auth-email {
+  font-family: var(--font-mono);
+}
+
+.samograph-settings-section {
+  max-width: var(--width-prose);
+  padding-block: var(--space-5);
+  border-top: 1px solid var(--border-strong);
+}
+
+.samograph-savebar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  background: var(--surface);
+  border-top: 1px solid var(--border-strong);
+}
+
+.samograph-savebar-status {
+  color: var(--muted);
+}
+
+.samograph-signin {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.samograph-signin-methods {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.samograph-signin-method {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-4);
+}
+
+.samograph-signin-method-name {
+  font-weight: 600;
+}
+
+.samograph-signin-method-state {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.samograph-skeleton {
+  display: grid;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.samograph-skeleton > span[aria-hidden="true"] {
+  height: var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--muted) 15%, transparent);
+  animation: samograph-skeleton-shimmer 1.4s ease-in-out infinite alternate;
+}
+
+.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(2) { width: 70%; }
+.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 85%; }
+.samograph-skeleton--form { max-width: var(--width-form); }
+.samograph-skeleton--page { max-width: var(--width-prose); }
+
+.samograph-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes samograph-skeleton-shimmer {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samograph-skeleton > span[aria-hidden="true"] { animation: none; }
+}
+/* ===== end Slice 5 ===== */
+
 /* =============================================================================
  * Dashboard — call list (SPEC §3 Story 1). Each row is a whole-row link into
  * its per-call transcript page; it must *read* as tappable.
