@@ -103,7 +103,7 @@ describe("Settings Calendar connection", () => {
     fireEvent.click(trigger);
 
     const dialog = await view.findByRole("dialog", { name: /disconnect/i });
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.hasAttribute("aria-modal")).toBe(false);
     const cancel = [...dialog.querySelectorAll("button")].find((button) => button.textContent === "Cancel");
     const confirm = [...dialog.querySelectorAll("button")].find((button) => button.textContent === "Disconnect");
     if (!cancel || !confirm) throw new Error("missing confirmation buttons");
@@ -113,15 +113,12 @@ describe("Settings Calendar connection", () => {
     expect(confirm.className).toContain("samograph-btn--danger");
     expect(confirm.className).toContain("samograph-btn--solid");
 
-    confirm.focus();
-    fireEvent.keyDown(document, { key: "Tab" });
-    expect(document.activeElement).toBe(cancel);
-    cancel.focus();
-    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-    expect(document.activeElement).toBe(confirm);
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Escape" });
+    expect(view.getByRole("dialog", { name: /disconnect/i })).toBe(dialog);
 
-    document.body.focus();
-    fireEvent.keyDown(document, { key: "Escape" });
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: "Escape" });
     expect(view.queryByRole("dialog", { name: /disconnect/i })).toBeNull();
     expect(document.activeElement).toBe(trigger);
     expect(client.requests.some((r) => r.path === "/calendar/connection" && r.method === "DELETE")).toBe(false);

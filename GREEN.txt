@@ -22,3 +22,13 @@ RED:
 GREEN:
 - cd apps/web && bun test: 511 pass, 0 fail across 45 files.
 - bunx tsc --noEmit -p apps/web/tsconfig.json: clean.
+
+Fix round 2 — RED/GREEN summary
+
+RED:
+- Updated the inline-confirm regression contract to reject aria-modal, require outside Escape to be ignored, and retain inside Escape cancellation.
+
+GREEN:
+- InlineConfirm is explicitly non-modal, no longer traps Tab, and scopes Escape handling to events bubbling from within the dialog.
+- cd apps/web && bun test: 511 pass, 0 fail across 45 files.
+- bunx tsc --noEmit -p apps/web/tsconfig.json: clean.
