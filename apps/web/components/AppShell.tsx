@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import type { AppApiClient } from "../lib/appApiClient.ts";
 import { AccountEmail } from "./AccountEmail.tsx";
 import { LogoutButton } from "./LogoutButton.tsx";
@@ -21,6 +22,7 @@ export function AppShell({
   pageClassName,
   children,
 }: AppShellProps) {
+  const pathname = usePathname();
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,11 +44,11 @@ export function AppShell({
       <a className="samograph-skip-link" href="#main">Skip to content</a>
       <header className="samograph-app-nav">
         <div className="samograph-app-nav-inner">
-          <a className="samograph-app-brand" href="/dashboard">samograph</a>
+          <a className="samograph-app-brand" href={variant === "public" ? "/" : "/dashboard"}>samograph</a>
           {variant === "app" ? (
             <nav className="samograph-app-nav-links" aria-label="Primary">
-              <a href="/dashboard">Dashboard</a>
-              <a href="/settings">Settings</a>
+              <a href="/dashboard" aria-current={pathname === "/dashboard" ? "page" : undefined}>Dashboard</a>
+              <a href="/settings" aria-current={pathname === "/settings" ? "page" : undefined}>Settings</a>
             </nav>
           ) : null}
           <div className="samograph-app-nav-right">

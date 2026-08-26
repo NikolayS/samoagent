@@ -111,16 +111,13 @@ describe("AppShell — shows which account you are signed in as (#238)", () => {
   });
 });
 
-describe("SettingsPage — shows which account you are signed in as (#238)", () => {
-  it("renders 'Signed in as <email>' near the page title", async () => {
+describe("SettingsPage — leaves account identity to AppShell", () => {
+  it("does not render a duplicate account chip", async () => {
     const client = createFakeAppApiClient({ seedAccountEmail: "owner@samograph.test" });
     const { container, findByText } = render(
       <SettingsPage client={client} redirect={noopRedirect} />,
     );
     await findByText("Settings");
-    await waitFor(() => {
-      const chip = container.querySelector(".samograph-settings > .samograph-account-email");
-      expect(chip?.textContent).toBe("Signed in as owner@samograph.test");
-    });
+    expect(container.querySelector(".samograph-settings > .samograph-account-email")).toBeNull();
   });
 });

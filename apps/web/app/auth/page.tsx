@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthLanding } from "../../components/AuthLanding.tsx";
+import { AppShell } from "../../components/AppShell.tsx";
 import { createHttpAppApiClient } from "../../lib/appApiClient.ts";
 
 const client = createHttpAppApiClient();
@@ -30,10 +31,10 @@ function AuthLandingInner() {
 
 export default function AuthRequestPage() {
   return (
-    <main>
+    <AppShell variant="public" pageClassName="samograph-page--form">
       <Suspense fallback={<p>Loading…</p>}>
         <AuthLandingInner />
       </Suspense>
-    </main>
+    </AppShell>
   );
 }
