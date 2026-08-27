@@ -293,7 +293,6 @@ export function createCallsHandler(
           actor: `user:${claims.userId}`,
           meetingUrl: candidate,
           source: "manual",
-          sourceEventId: null,
         }, {
           sql,
           enqueue,

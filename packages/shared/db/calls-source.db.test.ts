@@ -38,9 +38,25 @@ d("calls calendar source identity", () => {
       throw new Error("expected duplicate insert to fail");
     } catch (error) {
       expect((error as { errno?: string }).errno).toBe("23505");
+      const pgError = error as { constraint?: string; constraint_name?: string };
+      expect(pgError.constraint ?? pgError.constraint_name)
+        .toBe("calls_tenant_source_event_unique_idx");
     }
 
     await expect(sql`INSERT INTO calls (tenant_id, meeting_url, source, source_event_id)
       VALUES (${tenantB}, 'https://meet.google.com/abc-defg-hij', 'calendar', ${eventId})`).resolves.toBeDefined();
+  });
+
+  it("enforces the source and source-event pairing", async () => {
+    await expect(sql`INSERT INTO calls (tenant_id, meeting_url, source, source_event_id)
+      VALUES (${tenantA}, 'https://zoom.us/j/123', 'manual', ${`event-${randomUUID()}`})`)
+      .rejects.toMatchObject({ errno: "23514" });
+    await expect(sql`INSERT INTO calls (tenant_id, meeting_url, source, source_event_id)
+      VALUES (${tenantA}, 'https://zoom.us/j/456', 'calendar', NULL)`)
+      .rejects.toMatchObject({ errno: "23514" });
+
+    await expect(sql`INSERT INTO calls (tenant_id, meeting_url, source, source_event_id)
+      VALUES (${tenantA}, 'https://zoom.us/j/789', 'manual', NULL)`)
+      .resolves.toBeDefined();
   });
 });

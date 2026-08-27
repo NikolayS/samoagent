@@ -1,6 +1,5 @@
 import type { SQL } from "bun";
 import type { OrchestratorJob } from "../../bot-orchestrator/index.ts";
-import type { CallSource } from "../../../packages/shared/db/calls.ts";
 import { setTenant } from "../../../packages/shared/db/client.ts";
 import { resolveKeyterms } from "../../../packages/shared/settings/index.ts";
 import type { RateLimiter } from "../auth/rate-limit.ts";
@@ -13,14 +12,18 @@ export const BOT_CREATE_WINDOW_MS = 60 * 60 * 1000;
 export const RECALL_COST_CODE = "SAMO-RECALL-COST" as const;
 
 const UNIQUE_VIOLATION = "23505";
+const SOURCE_EVENT_UNIQUE_CONSTRAINT = "calls_tenant_source_event_unique_idx";
 
-export interface CreateCallInput {
+interface CreateCallInputBase {
   tenantId: string;
   actor: string;
   meetingUrl: unknown;
-  source: CallSource;
-  sourceEventId: string | null;
 }
+
+export type CreateCallInput = CreateCallInputBase & (
+  | { source: "manual"; sourceEventId?: never }
+  | { source: "calendar"; sourceEventId: string }
+);
 
 export interface CreateCallDeps {
   sql: SQL;
@@ -68,7 +71,15 @@ export async function createCallForTenant(
     });
   } catch (error) {
     await deps.rateLimiter.refund(rateKey, BOT_CREATE_WINDOW_MS, rateNow);
-    if ((error as { errno?: string }).errno === UNIQUE_VIOLATION) return { kind: "duplicate" };
+    const pgError = error as {
+      errno?: string;
+      constraint?: string;
+      constraint_name?: string;
+    };
+    if (
+      pgError.errno === UNIQUE_VIOLATION
+      && (pgError.constraint ?? pgError.constraint_name) === SOURCE_EVENT_UNIQUE_CONSTRAINT
+    ) return { kind: "duplicate" };
     throw error;
   }
 
