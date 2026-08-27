@@ -22,7 +22,7 @@ describe("Slice 3 transcript instrument CSS", () => {
     );
     expect(section).toMatch(/\.samograph-line-speaker\s*\{[^}]*display\s*:\s*inline-flex[^}]*min-width\s*:\s*8ch[^}]*overflow\s*:\s*hidden/s);
     expect(section).toMatch(/\.samograph-line-speaker-name\s*\{[^}]*flex\s*:\s*0\s+1\s+auto[^}]*min-width\s*:\s*0[^}]*overflow\s*:\s*hidden[^}]*text-overflow\s*:\s*ellipsis[^}]*white-space\s*:\s*nowrap/s);
-    expect(section).toMatch(/\.samograph-line-speaker-marker\s*\{[^}]*flex\s*:\s*0\s+0\s+auto[^}]*white-space\s*:\s*nowrap/s);
+    expect(section).toMatch(/\.samograph-line-speaker-marker\s*\{[^}]*flex\s*:\s*0\s+0\s+auto[^}]*white-space\s*:\s*pre/s);
     expect(section).toMatch(/\.samograph-transcript-row\s*>\s*\*\s*\{[^}]*min-width\s*:\s*0[^}]*overflow\s*:\s*hidden/s);
     expect(section).toMatch(/word-break\s*:\s*normal/);
     expect(section).toMatch(/overflow-wrap\s*:\s*anywhere/);

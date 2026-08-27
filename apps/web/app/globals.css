@@ -1376,7 +1376,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 
 .samograph-line-speaker-marker {
   flex: 0 0 auto;
-  white-space: nowrap;
+  white-space: pre;
 }
 
 .samograph-line-speaker[data-speaker-index="1"] { color: var(--speaker-1); }
