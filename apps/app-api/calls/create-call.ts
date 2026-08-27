@@ -8,6 +8,8 @@ import { validateMeetingUrl } from "./validate.ts";
 import { tenantActive } from "../auth/owner-session.ts";
 
 export const BOT_CREATE_PER_TENANT_LIMIT = 30;
+/** Calendar auto-join has an independent per-tenant budget so it cannot starve manual calls. */
+export const AUTO_CREATE_PER_TENANT_LIMIT = 10;
 export const BOT_CREATE_WINDOW_MS = 60 * 60 * 1000;
 export const RECALL_COST_CODE = "SAMO-RECALL-COST" as const;
 
@@ -47,10 +49,12 @@ export async function createCallForTenant(
   if (!valid.ok) return { kind: "invalid_url" };
   if (!(await tenantActive(deps.sql, input.tenantId))) return { kind: "tenant_inactive" };
 
-  const rateKey = `bot-create:${input.tenantId}`;
+  const isAutoJoin = input.source === "calendar";
+  const rateKey = isAutoJoin ? `bot-create:auto:${input.tenantId}` : `bot-create:${input.tenantId}`;
+  const rateLimit = isAutoJoin ? AUTO_CREATE_PER_TENANT_LIMIT : BOT_CREATE_PER_TENANT_LIMIT;
   const rateNow = deps.now();
   const reservation = await deps.rateLimiter.hit(
-    rateKey, BOT_CREATE_PER_TENANT_LIMIT, BOT_CREATE_WINDOW_MS, rateNow,
+    rateKey, rateLimit, BOT_CREATE_WINDOW_MS, rateNow,
   );
   if (!reservation.allowed) return { kind: "cost_cap", retryAfterMs: reservation.retryAfterMs };
 

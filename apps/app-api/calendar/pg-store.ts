@@ -38,11 +38,11 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
       return { connection, meetings };
     });
   }
-  async autoJoinCandidates(connectionId: string, tenantId: string, from: Date, to: Date) {
+  async autoJoinCandidates(connectionId: string, tenantId: string, now: Date, from: Date, to: Date) {
     return this.sql.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, tenantId);
-      const rows = await tx`SELECT provider_event_id,meeting_url,starts_at FROM calendar_events WHERE connection_id=${connectionId} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' AND starts_at BETWEEN ${from} AND ${to} ORDER BY starts_at,provider_event_id` as unknown as Row[];
+      const rows = await tx`SELECT provider_event_id,meeting_url,starts_at FROM calendar_events WHERE connection_id=${connectionId} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' AND starts_at BETWEEN ${from} AND ${to} AND ends_at > ${now} ORDER BY starts_at,provider_event_id` as unknown as Row[];
       return rows.map((row) => ({ providerEventId: String(row.provider_event_id), meetingUrl: String(row.meeting_url), startsAt: new Date(row.starts_at as string) }));
     });
   }

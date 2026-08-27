@@ -5,6 +5,7 @@ import type { CreateCallInput, CreateCallResult } from "../calls/create-call.ts"
 
 export const CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 export const AUTOJOIN_LEAD_MS = 6 * 60 * 1000;
+export const AUTOJOIN_LOOKBACK_MS = 10 * 60 * 1000;
 const CONCURRENCY = 4;
 
 export interface CalendarSyncPollerDeps {
@@ -21,7 +22,7 @@ export interface CalendarSyncPollerDeps {
 
 export interface CalendarAutoJoinEvent { providerEventId: string; meetingUrl: string; startsAt: Date }
 export interface CalendarAutoJoinStore {
-  candidates(connectionId: string, tenantId: string, from: Date, to: Date): Promise<CalendarAutoJoinEvent[]>;
+  candidates(connectionId: string, tenantId: string, now: Date, from: Date, to: Date): Promise<CalendarAutoJoinEvent[]>;
 }
 interface AutoJoinConnection { id: string; tenantId: string; autoJoin: boolean }
 interface CalendarAutoJoinDeps {
@@ -42,11 +43,17 @@ function sqlstate(error: unknown): string | null {
 
 export async function runCalendarAutoJoin(connection: AutoJoinConnection, deps: CalendarAutoJoinDeps): Promise<void> {
   if (!connection.autoJoin) return;
-  const from = deps.now?.() ?? new Date();
-  const events = await deps.store.candidates(connection.id, connection.tenantId, from, new Date(from.getTime() + AUTOJOIN_LEAD_MS));
+  const now = deps.now?.() ?? new Date();
+  const events = await deps.store.candidates(
+    connection.id,
+    connection.tenantId,
+    now,
+    new Date(now.getTime() - AUTOJOIN_LOOKBACK_MS),
+    new Date(now.getTime() + AUTOJOIN_LEAD_MS),
+  );
   for (const event of events) {
     try {
-      const result = await deps.createCall({ tenantId: connection.tenantId, actor: "calendar-autojoin", meetingUrl: event.meetingUrl, source: "calendar", sourceEventId: event.providerEventId });
+      const result = await deps.createCall({ tenantId: connection.tenantId, actor: "calendar-autojoin", meetingUrl: event.meetingUrl, source: "calendar", sourceEventId: `${connection.id}:${event.providerEventId}` });
       deps.metrics?.incCalendarAutoJoin(result.kind);
       if (result.kind !== "created" && result.kind !== "duplicate") deps.logger?.warn(`[calendar-autojoin] connection ${connection.id} event ${event.providerEventId} result: ${result.kind}`);
     } catch (error) {
