@@ -1462,6 +1462,11 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   border: 1px solid var(--panel-gutter);
 }
 
+.samograph-percall .samograph-toggle-chat[aria-pressed="true"] {
+  color: var(--panel-ground);
+  background: var(--panel-muted);
+}
+
 .samograph-share-state {
   justify-content: flex-end;
 }
@@ -1491,9 +1496,15 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   }
 
   .samograph-transcript-row {
-    grid-template-columns: 42px minmax(74px, max-content) minmax(82px, max-content) minmax(0, 1fr);
+    grid-template-columns: 42px minmax(74px, 11ch) minmax(82px, max-content) minmax(0, 1fr);
     gap: 8px;
     font-size: 0.72rem;
+  }
+
+  .samograph-line-time {
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   .samograph-line-speaker {

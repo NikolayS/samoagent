@@ -346,7 +346,7 @@ export function PerCallTranscript({
     if (!isPinnedToBottom) return;
     const transcript = transcriptRef.current;
     transcript?.scrollTo?.({ top: transcript.scrollHeight });
-  }, [state.lines.length, state.partial?.text, isPinnedToBottom]);
+  }, [state.lines.length, state.partial?.text, isPinnedToBottom, isChatHidden]);
 
   // A terminal failure with nothing captured replaces the empty list with the
   // failure card; once lines exist the transcript stays and the header keeps
@@ -444,7 +444,7 @@ export function PerCallTranscript({
             aria-pressed={isChatHidden}
             onClick={() => setIsChatHidden((hidden) => !hidden)}
           >
-            {isChatHidden ? "Show chat" : "Hide chat"}
+            Hide chat
           </button>
         </div>
         <div className="samograph-share-state">

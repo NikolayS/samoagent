@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { render, act } from "@testing-library/react";
+import { render, act, fireEvent } from "@testing-library/react";
 import { ShareCallView, SHARE_HEADER_COPY } from "./ShareCallView.tsx";
 import {
   SHARE_INACTIVE_COPY,
@@ -80,12 +80,15 @@ describe("ShareCallView — read-only shared transcript (SPEC §4.1, §5.7, Stor
 
   it("exposes NO owner controls (provably control-free, Story 2)", () => {
     const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
-    const { container } = render(
+    const { container, getByRole } = render(
       <ShareCallView streamClient={stream} shareToken="shr_abc" />,
     );
     expect(container.querySelector(".samograph-owner-controls")).toBeNull();
     expect(container.querySelectorAll("button")).toHaveLength(1);
-    expect(container.querySelector("button")?.textContent).toBe("Hide chat");
+    const hideChat = getByRole("button", { name: "Hide chat" });
+    expect(hideChat.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(hideChat);
+    expect(getByRole("button", { name: "Hide chat" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("shows the 'no longer active' card on SAMO-TOKEN-002 (not a silent empty)", async () => {

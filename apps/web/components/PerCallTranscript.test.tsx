@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, mock } from "bun:test";
 import { render, act, fireEvent, waitFor } from "@testing-library/react";
 import {
   PerCallTranscript,
@@ -170,16 +170,35 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     expect(container.querySelector(".samograph-transcript-actions")?.contains(hideChat)).toBe(true);
     fireEvent.click(hideChat);
 
-    const showChat = getByRole("button", { name: "Show chat" });
-    expect(showChat.getAttribute("aria-pressed")).toBe("true");
+    const pressedHideChat = getByRole("button", { name: "Hide chat" });
+    expect(pressedHideChat.getAttribute("aria-pressed")).toBe("true");
     expect(queryByText(/typed words/, { selector: ".samograph-visually-hidden" })).toBeNull();
     expect(container.querySelector(".samograph-line-number")?.textContent).toBe("4");
     expect(queryByText(/spoken words/, { selector: ".samograph-visually-hidden" })).toBeDefined();
 
-    fireEvent.click(showChat);
+    fireEvent.click(pressedHideChat);
     expect(getByRole("button", { name: "Hide chat" }).getAttribute("aria-pressed")).toBe("false");
     expect(queryByText(/typed words/, { selector: ".samograph-visually-hidden" })).toBeDefined();
     expect([...container.querySelectorAll(".samograph-line-number")].map((node) => node.textContent)).toEqual(["4", "9"]);
+  });
+
+  it("keeps a pinned viewer at the bottom when hidden chat is restored", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container, getByRole } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    const transcript = container.querySelector(".samograph-transcript") as HTMLOListElement;
+    const scrollTo = mock(() => undefined);
+    transcript.scrollTo = scrollTo;
+    Object.defineProperty(transcript, "scrollHeight", { configurable: true, value: 480 });
+
+    act(() => client.emitLine(line({ seq: 1, kind: "chat", text: "typed words" })));
+    const hideChat = getByRole("button", { name: "Hide chat" });
+    fireEvent.click(hideChat);
+    scrollTo.mockClear();
+    fireEvent.click(hideChat);
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 480 });
   });
 
   it("hangs the speaker colour off a data attribute the stylesheet can select", () => {

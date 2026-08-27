@@ -14,6 +14,12 @@ describe("Slice 3 transcript instrument CSS", () => {
       /grid-template-columns\s*:\s*56px\s+minmax\(88px\s*,\s*max-content\)\s+minmax\(96px\s*,\s*max-content\)\s+minmax\(0\s*,\s*1fr\)/,
     );
     expect(section).toMatch(/\.samograph-line-time\s*\{[^}]*white-space\s*:\s*nowrap/s);
+    expect(section).toMatch(
+      /@media\s*\(max-width:\s*48rem\)[\s\S]*?\.samograph-transcript-row\s*\{[^}]*grid-template-columns\s*:\s*42px\s+minmax\(74px\s*,\s*11ch\)/,
+    );
+    expect(section).toMatch(
+      /@media\s*\(max-width:\s*48rem\)[\s\S]*?\.samograph-line-time\s*\{[^}]*white-space\s*:\s*normal[^}]*overflow-wrap\s*:\s*normal[^}]*word-break\s*:\s*normal/s,
+    );
     expect(section).toMatch(/\.samograph-line-speaker\s*\{[^}]*max-width\s*:\s*200px[^}]*white-space\s*:\s*nowrap[^}]*overflow\s*:\s*hidden[^}]*text-overflow\s*:\s*ellipsis/s);
     expect(section).toMatch(/word-break\s*:\s*normal/);
     expect(section).toMatch(/overflow-wrap\s*:\s*anywhere/);
