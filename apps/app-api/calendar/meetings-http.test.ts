@@ -107,4 +107,12 @@ describe("calendar auto-join controls", () => {
     expect(event.status).toBe(404);
     expect(seen).toEqual([["user", "tenant", "foreign", true]]);
   });
+
+  it("returns 400 for a malformed or empty encoded meeting id", async () => {
+    const h = handler({ excludeMeeting: async () => { throw new Error("must not be called"); } } as any);
+    const malformed = await h(new Request("http://api.test/calendar/meetings/%E0%A4%A", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ excluded: true }) }));
+    expect(malformed.status).toBe(400);
+    const empty = await h(new Request("http://api.test/calendar/meetings/", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ excluded: true }) }));
+    expect(empty.status).toBe(400);
+  });
 });

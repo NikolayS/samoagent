@@ -36,9 +36,20 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
     const rows = await this.sql.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, tenantId);
-      return tx`UPDATE calendar_events SET auto_join_excluded=${excluded},updated_at=now() WHERE id=${eventId} AND connection_id=${String(connections[0].id)} RETURNING id`;
-    }) as unknown as Row[];
-    return rows.length === 1;
+      if (excluded) return tx`WITH target AS (
+          SELECT connection_id,provider_event_id,tenant_id FROM calendar_events WHERE id=${eventId} AND connection_id=${String(connections[0].id)}
+        ), inserted AS (
+          INSERT INTO calendar_event_exclusions(connection_id,provider_event_id,tenant_id)
+          SELECT connection_id,provider_event_id,tenant_id FROM target ON CONFLICT DO NOTHING RETURNING connection_id
+        ) SELECT EXISTS(SELECT 1 FROM target) AS found`;
+      return tx`WITH target AS (
+          SELECT connection_id,provider_event_id FROM calendar_events WHERE id=${eventId} AND connection_id=${String(connections[0].id)}
+        ), deleted AS (
+          DELETE FROM calendar_event_exclusions exclusion USING target
+          WHERE exclusion.connection_id=target.connection_id AND exclusion.provider_event_id=target.provider_event_id RETURNING exclusion.connection_id
+        ) SELECT EXISTS(SELECT 1 FROM target) AS found`;
+    }) as unknown as Array<{ found: boolean }>;
+    return rows[0]?.found === true;
   }
   async meetings(userId: string, tenantId: string, limit: number, now: Date): Promise<CalendarMeetingsSnapshot> {
     return this.sql.begin(async (tx) => {
@@ -47,7 +58,10 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
       if (!connection || connection.status === "broken") return { connection, meetings: [] };
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, tenantId);
-      const rows = await tx`SELECT id,title,starts_at,ends_at,all_day,meeting_url,meeting_provider,organizer_email,attendee_response,auto_join_excluded FROM calendar_events WHERE ends_at>${now} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' ORDER BY starts_at,id LIMIT ${limit}` as unknown as Row[];
+      const rows = await tx`SELECT e.id,e.title,e.starts_at,e.ends_at,e.all_day,e.meeting_url,e.meeting_provider,e.organizer_email,e.attendee_response,(exclusion.connection_id IS NOT NULL) AS auto_join_excluded
+        FROM calendar_events e
+        LEFT JOIN calendar_event_exclusions exclusion ON exclusion.connection_id=e.connection_id AND exclusion.provider_event_id=e.provider_event_id
+        WHERE e.ends_at>${now} AND e.meeting_url IS NOT NULL AND NOT e.all_day AND e.attendee_response IS DISTINCT FROM 'declined' ORDER BY e.starts_at,e.id LIMIT ${limit}` as unknown as Row[];
       const meetings: CalendarMeeting[] = rows.map((row) => ({ id: String(row.id), title: String(row.title), startsAt: new Date(row.starts_at as string), endsAt: new Date(row.ends_at as string), allDay: Boolean(row.all_day), meetingUrl: row.meeting_url === null ? null : String(row.meeting_url), meetingProvider: row.meeting_provider as CalendarMeeting["meetingProvider"], organizerEmail: row.organizer_email === null ? null : String(row.organizer_email), attendeeResponse: row.attendee_response as CalendarMeeting["attendeeResponse"], autoJoinExcluded: Boolean(row.auto_join_excluded) }));
       return { connection, meetings };
     });
@@ -64,7 +78,9 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
             AND calls.created_at >= ${new Date(now.getTime() - 4 * 60 * 60_000)}
             AND calls.status NOT IN ('ENDED','COULD_NOT_JOIN','COULD_NOT_RECORD','BOT_REMOVED')
         ) AS available
-        FROM calendar_events WHERE connection_id=${connectionId} AND NOT auto_join_excluded AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' AND starts_at BETWEEN ${from} AND ${to} AND ends_at > ${now} ORDER BY starts_at,provider_event_id` as unknown as Row[];
+        FROM calendar_events WHERE connection_id=${connectionId}
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_exclusions exclusion WHERE exclusion.connection_id=calendar_events.connection_id AND exclusion.provider_event_id=calendar_events.provider_event_id)
+          AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' AND starts_at BETWEEN ${from} AND ${to} AND ends_at > ${now} ORDER BY starts_at,provider_event_id` as unknown as Row[];
       return rows.map((row) => ({ providerEventId: String(row.provider_event_id), meetingUrl: String(row.meeting_url), startsAt: new Date(row.starts_at as string), alreadyActive: !Boolean(row.available) }));
     });
   }

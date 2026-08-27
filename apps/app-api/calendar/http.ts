@@ -66,11 +66,15 @@ export function createCalendarHandler(service: CalendarHttpService, sessionSecre
       const row = await service.updateAutoJoin(claims.userId, claims.tenantId, value);
       return row ? Response.json(connectionJson(row), { headers: { "cache-control": "no-store" } }) : new Response("not found", { status: 404 });
     }
-    const meetingMatch = req.method === "PATCH" ? url.pathname.match(/^\/calendar\/meetings\/([^/]+)$/) : null;
+    const meetingMatch = req.method === "PATCH" ? url.pathname.match(/^\/calendar\/meetings\/([^/]*)$/) : null;
     if (meetingMatch) {
+      let meetingId: string;
+      try { meetingId = decodeURIComponent(meetingMatch[1]); }
+      catch { return new Response(null, { status: 400 }); }
+      if (meetingId.trim() === "") return new Response(null, { status: 400 });
       const value = await exactBoolean(req, "excluded"); if (value === null) return new Response(null, { status: 400 });
-      const updated = await service.excludeMeeting(claims.userId, claims.tenantId, decodeURIComponent(meetingMatch[1]), value);
-      return updated ? Response.json({ id: decodeURIComponent(meetingMatch[1]), excluded: value }, { headers: { "cache-control": "no-store" } }) : new Response("not found", { status: 404 });
+      const updated = await service.excludeMeeting(claims.userId, claims.tenantId, meetingId, value);
+      return updated ? Response.json({ id: meetingId, excluded: value }, { headers: { "cache-control": "no-store" } }) : new Response("not found", { status: 404 });
     }
     if (req.method === "DELETE" && url.pathname === "/calendar/connection") { const result = await service.disconnect(claims.userId, claims.tenantId); metrics?.incCalendarDisconnect(result); return new Response(null, { status: 204 }); }
     return new Response("not found", { status: 404 });
