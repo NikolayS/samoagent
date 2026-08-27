@@ -16,6 +16,10 @@ export const RECALL_COST_CODE = "SAMO-RECALL-COST" as const;
 const UNIQUE_VIOLATION = "23505";
 const SOURCE_EVENT_UNIQUE_CONSTRAINT = "calls_tenant_source_event_unique_idx";
 
+export function autoJoinLockKey(tenantId: string, url: string): string {
+  return `${tenantId}:${url}`;
+}
+
 interface CreateCallInputBase {
   tenantId: string;
   actor: string;
@@ -66,9 +70,9 @@ export async function createCallForTenant(
     transactionResult = await deps.sql.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, input.tenantId);
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${autoJoinLockKey(input.tenantId, valid.url)}))`;
 
       if (input.source === "calendar") {
-        await tx`SELECT pg_advisory_xact_lock(hashtext(${input.tenantId} || ':' || ${valid.url}))`;
         const active = await tx`
           SELECT id FROM calls
           WHERE tenant_id=${input.tenantId}
