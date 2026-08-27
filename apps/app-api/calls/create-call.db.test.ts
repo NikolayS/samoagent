@@ -98,6 +98,46 @@ d("createCallForTenant calendar concurrency", () => {
     await expectCalendarWaitsForHeldCall("calendar");
   });
 
+  it("makes a manual create wait for a locked calendar insert, then returns already_active", async () => {
+    const meetingUrl = `https://zoom.us/j/${Date.now()}-${randomUUID()}`;
+    const held = await holdLockedCall(meetingUrl, "calendar");
+    let resolved = false;
+    const manualCreate = createCallForTenant({
+      tenantId,
+      actor: "user:test",
+      meetingUrl,
+      source: "manual",
+    }, {
+      sql: secondSql,
+      enqueue: () => {},
+      rateLimiter: new InMemoryRateLimiter(),
+      now: Date.now,
+    }).then((result) => { resolved = true; return result; });
+
+    try {
+      await Bun.sleep(300);
+      expect(resolved).toBe(false);
+    } finally {
+      held.commit();
+    }
+    await held.transaction;
+    expect(await manualCreate).toEqual({ kind: "already_active", callId: held.callId });
+  });
+
+  it("returns already_active for a manual create after a calendar create", async () => {
+    const meetingUrl = `https://zoom.us/j/${Date.now()}-${randomUUID()}`;
+    const calendar = await createCallForTenant({
+      tenantId, actor: "calendar-autojoin", meetingUrl, source: "calendar",
+      sourceEventId: `sequential:${randomUUID()}`,
+    }, { sql: firstSql, enqueue: () => {}, rateLimiter: new InMemoryRateLimiter(), now: Date.now });
+    expect(calendar.kind).toBe("created");
+
+    const manual = await createCallForTenant({ tenantId, actor: "user:test", meetingUrl, source: "manual" }, {
+      sql: secondSql, enqueue: () => {}, rateLimiter: new InMemoryRateLimiter(), now: Date.now,
+    });
+    expect(manual).toEqual({ kind: "already_active", callId: calendar.kind === "created" ? calendar.call.id : "" });
+  });
+
   it("serializes two calendar creates for one tenant and normalized meeting URL", async () => {
     const meetingUrl = `https://zoom.us/j/${Date.now()}`;
     const jobs: string[] = [];

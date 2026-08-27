@@ -45,6 +45,9 @@ const server = Bun.serve({
       lastPostBody = (body ?? {}) as Record<string, unknown>;
       // Read EXACTLY the key the real handler reads (apps/app-api/calls/http.ts).
       const candidate = (body as { meeting_url?: unknown } | null)?.meeting_url;
+      if (candidate === "https://zoom.us/j/409") {
+        return Response.json({ code: "SAMO-CALL-ACTIVE", id: "active-wire", status: "IN_CALL" }, { status: 409 });
+      }
       const valid = validateMeetingUrl(candidate);
       if (!valid.ok) return errorResponse(CALL_URL_INVALID);
       counter += 1;
@@ -105,6 +108,15 @@ describe("createHttpAppApiClient — over-the-wire contract with app-api", () =>
       "That doesn't look like a Zoom or Google Meet meeting link.",
     );
     expect((thrown as AppApiError).status).toBe(400);
+  });
+
+  it("createCall surfaces SAMO-CALL-ACTIVE with the existing call id", async () => {
+    let thrown: unknown;
+    try { await client.createCall({ meetingUrl: "https://zoom.us/j/409" }); } catch (err) { thrown = err; }
+    expect(thrown).toBeInstanceOf(AppApiError);
+    expect((thrown as AppApiError).code).toBe("SAMO-CALL-ACTIVE");
+    expect((thrown as AppApiError).id).toBe("active-wire");
+    expect((thrown as AppApiError).status).toBe(409);
   });
 
   it("listCalls reads `GET /calls` and maps snake_case rows to typed Calls", async () => {

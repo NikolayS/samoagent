@@ -12,6 +12,7 @@ export const BOT_CREATE_PER_TENANT_LIMIT = 30;
 export const AUTO_CREATE_PER_TENANT_LIMIT = 10;
 export const BOT_CREATE_WINDOW_MS = 60 * 60 * 1000;
 export const RECALL_COST_CODE = "SAMO-RECALL-COST" as const;
+export const CALL_ACTIVE_CODE = "SAMO-CALL-ACTIVE" as const;
 
 const UNIQUE_VIOLATION = "23505";
 const SOURCE_EVENT_UNIQUE_CONSTRAINT = "calls_tenant_source_event_unique_idx";
@@ -72,17 +73,15 @@ export async function createCallForTenant(
       await setTenant(tx, input.tenantId);
       await tx`SELECT pg_advisory_xact_lock(hashtext(${autoJoinLockKey(input.tenantId, valid.url)}))`;
 
-      if (input.source === "calendar") {
-        const active = await tx`
-          SELECT id FROM calls
-          WHERE tenant_id=${input.tenantId}
-            AND meeting_url=${valid.url}
-            AND created_at > now() - interval '4 hours'
-            AND status NOT IN ('ENDED','COULD_NOT_JOIN','COULD_NOT_RECORD','BOT_REMOVED')
-          ORDER BY created_at DESC, id
-          LIMIT 1` as unknown as Array<{ id: string }>;
-        if (active[0]) return { kind: "already_active", callId: active[0].id };
-      }
+      const active = await tx`
+        SELECT id FROM calls
+        WHERE tenant_id=${input.tenantId}
+          AND meeting_url=${valid.url}
+          AND created_at > now() - interval '4 hours'
+          AND status NOT IN ('ENDED','COULD_NOT_JOIN','COULD_NOT_RECORD','BOT_REMOVED')
+        ORDER BY created_at DESC, id
+        LIMIT 1` as unknown as Array<{ id: string }>;
+      if (active[0]) return { kind: "already_active", callId: active[0].id };
 
       const rows = await tx`
         INSERT INTO calls (tenant_id, meeting_url, status, ingest_degraded, source, source_event_id)
