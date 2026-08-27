@@ -161,7 +161,7 @@ export interface AppApiClient {
   startCalendarConnect(): Promise<{ authorizationUrl: string }>;
   disconnectCalendar(): Promise<void>;
   updateCalendarAutoJoin(autoJoin: boolean): Promise<CalendarStatus>;
-  setCalendarMeetingExcluded(eventId: string, excluded: boolean): Promise<void>;
+  setCalendarMeetingExcluded(eventId: string, excluded: boolean): Promise<{ id: string; excluded: boolean }>;
   listCalendarMeetings(limit?: number): Promise<CalendarMeetingsSnapshot>;
   /** `GET /auth/callback?token=…` — verifies the link; throws `AppApiError` on failure. */
   verifyMagicLink(token: string): Promise<void>;
@@ -366,6 +366,9 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
     async setCalendarMeetingExcluded(eventId, excluded) {
       const res = await fetch(`${baseUrl}/calendar/meetings/${encodeURIComponent(eventId)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ excluded }), credentials: "same-origin" });
       if (!res.ok) await throwTyped(res, "SAMO-CALENDAR-006");
+      const d = (await res.json()) as Record<string, unknown>;
+      if (typeof d.id !== "string" || typeof d.excluded !== "boolean") throw new Error("Invalid calendar meeting exclusion response");
+      return { id: d.id, excluded: d.excluded };
     },
     async listCalendarMeetings(limit) {
       const query = limit === undefined ? "" : `?limit=${encodeURIComponent(String(limit))}`;

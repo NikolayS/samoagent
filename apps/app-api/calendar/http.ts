@@ -1,5 +1,6 @@
 import { clientIp } from "../auth/http.ts";
 import { AUTH_ERROR_REDIRECT_PATH } from "../auth/google-http.ts";
+import { UUID_RE } from "../auth/oauth-state.ts";
 import { sessionInvalidResponse } from "../auth/owner-session.ts";
 import { buildClearedSessionCookie, SESSION_COOKIE_NAME, verifySession } from "../auth/session.ts";
 import { buildClearedCalendarOAuthStateCookie, readCalendarOAuthStateCookie } from "./oauth-state.ts";
@@ -71,7 +72,7 @@ export function createCalendarHandler(service: CalendarHttpService, sessionSecre
       let meetingId: string;
       try { meetingId = decodeURIComponent(meetingMatch[1]); }
       catch { return new Response(null, { status: 400 }); }
-      if (meetingId.trim() === "") return new Response(null, { status: 400 });
+      if (!UUID_RE.test(meetingId)) return new Response(null, { status: 400 });
       const value = await exactBoolean(req, "excluded"); if (value === null) return new Response(null, { status: 400 });
       const updated = await service.excludeMeeting(claims.userId, claims.tenantId, meetingId, value);
       return updated ? Response.json({ id: meetingId, excluded: value }, { headers: { "cache-control": "no-store" } }) : new Response("not found", { status: 404 });

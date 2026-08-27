@@ -57,10 +57,10 @@ function MeetingActions({ client, meetingUrl, title, onAuthFailure, onCreated }:
 
 function AutoMeetingActions({ client, meetingId, meetingUrl, title, initialExcluded, onAuthFailure }: { client: AppApiClient; meetingId: string; meetingUrl: string; title: string; initialExcluded: boolean; onAuthFailure: () => void }) {
   const [excluded, setExcluded] = useState(initialExcluded); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
-  useEffect(() => { setExcluded(initialExcluded); }, [initialExcluded]);
+  useEffect(() => { if (!busy) setExcluded(initialExcluded); }, [initialExcluded]);
   async function toggle() {
     const previous = excluded, next = !previous; setExcluded(next); setBusy(true); setError(null);
-    try { await client.setCalendarMeetingExcluded(meetingId, next); }
+    try { const confirmed = await client.setCalendarMeetingExcluded(meetingId, next); setExcluded(confirmed.excluded); }
     catch (err) { setExcluded(previous); if (isSessionInvalid(err)) onAuthFailure(); else setError("Auto-record couldn’t be updated. Try again."); }
     finally { setBusy(false); }
   }

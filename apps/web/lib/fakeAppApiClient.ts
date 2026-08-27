@@ -205,11 +205,12 @@ export class FakeAppApiClient implements AppApiClient {
     return { ...this.calendarStatus };
   }
 
-  async setCalendarMeetingExcluded(eventId: string, excluded: boolean): Promise<void> {
+  async setCalendarMeetingExcluded(eventId: string, excluded: boolean): Promise<{ id: string; excluded: boolean }> {
     this.requests.push({ path: `/calendar/meetings/${encodeURIComponent(eventId)}`, method: "PATCH", body: { excluded } });
     this.fail(this.options.failSetCalendarMeetingExcludedWith);
     const meeting = this.calendarMeetings.find((row) => row.id === eventId);
     if (meeting) meeting.autoJoinExcluded = excluded;
+    return { id: eventId, excluded };
   }
 
   async listCalendarMeetings(limit?: number): Promise<CalendarMeetingsSnapshot> {

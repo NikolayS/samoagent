@@ -47,6 +47,27 @@ d("calendar_events migration", () => {
     expect(remaining).toEqual([]);
   });
 
+  it("rejects a cross-tenant exclusion connection under the runtime role", async () => {
+    const a = await owner(), b = await owner();
+    let errno: string | undefined;
+    try {
+      await sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE samograph_app");
+        await setTenant(tx, a.tenantId);
+        await tx`INSERT INTO calendar_event_exclusions(connection_id,provider_event_id,tenant_id)
+          VALUES (${b.connectionId},'cross-tenant',${a.tenantId})`;
+      });
+    } catch (error) { errno = (error as { errno?: string }).errno; }
+    expect(errno).toBe("23503");
+  });
+
+  it("returns not found for another tenant's event after entering the runtime-role path", async () => {
+    const a = await owner(), b = await owner();
+    const rows = await event(b.connectionId, b.tenantId, "tenant-b-event") as unknown as Array<{ id: string }>;
+    const store = new PostgresCalendarConnectionStore(sql);
+    expect(await store.excludeMeeting(a.userId, a.tenantId, rows[0].id, true)).toBe(false);
+  });
+
   it("never lets an older reconciliation overwrite a newer success", async () => {
     const row = await owner(); const store = new PostgresCalendarConnectionStore(sql); const olderConnection = await store.startSync(row.connectionId); const newerConnection = await store.startSync(row.connectionId);
     const normalized = (title: string): NormalizedCalendarEvent => ({ providerEventId: "race", recurringEventId: null, title, organizerEmail: null, startsAt: new Date("2026-08-24T10:00:00Z"), endsAt: new Date("2026-08-24T11:00:00Z"), allDay: false, attendeeResponse: null, meetingUrl: null, meetingProvider: null, sourceUpdatedAt: null });

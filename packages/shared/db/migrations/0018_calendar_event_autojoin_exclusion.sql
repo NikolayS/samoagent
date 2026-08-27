@@ -4,11 +4,12 @@
 -- later recreation cannot silently discard a user's choice.
 
 CREATE TABLE calendar_event_exclusions (
-  connection_id uuid NOT NULL REFERENCES calendar_connections(id) ON DELETE CASCADE,
+  connection_id uuid NOT NULL,
   provider_event_id text NOT NULL,
   tenant_id uuid NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (connection_id, provider_event_id)
+  PRIMARY KEY (connection_id, provider_event_id),
+  CONSTRAINT calendar_event_exclusions_connection_fk FOREIGN KEY (connection_id, tenant_id) REFERENCES calendar_connections(id, tenant_id) ON DELETE CASCADE
 );
 
 ALTER TABLE calendar_event_exclusions ENABLE ROW LEVEL SECURITY;

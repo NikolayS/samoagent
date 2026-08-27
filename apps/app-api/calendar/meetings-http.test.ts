@@ -77,6 +77,8 @@ describe("GET /calendar/meetings", () => {
 });
 
 describe("calendar auto-join controls", () => {
+  const eventId = "e7f7fbcf-1f73-40d5-b730-f488104485e2";
+
   it("requires auth and validates exact boolean bodies", async () => {
     const h = handler({ updateAutoJoin: async () => null, excludeMeeting: async () => false } as any);
     expect((await h(new Request("http://api.test/calendar/connection", { method: "PATCH", body: JSON.stringify({ auto_join: true }) }))).status).toBe(401);
@@ -84,7 +86,7 @@ describe("calendar auto-join controls", () => {
       expect((await h(new Request("http://api.test/calendar/connection", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body) }))).status).toBe(400);
     }
     for (const body of [{}, { excluded: 1 }, { excluded: true, extra: 1 }]) {
-      expect((await h(new Request("http://api.test/calendar/meetings/event-1", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body) }))).status).toBe(400);
+      expect((await h(new Request(`http://api.test/calendar/meetings/${eventId}`, { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body) }))).status).toBe(400);
     }
   });
 
@@ -103,9 +105,9 @@ describe("calendar auto-join controls", () => {
     const connection = await handler({ updateAutoJoin: async () => null } as any)(new Request("http://api.test/calendar/connection", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ auto_join: true }) }));
     expect(connection.status).toBe(404);
     const seen: unknown[] = [];
-    const event = await handler({ excludeMeeting: async (...args: unknown[]) => { seen.push(args); return false; } } as any)(new Request("http://api.test/calendar/meetings/foreign", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ excluded: true }) }));
+    const event = await handler({ excludeMeeting: async (...args: unknown[]) => { seen.push(args); return false; } } as any)(new Request(`http://api.test/calendar/meetings/${eventId}`, { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ excluded: true }) }));
     expect(event.status).toBe(404);
-    expect(seen).toEqual([["user", "tenant", "foreign", true]]);
+    expect(seen).toEqual([["user", "tenant", eventId, true]]);
   });
 
   it("returns 400 for a malformed or empty encoded meeting id", async () => {
@@ -114,5 +116,7 @@ describe("calendar auto-join controls", () => {
     expect(malformed.status).toBe(400);
     const empty = await h(new Request("http://api.test/calendar/meetings/", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ excluded: true }) }));
     expect(empty.status).toBe(400);
+    const nonUuid = await h(new Request("http://api.test/calendar/meetings/not-a-uuid", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ excluded: true }) }));
+    expect(nonUuid.status).toBe(400);
   });
 });
