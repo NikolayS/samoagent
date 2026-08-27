@@ -9,7 +9,7 @@ const tenantId = "22222222-2222-4222-8222-222222222222";
 interface QueryRecord { query: string; values: unknown[] }
 
 function fakeSql(
-  options: { callError?: Error } = {},
+  options: { callError?: Error; activeCall?: { id: string } } = {},
   queries: QueryRecord[] = [],
 ): SQL {
   // Bun's SQL callable has richer Query/transaction overloads than this small
@@ -19,6 +19,9 @@ function fakeSql(
     const query = strings.join(" ");
     queries.push({ query, values });
     if (query.includes("FROM tenants")) return Promise.resolve([{ ok: 1 }]);
+    if (query.includes("FROM calls") && query.includes("meeting_url")) {
+      return Promise.resolve(options.activeCall ? [options.activeCall] : []);
+    }
     if (query.includes("INSERT INTO calls")) {
       if (options.callError) return Promise.reject(options.callError);
       return Promise.resolve([{ id: "call-1", status: "PENDING" }]);
@@ -54,6 +57,47 @@ if (false) {
 }
 
 describe("createCallForTenant", () => {
+  it("locks and returns already_active for a calendar call with an active normalized URL", async () => {
+    const queries: QueryRecord[] = [];
+    const d = deps(fakeSql({ activeCall: { id: "active-call" } }, queries));
+
+    const result = await createCallForTenant({
+      tenantId,
+      actor: "calendar-autojoin",
+      meetingUrl: " HTTPS://ZOOM.US/j/123 ",
+      source: "calendar",
+      sourceEventId: "connection:event-1",
+    }, d);
+
+    expect(result).toEqual({ kind: "already_active", callId: "active-call" });
+    expect(queries).toContainEqual({
+      query: expect.stringContaining("pg_advisory_xact_lock"),
+      values: [tenantId, "https://zoom.us/j/123"],
+    });
+    expect(queries).toContainEqual({
+      query: expect.stringContaining("FROM calls"),
+      values: [tenantId, "https://zoom.us/j/123"],
+    });
+    expect(queries.some(({ query }) => query.includes("INSERT INTO calls"))).toBe(false);
+    expect(d.jobs).toEqual([]);
+  });
+
+  it("does not issue the calendar advisory lock or active-call check for manual calls", async () => {
+    const queries: QueryRecord[] = [];
+    const d = deps(fakeSql({ activeCall: { id: "active-call" } }, queries));
+
+    const result = await createCallForTenant({
+      tenantId,
+      actor: "user:u1",
+      meetingUrl: "https://zoom.us/j/123",
+      source: "manual",
+    }, d);
+
+    expect(result.kind).toBe("created");
+    expect(queries.some(({ query }) => query.includes("pg_advisory_xact_lock"))).toBe(false);
+    expect(queries.some(({ query }) => query.includes("FROM calls") && query.includes("meeting_url"))).toBe(false);
+  });
+
   it("creates, audits, resolves settings, and enqueues", async () => {
     const queries: QueryRecord[] = [];
     const d = deps(fakeSql({}, queries));

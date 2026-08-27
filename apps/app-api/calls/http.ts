@@ -303,6 +303,7 @@ export function createCallsHandler(
         if (result.kind === "tenant_inactive") return sessionInvalidResponse();
         if (result.kind === "cost_cap") return recallCostResponse(result.retryAfterMs);
         if (result.kind === "duplicate") throw new Error("manual call unexpectedly duplicated");
+        if (result.kind === "already_active") throw new Error("manual call unexpectedly matched an active call");
         return Response.json({ id: result.call.id, status: result.call.status }, { status: 201 });
       } catch (err) {
         if ((err as { errno?: string }).errno === FK_VIOLATION) return sessionInvalidResponse();

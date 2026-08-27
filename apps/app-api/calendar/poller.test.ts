@@ -44,18 +44,21 @@ describe("calendar sync poller", () => {
     expect({ calls, bots }).toEqual({ calls: 2, bots: 1 });
   });
 
-  it("counts already-active candidates without creating a call or logging", async () => {
+  it("counts candidate-time and create-time already-active outcomes under the same label", async () => {
     const metrics = new MetricsRegistry(), warnings: string[] = [];
     let calls = 0;
     await runCalendarAutoJoin({ id: "c1", tenantId: "t1", autoJoin: true }, {
-      store: { candidates: async () => [{ providerEventId: "manual", meetingUrl: "https://zoom.us/j/1", startsAt: new Date(), alreadyActive: true }] },
-      createCall: async () => { calls++; return { kind: "created", call: { id: "call", status: "PENDING" } }; },
+      store: { candidates: async () => [
+        { providerEventId: "prefiltered", meetingUrl: "https://zoom.us/j/1", startsAt: new Date(), alreadyActive: true },
+        { providerEventId: "raced", meetingUrl: "https://zoom.us/j/1", startsAt: new Date() },
+      ] },
+      createCall: async () => { calls++; return { kind: "already_active", callId: "active-call" }; },
       logger: { warn: (message) => warnings.push(message) },
       metrics,
     });
-    expect(calls).toBe(0);
+    expect(calls).toBe(1);
     expect(warnings).toEqual([]);
-    expect(metrics.renderPrometheus()).toContain('calendar_autojoin_total{result="already_active"} 1');
+    expect(metrics.renderPrometheus()).toContain('calendar_autojoin_total{result="already_active"} 2');
   });
 
   it("scopes the same provider event id to its calendar connection", async () => {
