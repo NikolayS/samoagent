@@ -33,7 +33,7 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
       if (!connection || connection.status === "broken") return { connection, meetings: [] };
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, tenantId);
-      const rows = await tx`SELECT id,title,starts_at,ends_at,all_day,meeting_url,meeting_provider,organizer_email,attendee_response FROM calendar_events WHERE ends_at>${now} ORDER BY starts_at,id LIMIT ${limit}` as unknown as Row[];
+      const rows = await tx`SELECT id,title,starts_at,ends_at,all_day,meeting_url,meeting_provider,organizer_email,attendee_response FROM calendar_events WHERE ends_at>${now} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' ORDER BY starts_at,id LIMIT ${limit}` as unknown as Row[];
       const meetings: CalendarMeeting[] = rows.map((row) => ({ id: String(row.id), title: String(row.title), startsAt: new Date(row.starts_at as string), endsAt: new Date(row.ends_at as string), allDay: Boolean(row.all_day), meetingUrl: row.meeting_url === null ? null : String(row.meeting_url), meetingProvider: row.meeting_provider as CalendarMeeting["meetingProvider"], organizerEmail: row.organizer_email === null ? null : String(row.organizer_email), attendeeResponse: row.attendee_response as CalendarMeeting["attendeeResponse"] }));
       return { connection, meetings };
     });

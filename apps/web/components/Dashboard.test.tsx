@@ -96,6 +96,7 @@ describe("Dashboard — Slice 4 information hierarchy", () => {
     const upcoming = container.querySelector('section[aria-label="Upcoming meetings"]');
     const firstCallList = container.querySelector(".samograph-call-list");
     expect(hero!.compareDocumentPosition(upcoming!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(upcoming!.compareDocumentPosition(firstCallList!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(hero!.compareDocumentPosition(firstCallList!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

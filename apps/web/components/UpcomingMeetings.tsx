@@ -2,12 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { AppApiError, type AppApiClient, type CalendarMeetingsSnapshot } from "../lib/appApiClient.ts";
+import { isSessionInvalid, SESSION_INVALID_MESSAGE } from "../lib/apiError.ts";
 import { authErrorMessage } from "../lib/authErrors.ts";
 import { safeExternalUrl } from "../lib/safeExternalUrl.ts";
 import { formatDateTime, type DateTimeFormatOptions } from "../lib/formatDateTime.ts";
 import { useCalendarConnect } from "../lib/useCalendarConnect.ts";
 
 type UpcomingMeetingsProps = DateTimeFormatOptions & { client: AppApiClient; onAuthFailure: () => void };
+
+type AddMeetingPhase = "idle" | "creating" | "created" | "error";
+
+function MeetingActions({ client, meetingUrl, title }: { client: AppApiClient; meetingUrl: string; title: string }) {
+  const [phase, setPhase] = useState<AddMeetingPhase>("idle");
+  const [callId, setCallId] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  async function addSamograph() {
+    setCreateError(null);
+    setPhase("creating");
+    try {
+      const call = await client.createCall({ meetingUrl });
+      setCallId(call.id);
+      setPhase("created");
+    } catch (err) {
+      setCreateError(isSessionInvalid(err) ? SESSION_INVALID_MESSAGE : err instanceof AppApiError ? err.message : "Couldn't add samograph to that call. Try again.");
+      setPhase("error");
+    }
+  }
+
+  return <span>
+    {phase === "created" && callId ?
+      <a className="samograph-btn samograph-btn--primary samograph-btn--sm" href={`/calls/${encodeURIComponent(callId)}`} aria-label={`View ${title} call`}>Added — view call</a> :
+      <button type="button" className="samograph-btn samograph-btn--primary samograph-btn--sm" disabled={phase === "creating"} aria-busy={phase === "creating"} aria-label={`Add samograph to ${title}`} onClick={() => void addSamograph()}>{phase === "creating" ? "Adding…" : "Add samograph"}</button>}
+    <a className="samograph-btn samograph-btn--secondary samograph-btn--sm" href={meetingUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title}`}>Open</a>
+    {createError ? <span role="alert" className="samograph-alert samograph-alert--error">{createError}</span> : null}
+  </span>;
+}
 
 export function UpcomingMeetings({ client, onAuthFailure, locale, timeZone }: UpcomingMeetingsProps) {
   const [snapshot, setSnapshot] = useState<CalendarMeetingsSnapshot | null>(null);
@@ -55,7 +85,7 @@ export function UpcomingMeetings({ client, onAuthFailure, locale, timeZone }: Up
             <span className="samograph-meeting-title" title={meeting.title}>{meeting.title}</span>
             <span className="samograph-meeting-meta">{meeting.allDay ? "All day" : formatDateTime(meeting.startsAt, { locale, timeZone })} · {minutes} min{meeting.meetingProvider ? ` · ${meeting.meetingProvider === "google_meet" ? "Google Meet" : "Zoom"}` : ""}</span>
           </span>
-          {declined ? <span className="samograph-meeting-meta">Declined</span> : meetingUrl ? <a className="samograph-btn samograph-btn--secondary samograph-btn--sm" href={meetingUrl} target="_blank" rel="noopener noreferrer" aria-label={`Join ${meeting.title}`}>Join</a> : null}
+          {declined ? <span className="samograph-meeting-meta">Declined</span> : meetingUrl ? <MeetingActions client={client} meetingUrl={meetingUrl} title={meeting.title} /> : null}
         </li>;
       })}
     </ul>}

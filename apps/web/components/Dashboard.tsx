@@ -159,6 +159,7 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
     <>
       <h1>Your calls</h1>
       <AddToCallForm client={client} initialUrl={initialUrl} autoFocus={calls.length === 0} onCreated={() => void load()} />
+      <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} />
       {calls.length === 0 ? (
         <section aria-label="Your calls" className="samograph-empty-state">
           <p className="samograph-empty-title">No calls yet.</p>
@@ -192,7 +193,6 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
           ) : null}
         </>
       )}
-      <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} />
       {/* §5.14 GDPR: permanent whole-account erasure, gated by type-to-confirm. */}
       <AccountDangerZone client={client} redirect={redirect} />
     </>
