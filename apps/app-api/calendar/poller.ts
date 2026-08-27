@@ -20,7 +20,7 @@ export interface CalendarSyncPollerDeps {
   createCall?: (input: CreateCallInput) => Promise<CreateCallResult>;
 }
 
-export interface CalendarAutoJoinEvent { providerEventId: string; meetingUrl: string; startsAt: Date }
+export interface CalendarAutoJoinEvent { providerEventId: string; meetingUrl: string; startsAt: Date; alreadyActive?: boolean }
 export interface CalendarAutoJoinStore {
   candidates(connectionId: string, tenantId: string, now: Date, from: Date, to: Date): Promise<CalendarAutoJoinEvent[]>;
 }
@@ -52,6 +52,10 @@ export async function runCalendarAutoJoin(connection: AutoJoinConnection, deps: 
     new Date(now.getTime() + AUTOJOIN_LEAD_MS),
   );
   for (const event of events) {
+    if (event.alreadyActive) {
+      deps.metrics?.incCalendarAutoJoin("already_active");
+      continue;
+    }
     try {
       const result = await deps.createCall({ tenantId: connection.tenantId, actor: "calendar-autojoin", meetingUrl: event.meetingUrl, source: "calendar", sourceEventId: `${connection.id}:${event.providerEventId}` });
       deps.metrics?.incCalendarAutoJoin(result.kind);

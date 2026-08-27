@@ -42,8 +42,16 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
     return this.sql.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, tenantId);
-      const rows = await tx`SELECT provider_event_id,meeting_url,starts_at FROM calendar_events WHERE connection_id=${connectionId} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' AND starts_at BETWEEN ${from} AND ${to} AND ends_at > ${now} ORDER BY starts_at,provider_event_id` as unknown as Row[];
-      return rows.map((row) => ({ providerEventId: String(row.provider_event_id), meetingUrl: String(row.meeting_url), startsAt: new Date(row.starts_at as string) }));
+      const rows = await tx`SELECT provider_event_id,meeting_url,starts_at,
+        NOT EXISTS (
+          SELECT 1 FROM calls
+          WHERE calls.tenant_id=${tenantId}
+            AND calls.meeting_url=calendar_events.meeting_url
+            AND calls.created_at >= ${new Date(now.getTime() - 4 * 60 * 60_000)}
+            AND calls.status NOT IN ('ENDED','COULD_NOT_JOIN','COULD_NOT_RECORD','BOT_REMOVED')
+        ) AS available
+        FROM calendar_events WHERE connection_id=${connectionId} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' AND starts_at BETWEEN ${from} AND ${to} AND ends_at > ${now} ORDER BY starts_at,provider_event_id` as unknown as Row[];
+      return rows.map((row) => ({ providerEventId: String(row.provider_event_id), meetingUrl: String(row.meeting_url), startsAt: new Date(row.starts_at as string), alreadyActive: !Boolean(row.available) }));
     });
   }
   async startSync(connectionId: string): Promise<SyncConnection | null> {

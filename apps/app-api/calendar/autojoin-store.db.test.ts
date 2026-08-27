@@ -28,4 +28,29 @@ d("calendar auto-join window query", () => {
     for (const [id, starts, ends, allDay, response, url] of rows) await sql`INSERT INTO calendar_events(tenant_id,connection_id,provider_event_id,starts_at,ends_at,all_day,attendee_response,meeting_url) VALUES (${tenant},${connection},${id},${starts},${ends},${allDay},${response},${url})`;
     expect((await new PostgresCalendarConnectionStore(sql).autoJoinCandidates(connection, tenant, now, from, to)).map((row) => row.providerEventId)).toEqual(["lookback-running", "linked-timed-accepted", "null-response"]);
   });
+
+  it("excludes only active same-tenant calls with the same meeting URL", async () => {
+    const user = randomUUID(), otherUser = randomUUID(), tenant = randomUUID(), otherTenant = randomUUID(), connection = randomUUID();
+    users.push(user, otherUser);
+    await sql`INSERT INTO users(id,email) VALUES (${user},${`${user}@test`}),(${otherUser},${`${otherUser}@test`})`;
+    await sql`INSERT INTO tenants(id,owner_user_id) VALUES (${tenant},${user}),(${otherTenant},${otherUser})`;
+    await sql`INSERT INTO calendar_connections(id,user_id,tenant_id,encrypted_refresh_token,refresh_token_iv,refresh_token_tag,encryption_key_version,granted_scopes,auto_join) VALUES (${connection},${user},${tenant},${Buffer.alloc(32)},${Buffer.alloc(12)},${Buffer.alloc(16)},1,ARRAY['scope'],true)`;
+    const now = new Date("2026-08-27T12:00:00Z"), from = new Date("2026-08-27T11:50:00Z"), to = new Date("2026-08-27T12:06:00Z"), end = new Date("2026-08-27T13:00:00Z");
+    const urls = {
+      active: "https://zoom.us/j/active",
+      old: "https://zoom.us/j/old",
+      terminal: "https://zoom.us/j/terminal",
+      otherTenant: "https://zoom.us/j/other-tenant",
+    };
+    for (const [id, url] of Object.entries(urls)) await sql`INSERT INTO calendar_events(tenant_id,connection_id,provider_event_id,starts_at,ends_at,all_day,meeting_url) VALUES (${tenant},${connection},${id},${now},${end},false,${url})`;
+    await sql`INSERT INTO calls(tenant_id,meeting_url,status,source,created_at) VALUES
+      (${tenant},${urls.active},'IN_CALL','manual',${new Date(now.getTime() - 60_000)}),
+      (${tenant},${urls.old},'IN_CALL','manual',${new Date(now.getTime() - 5 * 60 * 60_000)}),
+      (${tenant},${urls.terminal},'ENDED','manual',${new Date(now.getTime() - 60_000)}),
+      (${otherTenant},${urls.otherTenant},'IN_CALL','manual',${new Date(now.getTime() - 60_000)})`;
+
+    const candidates = await new PostgresCalendarConnectionStore(sql).autoJoinCandidates(connection, tenant, now, from, to);
+    expect(candidates.filter((row) => !row.alreadyActive).map((row) => row.providerEventId)).toEqual(["old", "otherTenant", "terminal"]);
+    expect(candidates.filter((row) => row.alreadyActive).map((row) => row.providerEventId)).toEqual(["active"]);
+  });
 });
