@@ -332,9 +332,9 @@ d("startStatusPoller persistence (issue #118: JOINING → IN_CALL → ENDED, for
     await migrate(sql);
     await sql`INSERT INTO users (id, email) VALUES (${userA}, ${`${userA}@a.test`})`;
     await sql`INSERT INTO tenants (id, owner_user_id) VALUES (${tenantA}, ${userA})`;
-    for (const callId of calls) {
+    for (const [index, callId] of calls.entries()) {
       await sql`INSERT INTO calls (id, tenant_id, meeting_url, status, region, recall_bot_id, ingest_secret_hash)
-        VALUES (${callId}, ${tenantA}, 'https://meet.google.com/x', 'JOINING', 'eu-central', ${botFor(callId)}, 'x')`;
+        VALUES (${callId}, ${tenantA}, ${`https://meet.google.com/pol-lera-aa${String.fromCharCode(97 + index)}`}, 'JOINING', 'eu-central', ${botFor(callId)}, 'x')`;
     }
   });
 
@@ -573,9 +573,9 @@ d("statusPoller §5.9 disclosure + live status publish (#106/#117)", () => {
     await migrate(sql);
     await sql`INSERT INTO users (id, email) VALUES (${userA}, ${`${userA}@a.test`})`;
     await sql`INSERT INTO tenants (id, owner_user_id) VALUES (${tenantA}, ${userA})`;
-    for (const callId of calls) {
+    for (const [index, callId] of calls.entries()) {
       await sql`INSERT INTO calls (id, tenant_id, meeting_url, status, region, recall_bot_id, ingest_secret_hash)
-        VALUES (${callId}, ${tenantA}, 'https://meet.google.com/x', 'JOINING', 'eu-central', ${botFor(callId)}, 'x')`;
+        VALUES (${callId}, ${tenantA}, ${`https://meet.google.com/pol-lerb-aa${String.fromCharCode(97 + index)}`}, 'JOINING', 'eu-central', ${botFor(callId)}, 'x')`;
     }
   });
 

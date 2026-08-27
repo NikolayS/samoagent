@@ -21,6 +21,7 @@ and a leader-elected ingest watchdog (§4.5/§4.6).
 | `SAMO-INGEST-DEGRADED` (overlay) | Tunnel/ingest outage mid-call; transcript lines lost while degraded | [ingest-degraded.md](./ingest-degraded.md) |
 | `SAMO-WORKER-503` | Bot-worker unreachable (crash / stale `workers` row) | [ingest-degraded.md](./ingest-degraded.md#bot-worker-unreachable-samo-worker-503) |
 | `SAMO-RATE-001` | Share/agent connection or command cap hit (§5.7) | [ingest-degraded.md](./ingest-degraded.md#share-link-rate-limit-samo-rate-001) |
+| `SAMO-CALL-ACTIVE` | A normalized meeting URL already has a non-terminal call from the last four hours; use the returned call id | [could-not-join.md](./could-not-join.md#active-call-conflict-samo-call-active) |
 | status `COULD_NOT_JOIN` / `SAMO-CALL-JOIN` | Recall could not get the bot into the call | [could-not-join.md](./could-not-join.md) |
 | status `COULD_NOT_RECORD` / `SAMO-CALL-NOREC` | Bot joined but Recall reported `in_call_not_recording` | [could-not-record.md](./could-not-record.md) |
 | status `BOT_REMOVED` | Host removed the bot from the call | [could-not-join.md](./could-not-join.md#related-terminal-statuses) |

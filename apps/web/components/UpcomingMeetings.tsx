@@ -26,9 +26,11 @@ function MeetingActions({ client, meetingUrl, title, onAuthFailure, onCreated }:
   const [phase, setPhase] = useState<AddMeetingPhase>("idle");
   const [callId, setCallId] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [alreadyActive, setAlreadyActive] = useState(false);
 
   async function addSamograph() {
     setCreateError(null);
+    setAlreadyActive(false);
     setPhase("creating");
     try {
       const call = await client.createCall({ meetingUrl });
@@ -36,6 +38,12 @@ function MeetingActions({ client, meetingUrl, title, onAuthFailure, onCreated }:
       setPhase("created");
       onCreated?.(call);
     } catch (err) {
+      if (err instanceof AppApiError && err.code === "SAMO-CALL-ACTIVE" && err.id) {
+        setCallId(err.id);
+        setAlreadyActive(true);
+        setPhase("created");
+        return;
+      }
       if (isSessionInvalid(err)) {
         setPhase("error");
         onAuthFailure();
@@ -48,7 +56,7 @@ function MeetingActions({ client, meetingUrl, title, onAuthFailure, onCreated }:
 
   return <span>
     {phase === "created" && callId ?
-      <a className="samograph-btn samograph-btn--primary samograph-btn--sm" href={`/calls/${encodeURIComponent(callId)}`} aria-label={`View ${title} call`}>Added — view call</a> :
+      <a className="samograph-btn samograph-btn--primary samograph-btn--sm" href={`/calls/${encodeURIComponent(callId)}`} aria-label={alreadyActive ? "samograph is already in this call" : `View ${title} call`}>{alreadyActive ? "samograph is already in this call" : "Added — view call"}</a> :
       <button type="button" className="samograph-btn samograph-btn--primary samograph-btn--sm" disabled={phase === "creating"} aria-busy={phase === "creating"} aria-label={`Add samograph to ${title}`} onClick={() => void addSamograph()}>{phase === "creating" ? "Adding…" : "Add samograph"}</button>}
     <a className="samograph-btn samograph-btn--secondary samograph-btn--sm" href={meetingUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title}`}>Open</a>
     {createError ? <span role="alert" className="samograph-alert samograph-alert--error">{createError}</span> : null}

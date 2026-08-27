@@ -36,6 +36,17 @@ const SESSION_SECRET = "calls-db-test-session-secret-bbbbbbbbbbbbbbbbbbbb";
 const MEET_URL = "https://meet.google.com/abc-defg-hij";
 const ZOOM_URL = "https://us02web.zoom.us/j/89012345678";
 
+let meetUrlSequence = 0;
+function meetUrl(): string {
+  let value = meetUrlSequence++;
+  let code = "";
+  for (let i = 0; i < 10; i++) {
+    code = String.fromCharCode(97 + (value % 26)) + code;
+    value = Math.floor(value / 26);
+  }
+  return `https://meet.google.com/${code.slice(0, 3)}-${code.slice(3, 7)}-${code.slice(7)}`;
+}
+
 function fakeRecall(fake: RecallFake): RecallClient {
   return {
     async createBot(req: CreateBotRequest) {
@@ -114,8 +125,9 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
   it("POST /calls: valid Meet URL → 201 PENDING row in the caller's tenant + audit + enqueue", async () => {
     const { handler, jobs } = makeHandler();
     const before = await countCalls(tenantA);
+    const meetingUrl = meetUrl();
 
-    const res = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: MEET_URL } }));
+    const res = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: meetingUrl } }));
     expect(res.status).toBe(201);
     const body = (await res.json()) as { id: string; status: string };
     expect(body.status).toBe("PENDING");
@@ -127,7 +139,7 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
       FROM calls WHERE id = ${body.id}`;
     expect(rows.length).toBe(1);
     expect(rows[0].tenant_id).toBe(tenantA);
-    expect(rows[0].meeting_url).toBe(MEET_URL);
+    expect(rows[0].meeting_url).toBe(meetingUrl);
     expect(rows[0].status).toBe("PENDING");
     expect(rows[0].ingest_degraded).toBe(false);
 
@@ -145,7 +157,20 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
 
     // The orchestrator seam was enqueued with exactly this call + url, plus the
     // tenant's §5.12 transcription settings (defaults: multilingual, no keyterms).
-    expect(jobs).toEqual([{ callId: body.id, meetingUrl: MEET_URL, keyterms: [], language: "multi" }]);
+    expect(jobs).toEqual([{ callId: body.id, meetingUrl, keyterms: [], language: "multi" }]);
+  });
+
+  it("POST /calls: repeated active URL → 409 SAMO-CALL-ACTIVE with the existing call", async () => {
+    const { handler, jobs } = makeHandler();
+    const meetingUrl = meetUrl();
+    const first = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: meetingUrl } }));
+    expect(first.status).toBe(201);
+    const existing = (await first.json()) as { id: string; status: string };
+
+    const repeated = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: meetingUrl } }));
+    expect(repeated.status).toBe(409);
+    expect(await repeated.json()).toEqual({ code: "SAMO-CALL-ACTIVE", id: existing.id, status: existing.status });
+    expect(jobs).toHaveLength(1);
   });
 
   // ── §8 / §5.16: per-tenant bot-creation guardrail against the REAL create path ──
@@ -156,14 +181,14 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
 
     // The first BOT_CREATE_PER_TENANT_LIMIT creates for tenant A all succeed (201).
     for (let i = 0; i < BOT_CREATE_PER_TENANT_LIMIT; i++) {
-      const res = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: MEET_URL } }));
+      const res = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: meetUrl() } }));
       expect(res.status).toBe(201);
     }
     expect(await countCalls(tenantA)).toBe(before + BOT_CREATE_PER_TENANT_LIMIT);
     expect(jobs.length).toBe(BOT_CREATE_PER_TENANT_LIMIT); // one enqueue per successful create
 
     // The (cap+1)th create is rejected: 429 SAMO-RECALL-COST + Retry-After …
-    const over = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: MEET_URL } }));
+    const over = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: meetUrl() } }));
     expect(over.status).toBe(429);
     expect(Number(over.headers.get("Retry-After"))).toBeGreaterThanOrEqual(1);
     const overBody = (await over.json()) as { code: string; retryable: boolean };
@@ -176,18 +201,19 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
 
     // A DIFFERENT tenant (B) on the SAME handler is unaffected — its budget is fresh.
     const bBefore = await countCalls(tenantB);
-    const bRes = await handler(req("POST", "/calls", { cookie: cookieB, body: { meeting_url: ZOOM_URL } }));
+    const bRes = await handler(req("POST", "/calls", { cookie: cookieB, body: { meeting_url: meetUrl() } }));
     expect(bRes.status).toBe(201);
     expect(await countCalls(tenantB)).toBe(bBefore + 1);
   });
 
   it("POST /calls: valid Zoom URL is also accepted → 201 PENDING", async () => {
     const { handler, jobs } = makeHandler();
-    const res = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: ZOOM_URL } }));
+    const zoomUrl = `https://us02web.zoom.us/j/${String(89_000_000_000 + meetUrlSequence)}`;
+    const res = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: zoomUrl } }));
     expect(res.status).toBe(201);
     expect(((await res.json()) as { status: string }).status).toBe("PENDING");
     expect(jobs.length).toBe(1);
-    expect(jobs[0].meetingUrl).toBe(ZOOM_URL);
+    expect(jobs[0].meetingUrl).toBe(zoomUrl);
   });
 
   it("POST /calls: bad URL → 400 and NO call row is created (row-count unchanged)", async () => {
@@ -363,6 +389,7 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
   it("POST /calls then the enqueued orchestrator (Recall fake) drives PENDING→JOINING", async () => {
     const secret = "calls-itest-ingest-secret-deterministic-0001";
     const expectedHash = createHash("sha256").update(secret).digest("hex");
+    const meetingUrl = meetUrl();
 
     const jobs: OrchestratorJob[] = [];
     const handler = createCallsHandler({
@@ -380,10 +407,10 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
       },
     });
 
-    const res = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: MEET_URL } }));
+    const res = await handler(req("POST", "/calls", { cookie: cookieA, body: { meeting_url: meetingUrl } }));
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
-    expect(jobs).toEqual([{ callId: id, meetingUrl: MEET_URL, keyterms: [], language: "multi" }]);
+    expect(jobs).toEqual([{ callId: id, meetingUrl, keyterms: [], language: "multi" }]);
 
     const fake = createRecallFake({ seed: id });
     const row = await sql`

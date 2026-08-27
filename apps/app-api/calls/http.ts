@@ -33,10 +33,11 @@ import {
   createCallForTenant,
   BOT_CREATE_PER_TENANT_LIMIT,
   BOT_CREATE_WINDOW_MS,
+  CALL_ACTIVE_CODE,
   RECALL_COST_CODE,
 } from "./create-call.ts";
 
-export { BOT_CREATE_PER_TENANT_LIMIT, BOT_CREATE_WINDOW_MS, RECALL_COST_CODE } from "./create-call.ts";
+export { BOT_CREATE_PER_TENANT_LIMIT, BOT_CREATE_WINDOW_MS, CALL_ACTIVE_CODE, RECALL_COST_CODE } from "./create-call.ts";
 
 /** Default TTL for a minted share token's `expires_at` (§5.7): 30 days. */
 const DEFAULT_SHARE_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -303,6 +304,15 @@ export function createCallsHandler(
         if (result.kind === "tenant_inactive") return sessionInvalidResponse();
         if (result.kind === "cost_cap") return recallCostResponse(result.retryAfterMs);
         if (result.kind === "duplicate") throw new Error("manual call unexpectedly duplicated");
+        if (result.kind === "already_active") {
+          const status = await sql.begin(async (tx) => {
+            await tx.unsafe("SET LOCAL ROLE samograph_app");
+            await setTenant(tx, claims.tenantId);
+            const rows = await tx`SELECT status FROM calls WHERE id=${result.callId} LIMIT 1`;
+            return typeof rows[0]?.status === "string" ? rows[0].status : "ACTIVE";
+          });
+          return Response.json({ code: CALL_ACTIVE_CODE, id: result.callId, status }, { status: 409 });
+        }
         return Response.json({ id: result.call.id, status: result.call.status }, { status: 201 });
       } catch (err) {
         if ((err as { errno?: string }).errno === FK_VIOLATION) return sessionInvalidResponse();

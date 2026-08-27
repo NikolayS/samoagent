@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { MetricsRegistry } from "../../../packages/shared/observe/registry.ts";
 import { GoogleCalendarFailure } from "./google-calendar-client.ts";
-import { CALENDAR_SYNC_INTERVAL_MS, startCalendarSyncPoller } from "./poller.ts";
+import { AUTOJOIN_LEAD_MS, AUTOJOIN_LOOKBACK_MS, CALENDAR_SYNC_INTERVAL_MS, runCalendarAutoJoin, startCalendarSyncPoller } from "./poller.ts";
 
 type Row = { id: string };
 
@@ -11,6 +11,92 @@ function fakeSql(rows: Row[]) {
 }
 
 describe("calendar sync poller", () => {
+  it("auto-joins only eligible events in the lead window", async () => {
+    const now = new Date("2026-08-27T12:00:00Z");
+    const events = [
+      { providerEventId: "lookback", meetingUrl: "https://zoom.us/j/1", startsAt: new Date(now.getTime() - AUTOJOIN_LOOKBACK_MS), endsAt: new Date(now.getTime() + 1) },
+      { providerEventId: "too-old", meetingUrl: "https://zoom.us/j/6", startsAt: new Date(now.getTime() - AUTOJOIN_LOOKBACK_MS - 1), endsAt: new Date(now.getTime() + 1) },
+      { providerEventId: "ended", meetingUrl: "https://zoom.us/j/7", startsAt: new Date(now.getTime() - 1), endsAt: now },
+      { providerEventId: "inside", meetingUrl: "https://zoom.us/j/2", startsAt: new Date(now.getTime() + AUTOJOIN_LEAD_MS) },
+      { providerEventId: "after", meetingUrl: "https://zoom.us/j/3", startsAt: new Date(now.getTime() + AUTOJOIN_LEAD_MS + 1) },
+      { providerEventId: "declined", meetingUrl: "https://zoom.us/j/4", startsAt: now, attendeeResponse: "declined" as const },
+      { providerEventId: "all-day", meetingUrl: "https://zoom.us/j/5", startsAt: now, allDay: true },
+      { providerEventId: "linkless", meetingUrl: null, startsAt: now },
+    ];
+    const joined: string[] = [];
+    await runCalendarAutoJoin({ id: "c1", tenantId: "t1", autoJoin: true }, {
+      store: { candidates: async (_connectionId, _tenantId, current, from, to) => events.filter((event) => event.meetingUrl !== null && !event.allDay && event.attendeeResponse !== "declined" && event.startsAt >= from && event.startsAt <= to && (!event.endsAt || event.endsAt > current)) as any },
+      createCall: async (input) => { joined.push(input.sourceEventId); return { kind: "created", call: { id: input.sourceEventId, status: "PENDING" } }; },
+      now: () => now,
+    });
+    expect(joined).toEqual(["c1:lookback", "c1:inside"]);
+  });
+
+  it("uses duplicate as the idempotency path across consecutive ticks", async () => {
+    const event = { providerEventId: "stable", meetingUrl: "https://zoom.us/j/1", startsAt: new Date("2026-08-27T12:01:00Z") };
+    let calls = 0, bots = 0;
+    const deps = {
+      store: { candidates: async () => [event] }, now: () => new Date("2026-08-27T12:00:00Z"),
+      createCall: async (input: any) => { expect(input.sourceEventId).toBe("c1:stable"); calls++; if (calls === 1) { bots++; return { kind: "created" as const, call: { id: "call", status: "PENDING" } }; } return { kind: "duplicate" as const }; },
+    };
+    await runCalendarAutoJoin({ id: "c1", tenantId: "t1", autoJoin: true }, deps);
+    await runCalendarAutoJoin({ id: "c1", tenantId: "t1", autoJoin: true }, deps);
+    expect({ calls, bots }).toEqual({ calls: 2, bots: 1 });
+  });
+
+  it("counts candidate-time and create-time already-active outcomes under the same label", async () => {
+    const metrics = new MetricsRegistry(), warnings: string[] = [];
+    let calls = 0;
+    await runCalendarAutoJoin({ id: "c1", tenantId: "t1", autoJoin: true }, {
+      store: { candidates: async () => [
+        { providerEventId: "prefiltered", meetingUrl: "https://zoom.us/j/1", startsAt: new Date(), alreadyActive: true },
+        { providerEventId: "raced", meetingUrl: "https://zoom.us/j/1", startsAt: new Date() },
+      ] },
+      createCall: async () => { calls++; return { kind: "already_active", callId: "active-call" }; },
+      logger: { warn: (message) => warnings.push(message) },
+      metrics,
+    });
+    expect(calls).toBe(1);
+    expect(warnings).toEqual([]);
+    expect(metrics.renderPrometheus()).toContain('calendar_autojoin_total{result="already_active"} 2');
+  });
+
+  it("scopes the same provider event id to its calendar connection", async () => {
+    const sourceEventIds: string[] = [];
+    const deps = {
+      store: { candidates: async () => [{ providerEventId: "shared", meetingUrl: "https://zoom.us/j/1", startsAt: new Date() }] },
+      createCall: async (input: any) => { sourceEventIds.push(input.sourceEventId); return { kind: "created" as const, call: { id: "call", status: "PENDING" } }; },
+    };
+    await runCalendarAutoJoin({ id: "11111111-1111-4111-8111-111111111111", tenantId: "t1", autoJoin: true }, deps);
+    await runCalendarAutoJoin({ id: "22222222-2222-4222-8222-222222222222", tenantId: "t1", autoJoin: true }, deps);
+    expect(sourceEventIds).toEqual([
+      "11111111-1111-4111-8111-111111111111:shared",
+      "22222222-2222-4222-8222-222222222222:shared",
+    ]);
+  });
+
+  it("continues after cost_cap and never touches opted-out connections", async () => {
+    const attempted: string[] = [], warnings: string[] = [];
+    const metrics = new MetricsRegistry();
+    const store = { candidates: async () => [
+      { providerEventId: "capped", meetingUrl: "https://zoom.us/j/1", startsAt: new Date() },
+      { providerEventId: "next", meetingUrl: "https://zoom.us/j/2", startsAt: new Date() },
+    ] };
+    let reads = 0;
+    const deps = {
+      store: { candidates: async (...args: any[]) => { reads++; return store.candidates(); } }, now: () => new Date(),
+      createCall: async (input: any) => { attempted.push(input.sourceEventId); return input.sourceEventId === "c1:capped" ? { kind: "cost_cap" as const, retryAfterMs: 1 } : { kind: "created" as const, call: { id: "call", status: "PENDING" } }; },
+      logger: { warn: (message: string) => warnings.push(message) },
+      metrics,
+    };
+    await runCalendarAutoJoin({ id: "c1", tenantId: "t1", autoJoin: true }, deps);
+    await runCalendarAutoJoin({ id: "c2", tenantId: "t1", autoJoin: false }, deps);
+    expect(attempted).toEqual(["c1:capped", "c1:next"]);
+    expect(reads).toBe(1);
+    expect(warnings).toEqual(["[calendar-autojoin] connection c1 event capped result: cost_cap"]);
+    expect(metrics.renderPrometheus()).toContain('calendar_autojoin_total{result="cost_cap"} 1');
+    expect(metrics.renderPrometheus()).toContain('calendar_autojoin_total{result="created"} 1');
+  });
   it("schedules the exact five-minute default and stop() stops it", () => {
     let interval = -1, stopped = 0;
     const poller = startCalendarSyncPoller({

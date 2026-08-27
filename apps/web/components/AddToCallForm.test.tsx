@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { render, fireEvent } from "@testing-library/react";
 import { AddToCallForm } from "./AddToCallForm.tsx";
 import { createFakeAppApiClient } from "../lib/fakeAppApiClient.ts";
+import { AppApiError } from "../lib/appApiClient.ts";
 import { installDom } from "../test/setup.tsx";
 
 installDom();
@@ -177,6 +178,21 @@ describe("AddToCallForm — the dashboard's single primary action", () => {
     expect(
       await findByText("That doesn't look like a Zoom or Google Meet meeting link."),
     ).toBeDefined();
+  });
+
+  it("links to the existing call when SAMO-CALL-ACTIVE is returned", async () => {
+    const client = createFakeAppApiClient({ failCreateCallWith: {
+      code: "SAMO-CALL-ACTIVE", message: "Request failed.", status: 409,
+    } });
+    const { container, getByLabelText, findByRole, queryByRole } = render(<AddToCallForm client={client} />);
+    client.createCall = async () => {
+      throw new AppApiError("SAMO-CALL-ACTIVE", "Request failed.", false, 409, "active-1");
+    };
+    fireEvent.change(getByLabelText("Meeting link"), { target: { value: "https://zoom.us/j/123456789" } });
+    submit(container);
+    const link = await findByRole("link", { name: "samograph is already in this call" });
+    expect(link.getAttribute("href")).toBe("/calls/active-1");
+    expect(queryByRole("alert")).toBeNull();
   });
 
   it("shows a distinct 'signed out' copy (not generic) when the session is stale (#114)", async () => {

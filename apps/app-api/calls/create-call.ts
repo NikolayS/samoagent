@@ -8,11 +8,18 @@ import { validateMeetingUrl } from "./validate.ts";
 import { tenantActive } from "../auth/owner-session.ts";
 
 export const BOT_CREATE_PER_TENANT_LIMIT = 30;
+/** Calendar auto-join has an independent per-tenant budget so it cannot starve manual calls. */
+export const AUTO_CREATE_PER_TENANT_LIMIT = 10;
 export const BOT_CREATE_WINDOW_MS = 60 * 60 * 1000;
 export const RECALL_COST_CODE = "SAMO-RECALL-COST" as const;
+export const CALL_ACTIVE_CODE = "SAMO-CALL-ACTIVE" as const;
 
 const UNIQUE_VIOLATION = "23505";
 const SOURCE_EVENT_UNIQUE_CONSTRAINT = "calls_tenant_source_event_unique_idx";
+
+export function autoJoinLockKey(tenantId: string, url: string): string {
+  return `${tenantId}:${url}`;
+}
 
 interface CreateCallInputBase {
   tenantId: string;
@@ -34,6 +41,7 @@ export interface CreateCallDeps {
 
 export type CreateCallResult =
   | { kind: "created"; call: { id: string; status: string } }
+  | { kind: "already_active"; callId: string }
   | { kind: "invalid_url" }
   | { kind: "tenant_inactive" }
   | { kind: "cost_cap"; retryAfterMs: number }
@@ -47,18 +55,34 @@ export async function createCallForTenant(
   if (!valid.ok) return { kind: "invalid_url" };
   if (!(await tenantActive(deps.sql, input.tenantId))) return { kind: "tenant_inactive" };
 
-  const rateKey = `bot-create:${input.tenantId}`;
+  const isAutoJoin = input.source === "calendar";
+  const rateKey = isAutoJoin ? `bot-create:auto:${input.tenantId}` : `bot-create:${input.tenantId}`;
+  const rateLimit = isAutoJoin ? AUTO_CREATE_PER_TENANT_LIMIT : BOT_CREATE_PER_TENANT_LIMIT;
   const rateNow = deps.now();
   const reservation = await deps.rateLimiter.hit(
-    rateKey, BOT_CREATE_PER_TENANT_LIMIT, BOT_CREATE_WINDOW_MS, rateNow,
+    rateKey, rateLimit, BOT_CREATE_WINDOW_MS, rateNow,
   );
   if (!reservation.allowed) return { kind: "cost_cap", retryAfterMs: reservation.retryAfterMs };
 
-  let created: { id: string; status: string };
+  let transactionResult:
+    | { kind: "created"; call: { id: string; status: string } }
+    | { kind: "already_active"; callId: string };
   try {
-    created = await deps.sql.begin(async (tx) => {
+    transactionResult = await deps.sql.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, input.tenantId);
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${autoJoinLockKey(input.tenantId, valid.url)}))`;
+
+      const active = await tx`
+        SELECT id FROM calls
+        WHERE tenant_id=${input.tenantId}
+          AND meeting_url=${valid.url}
+          AND created_at > now() - interval '4 hours'
+          AND status NOT IN ('ENDED','COULD_NOT_JOIN','COULD_NOT_RECORD','BOT_REMOVED')
+        ORDER BY created_at DESC, id
+        LIMIT 1` as unknown as Array<{ id: string }>;
+      if (active[0]) return { kind: "already_active", callId: active[0].id };
+
       const rows = await tx`
         INSERT INTO calls (tenant_id, meeting_url, status, ingest_degraded, source, source_event_id)
         VALUES (${input.tenantId}, ${valid.url}, 'PENDING', false, ${input.source}, ${input.sourceEventId})
@@ -67,7 +91,7 @@ export async function createCallForTenant(
       await tx`
         INSERT INTO audit_log (tenant_id, call_id, actor, action)
         VALUES (${input.tenantId}, ${row.id}, ${input.actor}, 'call.create')`;
-      return row;
+      return { kind: "created", call: row };
     });
   } catch (error) {
     await deps.rateLimiter.refund(rateKey, BOT_CREATE_WINDOW_MS, rateNow);
@@ -83,12 +107,17 @@ export async function createCallForTenant(
     throw error;
   }
 
+  if (transactionResult.kind === "already_active") {
+    await deps.rateLimiter.refund(rateKey, BOT_CREATE_WINDOW_MS, rateNow);
+    return transactionResult;
+  }
+
   const settings = await readTenantSettings(deps.sql, input.tenantId);
   await deps.enqueue({
-    callId: created.id,
+    callId: transactionResult.call.id,
     meetingUrl: valid.url,
     keyterms: resolveKeyterms(settings),
     language: settings.language,
   });
-  return { kind: "created", call: created };
+  return transactionResult;
 }
