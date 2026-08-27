@@ -83,7 +83,9 @@ describe("ShareCallView — read-only shared transcript (SPEC §4.1, §5.7, Stor
     const { container } = render(
       <ShareCallView streamClient={stream} shareToken="shr_abc" />,
     );
-    expect(container.querySelectorAll("button")).toHaveLength(0);
+    expect(container.querySelector(".samograph-owner-controls")).toBeNull();
+    expect(container.querySelectorAll("button")).toHaveLength(1);
+    expect(container.querySelector("button")?.textContent).toBe("Hide chat");
   });
 
   it("shows the 'no longer active' card on SAMO-TOKEN-002 (not a silent empty)", async () => {

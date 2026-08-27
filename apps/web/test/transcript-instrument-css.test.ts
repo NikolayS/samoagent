@@ -11,8 +11,12 @@ describe("Slice 3 transcript instrument CSS", () => {
     expect(css).toContain(heading);
     expect(section).toMatch(/\.samograph-transcript-row\s*\{/);
     expect(section).toMatch(
-      /grid-template-columns\s*:\s*56px\s+88px\s+96px\s+minmax\(0\s*,\s*1fr\)/,
+      /grid-template-columns\s*:\s*56px\s+minmax\(88px\s*,\s*max-content\)\s+minmax\(96px\s*,\s*max-content\)\s+minmax\(0\s*,\s*1fr\)/,
     );
+    expect(section).toMatch(/\.samograph-line-time\s*\{[^}]*white-space\s*:\s*nowrap/s);
+    expect(section).toMatch(/\.samograph-line-speaker\s*\{[^}]*max-width\s*:\s*200px[^}]*white-space\s*:\s*nowrap[^}]*overflow\s*:\s*hidden[^}]*text-overflow\s*:\s*ellipsis/s);
+    expect(section).toMatch(/word-break\s*:\s*normal/);
+    expect(section).toMatch(/overflow-wrap\s*:\s*anywhere/);
   });
 
   it("does not constrain transcript or call-view classes to 32rem", () => {

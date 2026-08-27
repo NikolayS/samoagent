@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { render, act, waitFor } from "@testing-library/react";
+import { render, act, fireEvent, waitFor } from "@testing-library/react";
 import {
   PerCallTranscript,
   SHARE_INACTIVE_COPY,
@@ -15,7 +15,7 @@ installDom();
 const TS = "2026-06-29 10:00:00";
 
 function line(
-  over: Partial<{ seq: number; ts: string; speaker: string; text: string; final: boolean }> = {},
+  over: Partial<{ seq: number; ts: string; speaker: string; text: string; final: boolean; kind: "speech" | "chat" }> = {},
 ) {
   return { seq: 1, ts: TS, speaker: "Alice", text: "hello world", final: true, ...over };
 }
@@ -142,6 +142,46 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     expect(row?.querySelector(".samograph-line-utterance")?.textContent).toBe("columns");
   });
 
+  it("exposes the full speaker label as a tooltip when the visible label is truncated", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ speaker: "Alexander Samokhvalov", kind: "chat" })));
+    expect(container.querySelector(".samograph-line-speaker")?.getAttribute("title")).toBe(
+      "Alexander Samokhvalov (chat)",
+    );
+  });
+
+  it("lets shared viewers hide and show chat without affecting speech or ordinals", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container, getByRole, queryByText } = render(
+      <PerCallTranscript
+        streamClient={client}
+        auth={{ kind: "share", token: "shr_abc" }}
+        callId="call_1"
+      />,
+    );
+    act(() => client.emitLine(line({ seq: 4, text: "spoken words", kind: "speech" })));
+    act(() => client.emitLine(line({ seq: 9, text: "typed words", kind: "chat" })));
+
+    const hideChat = getByRole("button", { name: "Hide chat" });
+    expect(hideChat.getAttribute("aria-pressed")).toBe("false");
+    expect(container.querySelector(".samograph-transcript-actions")?.contains(hideChat)).toBe(true);
+    fireEvent.click(hideChat);
+
+    const showChat = getByRole("button", { name: "Show chat" });
+    expect(showChat.getAttribute("aria-pressed")).toBe("true");
+    expect(queryByText(/typed words/, { selector: ".samograph-visually-hidden" })).toBeNull();
+    expect(container.querySelector(".samograph-line-number")?.textContent).toBe("4");
+    expect(queryByText(/spoken words/, { selector: ".samograph-visually-hidden" })).toBeDefined();
+
+    fireEvent.click(showChat);
+    expect(getByRole("button", { name: "Hide chat" }).getAttribute("aria-pressed")).toBe("false");
+    expect(queryByText(/typed words/, { selector: ".samograph-visually-hidden" })).toBeDefined();
+    expect([...container.querySelectorAll(".samograph-line-number")].map((node) => node.textContent)).toEqual(["4", "9"]);
+  });
+
   it("hangs the speaker colour off a data attribute the stylesheet can select", () => {
     const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
     const { container } = render(
@@ -256,7 +296,9 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
         callId="call_1"
       />,
     );
-    expect(container.querySelectorAll("button")).toHaveLength(0);
+    expect(container.querySelector(".samograph-owner-controls")).toBeNull();
+    expect(container.querySelectorAll("button")).toHaveLength(1);
+    expect(container.querySelector("button")?.textContent).toBe("Hide chat");
   });
 
   it("surfaces a typed SAMO-TOKEN-002 from fetchCallDetail as a 'no longer active' card", async () => {
@@ -501,9 +543,9 @@ describe("PerCallTranscript — failed calls display the persisted error reason 
     expect(link.getAttribute("href")).toBe("/calls/call_9/transcript.txt?token=shr_abc");
   });
 
-  // #197 — the page offers BOTH the full download and a speech-only download
+  // #197 — the page offers BOTH the full download and a no-chat download
   // (chat comments filtered out server-side via `?comments=exclude`).
-  it("offers BOTH a full download and a speech-only download at the right URLs (session)", () => {
+  it("offers BOTH a full download and a no-chat download at the right URLs (session)", () => {
     const client = createFakeTranscriptStreamClient({ callDetail: detail() });
     const { getByRole } = render(
       <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
@@ -511,7 +553,7 @@ describe("PerCallTranscript — failed calls display the persisted error reason 
     const full = getByRole("link", { name: /download transcript/i }) as HTMLAnchorElement;
     expect(full.getAttribute("href")).toBe("/calls/call_1/transcript.txt");
     expect(full.hasAttribute("download")).toBe(true);
-    const speechOnly = getByRole("link", { name: /speech only/i }) as HTMLAnchorElement;
+    const speechOnly = getByRole("link", { name: "Download (no chat)" }) as HTMLAnchorElement;
     expect(speechOnly.getAttribute("href")).toBe(
       "/calls/call_1/transcript.txt?comments=exclude",
     );
@@ -529,7 +571,7 @@ describe("PerCallTranscript — failed calls display the persisted error reason 
     );
     const full = getByRole("link", { name: /download transcript/i }) as HTMLAnchorElement;
     expect(full.getAttribute("href")).toBe("/calls/call_9/transcript.txt?token=shr_abc");
-    const speechOnly = getByRole("link", { name: /speech only/i }) as HTMLAnchorElement;
+    const speechOnly = getByRole("link", { name: "Download (no chat)" }) as HTMLAnchorElement;
     expect(speechOnly.getAttribute("href")).toBe(
       "/calls/call_9/transcript.txt?comments=exclude&token=shr_abc",
     );

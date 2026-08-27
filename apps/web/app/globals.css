@@ -1321,7 +1321,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 
 .samograph-transcript-row {
   display: grid;
-  grid-template-columns: 56px 88px 96px minmax(0, 1fr);
+  grid-template-columns: 56px minmax(88px, max-content) minmax(96px, max-content) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
   min-height: 34px;
@@ -1331,7 +1331,8 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   line-height: 1.6;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .samograph-percall .samograph-transcript-row::before,
@@ -1349,11 +1350,16 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 
 .samograph-line-time {
   color: var(--panel-muted);
+  white-space: nowrap;
 }
 
 .samograph-line-speaker {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
   color: var(--speaker-0);
   font-weight: 500;
+  text-overflow: ellipsis;
 }
 
 .samograph-line-speaker[data-speaker-index="1"] { color: var(--speaker-1); }
@@ -1431,7 +1437,8 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 }
 
 .samograph-percall .samograph-download-transcript,
-.samograph-percall .samograph-download-transcript-speech {
+.samograph-percall .samograph-download-transcript-speech,
+.samograph-percall .samograph-toggle-chat {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -1448,7 +1455,8 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   border: 1px solid var(--panel-ink);
 }
 
-.samograph-percall .samograph-download-transcript-speech {
+.samograph-percall .samograph-download-transcript-speech,
+.samograph-percall .samograph-toggle-chat {
   color: var(--panel-ink);
   background: transparent;
   border: 1px solid var(--panel-gutter);
@@ -1483,9 +1491,13 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   }
 
   .samograph-transcript-row {
-    grid-template-columns: 42px 74px 82px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(74px, max-content) minmax(82px, max-content) minmax(0, 1fr);
     gap: 8px;
     font-size: 0.72rem;
+  }
+
+  .samograph-line-speaker {
+    max-width: 160px;
   }
 
   .samograph-share-state {
