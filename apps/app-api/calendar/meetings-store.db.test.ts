@@ -21,11 +21,11 @@ d("calendar meetings cache query", () => {
     const bytes = Buffer.alloc(32), iv = Buffer.alloc(12), tag = Buffer.alloc(16);
     await sql`INSERT INTO calendar_connections(id,user_id,tenant_id,encrypted_refresh_token,refresh_token_iv,refresh_token_tag,encryption_key_version,granted_scopes) VALUES (${connection},${user},${tenant},${bytes},${iv},${tag},1,ARRAY['scope']),(${otherConnection},${otherUser},${otherTenant},${bytes},${iv},${tag},1,ARRAY['scope'])`;
     const first = "00000000-0000-4000-8000-000000000001", second = "00000000-0000-4000-8000-000000000002";
-    await sql`INSERT INTO calendar_events(id,tenant_id,connection_id,provider_event_id,title,starts_at,ends_at,meeting_url) VALUES
-      (${second},${tenant},${connection},'second','second',${new Date("2026-08-21T13:00:00Z")},${new Date("2026-08-21T14:00:00Z")},'https://zoom.us/j/2'),
-      (${first},${tenant},${connection},'first','first',${new Date("2026-08-21T13:00:00Z")},${new Date("2026-08-21T14:00:00Z")},'https://zoom.us/j/1'),
-      (${randomUUID()},${tenant},${connection},'ended','ended',${new Date("2026-08-21T10:00:00Z")},${now}),
-      (${randomUUID()},${otherTenant},${otherConnection},'other','other',${new Date("2026-08-21T12:30:00Z")},${new Date("2026-08-21T14:00:00Z")})`;
+    await sql`INSERT INTO calendar_events(id,tenant_id,connection_id,provider_event_id,title,starts_at,ends_at,all_day,attendee_response,meeting_url) VALUES
+      (${second},${tenant},${connection},'second','second',${new Date("2026-08-21T13:00:00Z")},${new Date("2026-08-21T14:00:00Z")},false,'accepted','https://zoom.us/j/2'),
+      (${first},${tenant},${connection},'first','first',${new Date("2026-08-21T13:00:00Z")},${new Date("2026-08-21T14:00:00Z")},false,'accepted','https://zoom.us/j/1'),
+      (${randomUUID()},${tenant},${connection},'ended','ended',${new Date("2026-08-21T10:00:00Z")},${now},false,'accepted','https://zoom.us/j/ended'),
+      (${randomUUID()},${otherTenant},${otherConnection},'other','other',${new Date("2026-08-21T12:30:00Z")},${new Date("2026-08-21T14:00:00Z")},false,'accepted','https://zoom.us/j/other')`;
     const snapshot = await new PostgresCalendarConnectionStore(sql).meetings(user, tenant, 1, now);
     expect(snapshot.connection?.status).toBe("connected");
     expect(snapshot.meetings.map((row) => row.id)).toEqual([first]);
