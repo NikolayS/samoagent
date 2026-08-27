@@ -62,7 +62,7 @@ describe("Dashboard upcoming meetings", () => {
     expect(title.getAttribute("title")).toBe(long);
   });
 
-  it("renders meeting row typography and a small secondary Join button", async () => {
+  it("adds samograph to a meeting, guards the action while pending, and links the created call", async () => {
     const client = createFakeAppApiClient({ seedCalendarMeetings: {
       connectionState: "connected", lastSyncAt: null, meetings: [
         { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted" },
@@ -73,10 +73,65 @@ describe("Dashboard upcoming meetings", () => {
     const item = title.closest("li.samograph-meeting-item");
     expect(title.classList.contains("samograph-meeting-title")).toBe(true);
     expect(item?.querySelector("span.samograph-meeting-meta")).not.toBeNull();
-    const join = view.getByRole("link", { name: "Join Planning" });
-    expect(join.classList.contains("samograph-btn")).toBe(true);
-    expect(join.classList.contains("samograph-btn--secondary")).toBe(true);
-    expect(join.classList.contains("samograph-btn--sm")).toBe(true);
+    let resolveCreate!: (call: Awaited<ReturnType<typeof client.createCall>>) => void;
+    client.createCall = mock(() => new Promise((resolve) => { resolveCreate = resolve; }));
+    const add = view.getByRole("button", { name: "Add samograph to Planning" });
+    fireEvent.click(add);
+    expect(add.getAttribute("aria-busy")).toBe("true");
+    expect(add.hasAttribute("disabled")).toBe(true);
+    resolveCreate({ id: "call-1", meetingUrl: "https://meet.google.com/abc-defg-hij", provider: "google_meet", status: "PENDING" });
+    const created = await view.findByRole("link", { name: "View Planning call" });
+    expect(created.getAttribute("href")).toBe("/calls/call-1");
+    expect(client.createCall).toHaveBeenCalledWith({ meetingUrl: "https://meet.google.com/abc-defg-hij" });
+    const open = view.getByRole("link", { name: "Open Planning" });
+    expect(open.getAttribute("target")).toBe("_blank");
+    expect(open.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("notifies the dashboard after adding samograph so its calls can be refreshed", async () => {
+    const onCreated = mock(() => {});
+    const client = createFakeAppApiClient({ seedCalendarMeetings: {
+      connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted" },
+      ],
+    } });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} onCreated={onCreated} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({
+      meetingUrl: "https://meet.google.com/abc-defg-hij",
+    }));
+  });
+
+  it("hands session-invalid create-call failures to the auth failure path", async () => {
+    const onAuthFailure = mock(() => {});
+    const client = createFakeAppApiClient({
+      seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://zoom.us/j/123456789", meetingProvider: "zoom", organizerEmail: null, attendeeResponse: "accepted" },
+      ] },
+      failCreateCallWith: { code: "SAMO-AUTH-005", message: "Session invalid.", status: 401 },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={onAuthFailure} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
+
+    await waitFor(() => expect(onAuthFailure).toHaveBeenCalledTimes(1));
+    expect(view.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the create-call error and lets the user retry", async () => {
+    const client = createFakeAppApiClient({
+      seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://zoom.us/j/123456789", meetingProvider: "zoom", organizerEmail: null, attendeeResponse: "accepted" },
+      ] },
+      failCreateCallWith: { code: "SAMO-CALL-FAILED", message: "Could not create call." },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
+    expect((await view.findByRole("alert")).textContent).toBe("Could not create call.");
+    expect(view.getByRole("button", { name: "Add samograph to Planning" }).hasAttribute("disabled")).toBe(false);
   });
 
   it("starts Google Calendar connect from the dashboard when the capability is available", async () => {
@@ -163,7 +218,7 @@ describe("Dashboard upcoming meetings", () => {
     expect((await view.findByText(/30 min/)).textContent).toBe("8/21/2026, 5:00:00 PM · 30 min");
   });
 
-  it("renders meetings independently with safe Join links and no Join for declined/unlinked rows", async () => {
+  it("renders meetings independently with safe Open links and no actions for declined/unlinked rows", async () => {
     const client = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [
       { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted" },
       { id: "2", title: "Declined", startsAt: "2026-08-21T18:00:00Z", endsAt: "2026-08-21T18:30:00Z", allDay: false, meetingUrl: "https://zoom.us/j/2", meetingProvider: "zoom", organizerEmail: null, attendeeResponse: "declined" },
@@ -172,12 +227,12 @@ describe("Dashboard upcoming meetings", () => {
       { id: "5", title: "JavaScript URL", startsAt: "2026-08-21T21:00:00Z", endsAt: "2026-08-21T21:30:00Z", allDay: false, meetingUrl: "javascript:alert(1)", meetingProvider: null, organizerEmail: null, attendeeResponse: "accepted" },
     ] } });
     const view = render(<Dashboard client={client} redirect={() => {}} />);
-    const join = await view.findByRole("link", { name: "Join Planning" });
-    expect(join.getAttribute("target")).toBe("_blank");
-    expect(join.getAttribute("rel")).toBe("noopener noreferrer");
-    expect(view.queryByRole("link", { name: /Join Declined/ })).toBeNull();
-    expect(view.queryByRole("link", { name: "Join Data URL" })).toBeNull();
-    expect(view.queryByRole("link", { name: "Join JavaScript URL" })).toBeNull();
+    const open = await view.findByRole("link", { name: "Open Planning" });
+    expect(open.getAttribute("target")).toBe("_blank");
+    expect(open.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(view.queryByRole("link", { name: /Open Declined/ })).toBeNull();
+    expect(view.queryByRole("link", { name: "Open Data URL" })).toBeNull();
+    expect(view.queryByRole("link", { name: "Open JavaScript URL" })).toBeNull();
     expect(await view.findByText("No link")).toBeDefined();
     expect(view.getAllByText("Declined")[0]?.closest("li")?.getAttribute("data-declined")).toBe("true");
   });
