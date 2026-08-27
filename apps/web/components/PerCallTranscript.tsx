@@ -109,6 +109,7 @@ export function PerCallTranscript({
   );
   const [fatalError, setFatalError] = useState<AppApiError | null>(null);
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+  const [isChatHidden, setIsChatHidden] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const transcriptRef = useRef<HTMLOListElement | null>(null);
   // §5.16 error detail (`calls.status_reason`) from the /calls/:id header —
@@ -345,7 +346,7 @@ export function PerCallTranscript({
     if (!isPinnedToBottom) return;
     const transcript = transcriptRef.current;
     transcript?.scrollTo?.({ top: transcript.scrollHeight });
-  }, [state.lines.length, state.partial?.text, isPinnedToBottom]);
+  }, [state.lines.length, state.partial?.text, isPinnedToBottom, isChatHidden]);
 
   // A terminal failure with nothing captured replaces the empty list with the
   // failure card; once lines exist the transcript stays and the header keeps
@@ -395,7 +396,7 @@ export function PerCallTranscript({
           }}
         >
           {!hasLines && emptyCopy && view.kind !== "error" ? <li className="samograph-transcript-empty">{emptyCopy}</li> : null}
-          {state.lines.map((l) =>
+          {state.lines.filter((l) => !isChatHidden || l.kind !== "chat").map((l) =>
             l.speaker === SAMOGRAPH_WARNING_SPEAKER ? (
               <li key={l.seq}>
                 <WarningLine line={l} />
@@ -409,6 +410,7 @@ export function PerCallTranscript({
                   className="samograph-line-speaker"
                   aria-hidden="true"
                   data-speaker-index={speakerIndex(l.speaker)}
+                  title={`${l.speaker}${l.kind === "chat" ? " (chat)" : ""}`}
                 >{l.speaker}{l.kind === "chat" ? " (chat)" : ""}:</b>
                 <span className="samograph-line-utterance" aria-hidden="true">{l.text}</span>
               </li>
@@ -423,7 +425,7 @@ export function PerCallTranscript({
               <span className="samograph-visually-hidden">{formatRenderLine(state.partial)}</span>
               <span className="samograph-line-number" aria-hidden="true">{state.partial.seq}</span>
               <time className="samograph-line-time" aria-hidden="true">{state.partial.ts}</time>
-              <b className="samograph-line-speaker" aria-hidden="true" data-speaker-index={speakerIndex(state.partial.speaker)}>{state.partial.speaker}:</b>
+              <b className="samograph-line-speaker" aria-hidden="true" data-speaker-index={speakerIndex(state.partial.speaker)} title={state.partial.speaker}>{state.partial.speaker}:</b>
               <span className="samograph-line-utterance" aria-hidden="true">{state.partial.text}</span>
             </li>
           ) : null}
@@ -435,7 +437,15 @@ export function PerCallTranscript({
       <footer className="samograph-controls samograph-instrument-foot">
         <div className="samograph-transcript-actions">
           <a className="samograph-download-transcript" href={transcriptDownloadHref(callId, auth)} download>Download transcript</a>
-          <a className="samograph-download-transcript-speech" href={transcriptDownloadHref(callId, auth, { excludeComments: true })} download>Download (speech only)</a>
+          <a className="samograph-download-transcript-speech" href={transcriptDownloadHref(callId, auth, { excludeComments: true })} download>Download (no chat)</a>
+          <button
+            type="button"
+            className="samograph-toggle-chat"
+            aria-pressed={isChatHidden}
+            onClick={() => setIsChatHidden((hidden) => !hidden)}
+          >
+            Hide chat
+          </button>
         </div>
         <div className="samograph-share-state">
           <span>{auth.kind === "share" ? "Read-only shared link" : "Share link · owner controls"}</span>
