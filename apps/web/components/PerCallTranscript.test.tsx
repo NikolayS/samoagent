@@ -142,6 +142,18 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     expect(row?.querySelector(".samograph-line-utterance")?.textContent).toBe("columns");
   });
 
+  it("renders an ISO wire timestamp in canonical UTC form", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container, getByText } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ ts: "2026-08-27T18:08:28.000Z", speaker: "Bob" })));
+    expect(container.querySelector(".samograph-line-time")?.textContent).toBe(
+      "2026-08-27 18:08:28",
+    );
+    expect(getByText("[2026-08-27 18:08:28] Bob: hello world")).toBeDefined();
+  });
+
   it("exposes the full speaker label as a tooltip when the visible label is truncated", () => {
     const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
     const { container } = render(
@@ -151,6 +163,24 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     expect(container.querySelector(".samograph-line-speaker")?.getAttribute("title")).toBe(
       "Alexander Samokhvalov (chat)",
     );
+    expect(container.querySelector(".samograph-line-speaker-name")?.textContent).toBe(
+      "Alexander Samokhvalov",
+    );
+    expect(container.querySelector(".samograph-line-speaker-marker")?.textContent).toBe(" (chat):");
+  });
+
+  it("keeps the chat marker separate from an ellipsized speaker name on partial lines", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ speaker: "Alexander Samokhvalov", kind: "chat", final: false })));
+    const speaker = container.querySelector(".samograph-line-partial .samograph-line-speaker");
+    expect(speaker?.getAttribute("title")).toBe("Alexander Samokhvalov (chat)");
+    expect(speaker?.querySelector(".samograph-line-speaker-name")?.textContent).toBe(
+      "Alexander Samokhvalov",
+    );
+    expect(speaker?.querySelector(".samograph-line-speaker-marker")?.textContent).toBe(" (chat):");
   });
 
   it("lets shared viewers hide and show chat without affecting speech or ordinals", () => {

@@ -78,6 +78,17 @@ export function isTerminalStatus(status: CallStatus): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
+const CANONICAL_TS = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+const ISO_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/;
+
+/** Normalize ISO wire timestamps to the transcript's canonical UTC display form. */
+export function formatTranscriptTimestamp(value: string): string {
+  if (CANONICAL_TS.test(value) || !ISO_TS.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
 export function initialTranscriptState(
   status: CallStatus = "PENDING",
 ): TranscriptViewState {
@@ -99,7 +110,7 @@ export function initialTranscriptState(
  */
 export function formatRenderLine(line: TranscriptLine): string {
   return formatTranscriptLineWithKind({
-    ts: line.ts,
+    ts: formatTranscriptTimestamp(line.ts),
     speaker: line.speaker,
     text: line.text,
     kind: line.kind,

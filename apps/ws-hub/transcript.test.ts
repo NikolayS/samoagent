@@ -178,6 +178,11 @@ d("transcript replay/backfill + REST (§5.5 / §5.6 / §5.10)", () => {
     expect(lines.map((l) => l.seq)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
   });
 
+  it("replay emits the exact canonical live timestamp format", async () => {
+    const lines = await asTenant(tenantA, (tx) => replayTranscripts(tx, callTxt, 0));
+    expect(lines[0]?.ts).toBe("2026-01-01 00:00:01");
+  });
+
   it("replay since_seq ≥ max returns EMPTY (not an error)", async () => {
     expect(await asTenant(tenantA, (tx) => replayTranscripts(tx, callA, 100))).toEqual([]);
     expect(await asTenant(tenantA, (tx) => replayTranscripts(tx, callA, 5000))).toEqual([]);

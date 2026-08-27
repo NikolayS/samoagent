@@ -3,6 +3,7 @@
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import {
   formatRenderLine,
+  formatTranscriptTimestamp,
   initialTranscriptState,
   isTerminalStatus,
   SAMOGRAPH_WARNING_SPEAKER,
@@ -405,13 +406,16 @@ export function PerCallTranscript({
               <li key={l.seq} className="samograph-line samograph-transcript-row">
                 <span className="samograph-visually-hidden">{formatRenderLine(l)}</span>
                 <span className="samograph-line-number" aria-hidden="true">{l.seq}</span>
-                <time className="samograph-line-time" aria-hidden="true">{l.ts}</time>
+                <time className="samograph-line-time" aria-hidden="true">{formatTranscriptTimestamp(l.ts)}</time>
                 <b
                   className="samograph-line-speaker"
                   aria-hidden="true"
                   data-speaker-index={speakerIndex(l.speaker)}
                   title={`${l.speaker}${l.kind === "chat" ? " (chat)" : ""}`}
-                >{l.speaker}{l.kind === "chat" ? " (chat)" : ""}:</b>
+                >
+                  <span className="samograph-line-speaker-name">{l.speaker}</span>
+                  <span className="samograph-line-speaker-marker">{l.kind === "chat" ? " (chat):" : ":"}</span>
+                </b>
                 <span className="samograph-line-utterance" aria-hidden="true">{l.text}</span>
               </li>
             ),
@@ -424,8 +428,16 @@ export function PerCallTranscript({
             >
               <span className="samograph-visually-hidden">{formatRenderLine(state.partial)}</span>
               <span className="samograph-line-number" aria-hidden="true">{state.partial.seq}</span>
-              <time className="samograph-line-time" aria-hidden="true">{state.partial.ts}</time>
-              <b className="samograph-line-speaker" aria-hidden="true" data-speaker-index={speakerIndex(state.partial.speaker)} title={state.partial.speaker}>{state.partial.speaker}:</b>
+              <time className="samograph-line-time" aria-hidden="true">{formatTranscriptTimestamp(state.partial.ts)}</time>
+              <b
+                className="samograph-line-speaker"
+                aria-hidden="true"
+                data-speaker-index={speakerIndex(state.partial.speaker)}
+                title={`${state.partial.speaker}${state.partial.kind === "chat" ? " (chat)" : ""}`}
+              >
+                <span className="samograph-line-speaker-name">{state.partial.speaker}</span>
+                <span className="samograph-line-speaker-marker">{state.partial.kind === "chat" ? " (chat):" : ":"}</span>
+              </b>
               <span className="samograph-line-utterance" aria-hidden="true">{state.partial.text}</span>
             </li>
           ) : null}

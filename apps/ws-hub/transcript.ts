@@ -18,6 +18,7 @@
  * A query for another tenant's call therefore returns ZERO rows.
  */
 import type { SQL } from "bun";
+import { canonicalTs } from "./timestamp.ts";
 
 /** Default backfill window: the most recent finalized lines (SPEC §5.5). */
 export const DEFAULT_BACKFILL_LIMIT = 200;
@@ -51,7 +52,7 @@ function mapRow(row: TranscriptRow): TranscriptLine {
     // `seq` is a Postgres bigint; coerce to a JS number (call seqs are well
     // within Number.MAX_SAFE_INTEGER) so the wire shape is plain JSON.
     seq: Number(row.seq),
-    ts: new Date(row.ts).toISOString(),
+    ts: canonicalTs(row.ts),
     speaker: row.speaker ?? null,
     text: row.text,
   };

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import {
+  formatTranscriptTimestamp,
   formatRenderLine,
   initialTranscriptState,
   transcriptReducer,
@@ -28,6 +29,24 @@ function line(
 
 const UNREACHABLE =
   "tunnel unreachable (ERR_NGROK_727) - transcript may be incomplete; rejoin with --tunnel cloudflared";
+
+describe("formatTranscriptTimestamp — defensive wire normalization", () => {
+  it("canonicalizes an ISO timestamp to UTC without milliseconds", () => {
+    expect(formatTranscriptTimestamp("2026-08-27T18:08:28.000Z")).toBe(
+      "2026-08-27 18:08:28",
+    );
+  });
+
+  it("passes an already-canonical timestamp through unchanged", () => {
+    expect(formatTranscriptTimestamp("2026-08-27 18:08:28")).toBe(
+      "2026-08-27 18:08:28",
+    );
+  });
+
+  it("passes garbage through unchanged", () => {
+    expect(formatTranscriptTimestamp("not-a-timestamp")).toBe("not-a-timestamp");
+  });
+});
 
 describe("transcriptReducer — partial / final lines (SPEC §5.5)", () => {
   it("a partial then its final yields exactly one finalized line, no partial, no dupe", () => {
