@@ -38,6 +38,7 @@ import { createSettingsHandler } from "./settings/http.ts";
 import type { SQL } from "bun";
 import type { Keyring } from "../../packages/shared/tokens/signing.ts";
 import type { OrchestratorJob } from "../bot-orchestrator/index.ts";
+import type { RateLimiter } from "./auth/rate-limit.ts";
 import type { CallRecordingControl } from "../bot-orchestrator/recallClient.ts";
 import { metricsHttpHandler } from "../../packages/shared/observe/metrics-http.ts";
 import type { MetricsRegistry } from "../../packages/shared/observe/registry.ts";
@@ -89,6 +90,8 @@ export interface AppApiConfig {
   calendarTokenEncryption?: { activeKey: Buffer; activeKeyVersion: number; decryptionKeys: Map<number, Buffer> };
   /** The bot-orchestrator seam: enqueue a join job for a new call (§5.2). */
   enqueue: (job: OrchestratorJob) => void | Promise<void>;
+  /** Shared bot-creation cost limiter; callers may share it with calendar auto-join. */
+  callRateLimiter?: RateLimiter;
   /**
    * Recall control for the §5.14 per-call delete (`DELETE /calls/:id`): force-leave
    * a live bot + erase its recording. Wired from `getCallRecordingControl` (real
@@ -148,6 +151,7 @@ export function createAppApi(config: AppApiConfig): AppApi {
     enqueue: config.enqueue,
     keyring: config.tokenKeyring,
     recall: config.recall,
+    rateLimiter: config.callRateLimiter,
   });
 
   // §5.14 whole-account GDPR erasure (`DELETE /account`). Reuses the SAME Recall

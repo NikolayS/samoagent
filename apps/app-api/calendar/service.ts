@@ -12,6 +12,7 @@ export interface CalendarConnection {
   id: string; userId: string; tenantId: string;
   encryptedRefreshToken: Buffer; refreshTokenIv: Buffer; refreshTokenTag: Buffer;
   encryptionKeyVersion: number; grantedScopes: string[]; status: "connected" | "broken";
+  autoJoin: boolean;
   connectedAt: Date; lastSyncAt: Date | null; lastSyncErrorAt: Date | null;
 }
 export interface CalendarConnectionStore {
@@ -67,7 +68,7 @@ export class CalendarService {
       const existing = await this.#deps.store.get(input.userId, input.tenantId);
       const rowBase = { id: existing?.id ?? randomUUID(), userId: input.userId, tenantId: input.tenantId };
       const encrypted = encryptSecret(exchanged.refreshToken, this.#deps.activeKey, this.#deps.activeKeyVersion, aad(rowBase));
-      const row: CalendarConnection = { ...rowBase, encryptedRefreshToken: encrypted.ciphertext, refreshTokenIv: encrypted.iv, refreshTokenTag: encrypted.tag, encryptionKeyVersion: encrypted.keyVersion, grantedScopes: exchanged.scopes, status: "connected", connectedAt: new Date(this.#deps.clock()), lastSyncAt: null, lastSyncErrorAt: null };
+      const row: CalendarConnection = { ...rowBase, encryptedRefreshToken: encrypted.ciphertext, refreshTokenIv: encrypted.iv, refreshTokenTag: encrypted.tag, encryptionKeyVersion: encrypted.keyVersion, grantedScopes: exchanged.scopes, status: "connected", autoJoin: existing?.autoJoin ?? false, connectedAt: new Date(this.#deps.clock()), lastSyncAt: null, lastSyncErrorAt: null };
       await this.#deps.store.save(row);
       // Slice 2 seam: Slices 3/4 inject the shared immediate synchronization service.
       await this.#deps.immediateSync?.(row.id).catch(() => {});

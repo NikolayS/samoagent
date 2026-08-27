@@ -70,6 +70,8 @@ export { formatCalendarStartupLine } from "./calendar/resolve-config.ts";
 import { startCalendarSyncPoller } from "./calendar/poller.ts";
 import { CalendarSyncService } from "./calendar/sync.ts";
 import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
+import { createCallForTenant } from "./calls/create-call.ts";
+import { InMemoryRateLimiter } from "./auth/rate-limit.ts";
 
 /**
  * Prod email fallback: if `RESEND_API_KEY` is not configured there is NO dev
@@ -209,10 +211,14 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
   // at Google with `redirect_uri_mismatch`. See docs/runbooks/google-oauth.md.
   const googleOAuth = googleOAuthFromEnv(env, webOrigin);
   const { googleCalendarOAuth, calendarTokenEncryption } = resolveCalendarConfig(env, webOrigin);
+  const calendarStore = new PostgresCalendarConnectionStore(sql);
+  const calendarAutoJoinRateLimiter = new InMemoryRateLimiter();
   const calendarPoller = googleCalendarOAuth && calendarTokenEncryption && googleCalendarOAuth.apiClient
     ? startCalendarSyncPoller({
         sql,
-        syncConnection: (connectionId) => new CalendarSyncService({ store: new PostgresCalendarConnectionStore(sql), client: googleCalendarOAuth.apiClient!, decryptionKeys: calendarTokenEncryption.decryptionKeys }).sync(connectionId),
+        syncConnection: (connectionId) => new CalendarSyncService({ store: calendarStore, client: googleCalendarOAuth.apiClient!, decryptionKeys: calendarTokenEncryption.decryptionKeys }).sync(connectionId),
+        autoJoinStore: { candidates: (...args) => calendarStore.autoJoinCandidates(...args) },
+        createCall: (input) => createCallForTenant(input, { sql, enqueue, rateLimiter: calendarAutoJoinRateLimiter, now: Date.now }),
         metrics: registry,
         logger: { warn: (message) => console.warn(message) },
       })
@@ -282,6 +288,7 @@ export function startAppApiServer(env: EnvLike = process.env): ReturnType<typeof
     googleCalendarOAuth,
     calendarTokenEncryption,
     enqueue,
+    callRateLimiter: calendarAutoJoinRateLimiter,
     // §5.14 per-call delete: force-leave a live bot + erase its Recall recording.
     // Real acts when RECALL_LIVE, else the in-repo fake (no key, no network).
     recall: getCallRecordingControl(),

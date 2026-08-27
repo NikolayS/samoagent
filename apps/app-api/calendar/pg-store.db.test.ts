@@ -39,6 +39,7 @@ d("PostgresCalendarConnectionStore", () => {
       encryptionKeyVersion: 1,
       grantedScopes: ["scope:calendar.read"],
       status: "connected",
+      autoJoin: false,
       connectedAt: new Date("2026-08-26T12:00:00.000Z"),
       lastSyncAt: null,
       lastSyncErrorAt: null,
