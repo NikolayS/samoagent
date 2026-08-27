@@ -8,6 +8,58 @@ import { installDom } from "../test/setup.tsx";
 installDom();
 
 describe("Dashboard upcoming meetings", () => {
+  it("shows auto state and toggles a meeting exclusion", async () => {
+    const client = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", autoJoin: true, lastSyncAt: null, meetings: [{ id: "event/1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted", autoJoinExcluded: false }] } });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    expect(await view.findByText("Auto")).toBeDefined();
+    fireEvent.click(view.getByRole("button", { name: "Skip auto-record for Planning" }));
+    expect(await view.findByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+    expect(client.requests).toContainEqual({ path: "/calendar/meetings/event%2F1", method: "PATCH", body: { excluded: true } });
+    expect(view.queryByRole("button", { name: "Add samograph to Planning" })).toBeNull();
+  });
+
+  it("rolls an optimistic exclusion toggle back when the request is rejected", async () => {
+    const client = createFakeAppApiClient({
+      seedCalendarMeetings: { connectionState: "connected", autoJoin: true, lastSyncAt: null, meetings: [{ id: "event-1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted", autoJoinExcluded: false }] },
+    });
+    let rejectUpdate!: (error: Error) => void;
+    client.setCalendarMeetingExcluded = mock(() => new Promise<{ id: string; excluded: boolean }>((_resolve, reject) => { rejectUpdate = reject; }));
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    fireEvent.click(await view.findByRole("button", { name: "Skip auto-record for Planning" }));
+    expect(await view.findByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+    rejectUpdate(new Error("failed"));
+    expect(await view.findByRole("button", { name: "Skip auto-record for Planning" })).toBeDefined();
+    expect((await view.findByRole("alert")).textContent).toBe("Auto-record couldn’t be updated. Try again.");
+  });
+
+  it("syncs the per-row exclusion state when a refreshed snapshot changes the prop", async () => {
+    const meeting = { id: "event-1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet" as const, organizerEmail: null, attendeeResponse: "accepted" as const };
+    const first = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", autoJoin: true, lastSyncAt: null, meetings: [{ ...meeting, autoJoinExcluded: false }] } });
+    const second = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", autoJoin: true, lastSyncAt: null, meetings: [{ ...meeting, autoJoinExcluded: true }] } });
+    const view = render(<UpcomingMeetings client={first} onAuthFailure={() => {}} />);
+    expect(await view.findByRole("button", { name: "Skip auto-record for Planning" })).toBeDefined();
+    view.rerender(<UpcomingMeetings client={second} onAuthFailure={() => {}} />);
+    expect(await view.findByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+  });
+  it("keeps an optimistic toggle during prop refreshes and applies the confirmed response", async () => {
+    const meeting = { id: "event-1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet" as const, organizerEmail: null, attendeeResponse: "accepted" as const };
+    const clientFor = (autoJoinExcluded: boolean) => createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", autoJoin: true, lastSyncAt: null, meetings: [{ ...meeting, autoJoinExcluded }] } });
+    const first = clientFor(false), refreshed = clientFor(true), stale = clientFor(false);
+    let resolveUpdate!: (value: { id: string; excluded: boolean }) => void;
+    first.setCalendarMeetingExcluded = mock(() => new Promise((resolve) => { resolveUpdate = resolve; })) as unknown as typeof first.setCalendarMeetingExcluded;
+    const view = render(<UpcomingMeetings client={first} onAuthFailure={() => {}} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Skip auto-record for Planning" }));
+    view.rerender(<UpcomingMeetings client={refreshed} onAuthFailure={() => {}} />);
+    await view.findByRole("button", { name: "Undo skip auto-record for Planning" });
+    view.rerender(<UpcomingMeetings client={stale} onAuthFailure={() => {}} />);
+    await waitFor(() => expect(stale.requests.some((request) => request.path === "/calendar/meetings?limit=20")).toBe(true));
+    await Promise.resolve();
+    resolveUpdate({ id: meeting.id, excluded: true });
+
+    await waitFor(() => expect(view.getByRole("button").getAttribute("aria-busy")).toBe("false"));
+    expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+  });
   it("shows one primary Connect CTA in the available-calendar empty state", async () => {
     const client = createFakeAppApiClient({
       googleCalendarEnabled: true,

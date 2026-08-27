@@ -82,6 +82,11 @@ const nextConfig = {
                 destination: `${apiOrigin}/calendar/meetings`,
               },
               {
+                source: "/calendar/meetings/:id",
+                has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
+                destination: `${apiOrigin}/calendar/meetings/:id`,
+              },
+              {
                 source: "/calendar/connection",
                 has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
                 destination: `${apiOrigin}/calendar/connection`,

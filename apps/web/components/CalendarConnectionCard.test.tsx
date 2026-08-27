@@ -7,6 +7,16 @@ import { installDom } from "../test/setup.tsx";
 installDom();
 
 describe("Settings Calendar connection", () => {
+  it("optimistically toggles auto-record and rolls back on failure", async () => {
+    const client = createFakeAppApiClient({ seedCalendarStatus: { provider: "google", state: "connected", connectedAt: null, lastSyncAt: null, lastSyncErrorAt: null, autoJoin: false }, failUpdateCalendarAutoJoinWith: { code: "failed", message: "failed" } });
+    const view = render(<CalendarConnectionCard client={client} onAuthFailure={() => {}} />);
+    const control = await view.findByRole("switch", { name: /auto-record my meetings/i }) as HTMLInputElement;
+    fireEvent.click(control);
+    expect(control.checked).toBe(true);
+    await waitFor(() => expect(control.checked).toBe(false));
+    expect(client.requests).toContainEqual({ path: "/calendar/connection", method: "PATCH", body: { auto_join: true } });
+    expect((await view.findByRole("alert")).textContent).toContain("Auto-record couldn’t be updated");
+  });
   it("formats last sync with the supplied locale and time zone", async () => {
     const client = createFakeAppApiClient({ seedCalendarStatus: { provider: "google", state: "connected", connectedAt: "2026-08-20T18:30:00Z", lastSyncAt: "2026-08-20T18:35:00Z", lastSyncErrorAt: null } });
     const view = render(<CalendarConnectionCard client={client} onAuthFailure={() => {}} locale="en-US" timeZone="UTC" />);

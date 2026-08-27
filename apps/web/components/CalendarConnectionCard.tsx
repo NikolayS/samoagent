@@ -14,6 +14,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
   const initialCalendarError = initialParams.get("calendar_error");
   const [status, setStatus] = useState<CalendarStatus | null>(null);
   const [disconnectBusy, setDisconnectBusy] = useState(false);
+  const [autoJoinBusy, setAutoJoinBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(() => initialCalendarError
     ? authErrorMessage(initialCalendarError)
     : initialParams.get("calendar") === "connected" ? "Google Calendar connected." : null);
@@ -27,7 +28,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     onAuthFailure,
     navigate: (authorizationUrl) => window.location.assign(authorizationUrl),
   });
-  const busy = connectBusy || disconnectBusy;
+  const busy = connectBusy || disconnectBusy || autoJoinBusy;
 
   const handleError = useCallback((error: unknown, fallback: string) => {
     if (error instanceof AppApiError && error.status === 401) { onAuthFailure(); return; }
@@ -68,6 +69,17 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     finally { setDisconnectBusy(false); }
   }
 
+  async function toggleAutoJoin() {
+    if (!status || status.state !== "connected") return;
+    const previous = status.autoJoin === true, next = !previous;
+    setStatus({ ...status, autoJoin: next }); setAutoJoinBusy(true); setMessage(null);
+    try { setStatus(await client.updateCalendarAutoJoin(next)); }
+    catch (error) {
+      setStatus((current) => current ? { ...current, autoJoin: previous } : current);
+      handleError(error, "Auto-record couldn’t be updated. Try again.");
+    } finally { setAutoJoinBusy(false); }
+  }
+
   function closeConfirm() {
     setConfirming(false);
     disconnectTrigger.current?.focus();
@@ -90,6 +102,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     </> : <>
       <p><strong>Connected</strong></p>
       {status.lastSyncAt ? <p className="samograph-field-hint">Last synced {formatDateTime(status.lastSyncAt, { locale, timeZone })}</p> : null}
+      <label className="samograph-toggle"><input type="checkbox" role="switch" checked={status.autoJoin === true} disabled={busy} onChange={() => void toggleAutoJoin()} /> <span><strong>Auto-record my meetings</strong><small className="samograph-field-hint">samograph joins every upcoming meeting with a video link a few minutes before it starts</small></span></label>
       <button ref={disconnectTrigger} type="button" className="samograph-btn samograph-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>Disconnect</button>
     </>}
     {confirming ? <InlineConfirm title="Disconnect Google Calendar?" confirmLabel="Disconnect" busy={disconnectBusy} onCancel={closeConfirm} onConfirm={() => void disconnect()}>Upcoming meetings will be removed.</InlineConfirm> : null}

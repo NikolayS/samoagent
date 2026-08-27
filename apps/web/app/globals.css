@@ -493,6 +493,11 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 .samograph-alert--warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
 .samograph-alert--success { color: var(--success-ink); background: color-mix(in srgb, var(--success-ink) 8%, var(--surface)); }
 .samograph-alert--info { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
+.samograph-toggle { display: flex; align-items: flex-start; gap: var(--space-3); margin-block: var(--space-4); cursor: pointer; }
+.samograph-toggle input { margin-top: 0.2rem; }
+.samograph-toggle span { display: grid; gap: var(--space-1); }
+.samograph-toggle .samograph-field-hint { display: block; }
+.samograph-chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0.15rem 0.45rem; font-size: var(--text-xs); font-weight: 700; }
 .samograph-danger-zone { border-top: var(--border-strong) solid var(--crit); padding-top: var(--space-5); }
 .samograph-danger-zone-title { color: var(--crit); }
 .samograph-danger-confirm { display: grid; gap: var(--space-2); margin-block: var(--space-5); }

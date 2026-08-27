@@ -27,6 +27,13 @@ d("calendar_events migration", () => {
     expect(String(policy[0].qual)).toContain("( SELECT current_setting('app.tenant_id'::text)");
     expect(String(policy[0].with_check)).toContain("( SELECT current_setting('app.tenant_id'::text)");
   });
+  it("protects durable exclusions with the same forced tenant RLS posture", async () => {
+    const posture = await sql`SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='calendar_event_exclusions'::regclass`;
+    const policy = await sql`SELECT qual,with_check FROM pg_policies WHERE tablename='calendar_event_exclusions' AND policyname='calendar_event_exclusions_tenant_isolation'`;
+    expect(posture).toEqual([{ relrowsecurity: true, relforcerowsecurity: true }]);
+    expect(String(policy[0].qual)).toContain("( SELECT current_setting('app.tenant_id'::text)");
+    expect(String(policy[0].with_check)).toContain("( SELECT current_setting('app.tenant_id'::text)");
+  });
   it("isolates tenants through the runtime role", async () => {
     const a = await owner(), b = await owner(); await event(a.connectionId, a.tenantId, "a"); await event(b.connectionId, b.tenantId, "b");
     const rows = await sql.begin(async (tx) => { await tx.unsafe("SET LOCAL ROLE samograph_app"); await setTenant(tx, a.tenantId); return tx`SELECT provider_event_id FROM calendar_events WHERE provider_event_id IN ('a','b') ORDER BY provider_event_id`; });
@@ -40,6 +47,27 @@ d("calendar_events migration", () => {
     expect(remaining).toEqual([]);
   });
 
+  it("rejects a cross-tenant exclusion connection under the runtime role", async () => {
+    const a = await owner(), b = await owner();
+    let errno: string | undefined;
+    try {
+      await sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE samograph_app");
+        await setTenant(tx, a.tenantId);
+        await tx`INSERT INTO calendar_event_exclusions(connection_id,provider_event_id,tenant_id)
+          VALUES (${b.connectionId},'cross-tenant',${a.tenantId})`;
+      });
+    } catch (error) { errno = (error as { errno?: string }).errno; }
+    expect(errno).toBe("23503");
+  });
+
+  it("returns not found for another tenant's event after entering the runtime-role path", async () => {
+    const a = await owner(), b = await owner();
+    const rows = await event(b.connectionId, b.tenantId, "tenant-b-event") as unknown as Array<{ id: string }>;
+    const store = new PostgresCalendarConnectionStore(sql);
+    expect(await store.excludeMeeting(a.userId, a.tenantId, rows[0].id, true)).toBe(false);
+  });
+
   it("never lets an older reconciliation overwrite a newer success", async () => {
     const row = await owner(); const store = new PostgresCalendarConnectionStore(sql); const olderConnection = await store.startSync(row.connectionId); const newerConnection = await store.startSync(row.connectionId);
     const normalized = (title: string): NormalizedCalendarEvent => ({ providerEventId: "race", recurringEventId: null, title, organizerEmail: null, startsAt: new Date("2026-08-24T10:00:00Z"), endsAt: new Date("2026-08-24T11:00:00Z"), allDay: false, attendeeResponse: null, meetingUrl: null, meetingProvider: null, sourceUpdatedAt: null });
@@ -50,6 +78,32 @@ d("calendar_events migration", () => {
     expect(await sql`SELECT last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ last_sync_at: newer }]);
     await store.markFailure(row.connectionId, { syncSeq: olderConnection!.syncSeq, brokenReason: "revoked", at: older });
     expect(await sql`SELECT status,broken_reason,last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ status: "connected", broken_reason: null, last_sync_at: newer }]);
+  });
+
+  it("preserves an auto-join exclusion when sync upserts the event", async () => {
+    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql);
+    const first = await store.startSync(row.connectionId); const second = await store.startSync(row.connectionId);
+    const at = new Date("2026-08-21T12:00:00Z"); const bounds = { windowStart: at, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: at };
+    const normalized = (title: string): NormalizedCalendarEvent => ({ providerEventId: "excluded", recurringEventId: null, title, organizerEmail: null, startsAt: new Date("2026-08-24T10:00:00Z"), endsAt: new Date("2026-08-24T11:00:00Z"), allDay: false, attendeeResponse: "accepted", meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", sourceUpdatedAt: null });
+    await store.reconcile(first!, [normalized("before")], bounds);
+    const cached = await sql`SELECT id FROM calendar_events WHERE connection_id=${row.connectionId} AND provider_event_id='excluded'` as unknown as Array<{ id: string }>;
+    expect(await store.excludeMeeting(row.userId, row.tenantId, cached[0].id, true)).toBe(true);
+    await store.reconcile(second!, [normalized("after")], { ...bounds, syncStartedAt: new Date(at.getTime() + 1) });
+    expect(await sql`SELECT e.title,(x.connection_id IS NOT NULL) AS excluded FROM calendar_events e LEFT JOIN calendar_event_exclusions x ON x.connection_id=e.connection_id AND x.provider_event_id=e.provider_event_id WHERE e.connection_id=${row.connectionId} AND e.provider_event_id='excluded'` as unknown).toEqual([{ title: "after", excluded: true }]);
+  });
+
+  it("preserves an auto-join exclusion when an event is deleted then recreated", async () => {
+    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql);
+    const at = new Date("2026-08-21T12:00:00Z"); const bounds = { windowStart: at, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: at };
+    const normalized: NormalizedCalendarEvent = { providerEventId: "recreated", recurringEventId: null, title: "Recreated", organizerEmail: null, startsAt: new Date("2026-08-24T10:00:00Z"), endsAt: new Date("2026-08-24T11:00:00Z"), allDay: false, attendeeResponse: "accepted", meetingUrl: "https://zoom.us/j/recreated", meetingProvider: "zoom", sourceUpdatedAt: null };
+    await store.reconcile((await store.startSync(row.connectionId))!, [normalized], bounds);
+    const original = await sql`SELECT id FROM calendar_events WHERE connection_id=${row.connectionId} AND provider_event_id='recreated'` as unknown as Array<{ id: string }>;
+    expect(await store.excludeMeeting(row.userId, row.tenantId, original[0].id, true)).toBe(true);
+    await store.reconcile((await store.startSync(row.connectionId))!, [], { ...bounds, syncStartedAt: new Date(at.getTime() + 1) });
+    await store.reconcile((await store.startSync(row.connectionId))!, [normalized], { ...bounds, syncStartedAt: new Date(at.getTime() + 2) });
+    const recreated = await sql`SELECT id FROM calendar_events WHERE connection_id=${row.connectionId} AND provider_event_id='recreated'` as unknown as Array<{ id: string }>;
+    expect(recreated[0].id).not.toBe(original[0].id);
+    expect((await store.meetings(row.userId, row.tenantId, 20, at)).meetings[0]?.autoJoinExcluded).toBe(true);
   });
 
   it("keeps the newer snapshot when an older reconciliation commits last at the same timestamp", async () => {

@@ -24,8 +24,10 @@ d("calendar auto-join window query", () => {
       ["declined", now, end, false, "declined", "https://zoom.us/j/7"],
       ["all-day", now, end, true, "accepted", "https://zoom.us/j/8"],
       ["linkless", now, end, false, "accepted", null],
+      ["excluded", now, end, false, "accepted", "https://zoom.us/j/9"],
     ] as const;
     for (const [id, starts, ends, allDay, response, url] of rows) await sql`INSERT INTO calendar_events(tenant_id,connection_id,provider_event_id,starts_at,ends_at,all_day,attendee_response,meeting_url) VALUES (${tenant},${connection},${id},${starts},${ends},${allDay},${response},${url})`;
+    await sql`INSERT INTO calendar_event_exclusions(connection_id,provider_event_id,tenant_id) VALUES (${connection},'excluded',${tenant})`;
     expect((await new PostgresCalendarConnectionStore(sql).autoJoinCandidates(connection, tenant, now, from, to)).map((row) => row.providerEventId)).toEqual(["lookback-running", "linked-timed-accepted", "null-response"]);
   });
 
