@@ -1375,7 +1375,7 @@ The stable Calendar errors added to §5.16 are:
 ### S5-7. §5.2 / §5.10 / §5.12 — Calendar meetings and opt-in auto-join — *Extension*
 
 **Amends:** §5.2 (call creation and bot join path), §5.10 (data model), and
-§5.12 (Calendar settings). PRs **#242–#249**, **#264**, **#265**, **#269**, and
+§5.12 (Calendar settings). PRs **#242, #243, #244, #245, #246, #249**, **#264**, **#265**, **#269**, and
 **#271**; follow-ups **#266** and **#270**.
 
 **What differs:** The S5-3 incremental Google Calendar connection now backs a
