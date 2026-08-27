@@ -26,15 +26,29 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
       ON CONFLICT (user_id,provider) DO UPDATE SET tenant_id=EXCLUDED.tenant_id, encrypted_refresh_token=EXCLUDED.encrypted_refresh_token, refresh_token_iv=EXCLUDED.refresh_token_iv, refresh_token_tag=EXCLUDED.refresh_token_tag, encryption_key_version=EXCLUDED.encryption_key_version, granted_scopes=EXCLUDED.granted_scopes, status='connected', broken_reason=NULL, connected_at=EXCLUDED.connected_at, updated_at=EXCLUDED.updated_at, last_sync_at=NULL, last_sync_error_at=NULL, sync_seq=calendar_connections.sync_seq+1, committed_sync_seq=calendar_connections.sync_seq+1`;
   }
   async delete(userId: string, tenantId: string) { await this.sql`DELETE FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'`; }
+  async updateAutoJoin(userId: string, tenantId: string, autoJoin: boolean) {
+    const rows = await this.sql`UPDATE calendar_connections SET auto_join=${autoJoin},updated_at=now() WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google' RETURNING *` as unknown as Row[];
+    return rows[0] ? map(rows[0]) : null;
+  }
+  async excludeMeeting(userId: string, tenantId: string, eventId: string, excluded: boolean) {
+    const connections = await this.sql`SELECT id FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'` as unknown as Row[];
+    if (!connections[0]) return false;
+    const rows = await this.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE samograph_app");
+      await setTenant(tx, tenantId);
+      return tx`UPDATE calendar_events SET auto_join_excluded=${excluded},updated_at=now() WHERE id=${eventId} AND connection_id=${String(connections[0].id)} RETURNING id`;
+    }) as unknown as Row[];
+    return rows.length === 1;
+  }
   async meetings(userId: string, tenantId: string, limit: number, now: Date): Promise<CalendarMeetingsSnapshot> {
     return this.sql.begin(async (tx) => {
-      const connections = await tx`SELECT status,last_sync_at FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'` as unknown as Array<{ status: "connected" | "broken"; last_sync_at: string | null }>;
-      const connection = connections[0] ? { status: connections[0].status, lastSyncAt: connections[0].last_sync_at ? new Date(connections[0].last_sync_at) : null } : null;
+      const connections = await tx`SELECT status,last_sync_at,auto_join FROM calendar_connections WHERE user_id=${userId} AND tenant_id=${tenantId} AND provider='google'` as unknown as Array<{ status: "connected" | "broken"; last_sync_at: string | null; auto_join: boolean }>;
+      const connection = connections[0] ? { status: connections[0].status, autoJoin: connections[0].auto_join, lastSyncAt: connections[0].last_sync_at ? new Date(connections[0].last_sync_at) : null } : null;
       if (!connection || connection.status === "broken") return { connection, meetings: [] };
       await tx.unsafe("SET LOCAL ROLE samograph_app");
       await setTenant(tx, tenantId);
-      const rows = await tx`SELECT id,title,starts_at,ends_at,all_day,meeting_url,meeting_provider,organizer_email,attendee_response FROM calendar_events WHERE ends_at>${now} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' ORDER BY starts_at,id LIMIT ${limit}` as unknown as Row[];
-      const meetings: CalendarMeeting[] = rows.map((row) => ({ id: String(row.id), title: String(row.title), startsAt: new Date(row.starts_at as string), endsAt: new Date(row.ends_at as string), allDay: Boolean(row.all_day), meetingUrl: row.meeting_url === null ? null : String(row.meeting_url), meetingProvider: row.meeting_provider as CalendarMeeting["meetingProvider"], organizerEmail: row.organizer_email === null ? null : String(row.organizer_email), attendeeResponse: row.attendee_response as CalendarMeeting["attendeeResponse"] }));
+      const rows = await tx`SELECT id,title,starts_at,ends_at,all_day,meeting_url,meeting_provider,organizer_email,attendee_response,auto_join_excluded FROM calendar_events WHERE ends_at>${now} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' ORDER BY starts_at,id LIMIT ${limit}` as unknown as Row[];
+      const meetings: CalendarMeeting[] = rows.map((row) => ({ id: String(row.id), title: String(row.title), startsAt: new Date(row.starts_at as string), endsAt: new Date(row.ends_at as string), allDay: Boolean(row.all_day), meetingUrl: row.meeting_url === null ? null : String(row.meeting_url), meetingProvider: row.meeting_provider as CalendarMeeting["meetingProvider"], organizerEmail: row.organizer_email === null ? null : String(row.organizer_email), attendeeResponse: row.attendee_response as CalendarMeeting["attendeeResponse"], autoJoinExcluded: Boolean(row.auto_join_excluded) }));
       return { connection, meetings };
     });
   }
@@ -50,7 +64,7 @@ export class PostgresCalendarConnectionStore implements CalendarConnectionStore,
             AND calls.created_at >= ${new Date(now.getTime() - 4 * 60 * 60_000)}
             AND calls.status NOT IN ('ENDED','COULD_NOT_JOIN','COULD_NOT_RECORD','BOT_REMOVED')
         ) AS available
-        FROM calendar_events WHERE connection_id=${connectionId} AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' AND starts_at BETWEEN ${from} AND ${to} AND ends_at > ${now} ORDER BY starts_at,provider_event_id` as unknown as Row[];
+        FROM calendar_events WHERE connection_id=${connectionId} AND NOT auto_join_excluded AND meeting_url IS NOT NULL AND NOT all_day AND attendee_response IS DISTINCT FROM 'declined' AND starts_at BETWEEN ${from} AND ${to} AND ends_at > ${now} ORDER BY starts_at,provider_event_id` as unknown as Row[];
       return rows.map((row) => ({ providerEventId: String(row.provider_event_id), meetingUrl: String(row.meeting_url), startsAt: new Date(row.starts_at as string), alreadyActive: !Boolean(row.available) }));
     });
   }

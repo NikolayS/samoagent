@@ -7,6 +7,15 @@ import { installDom } from "../test/setup.tsx";
 installDom();
 
 describe("Dashboard upcoming meetings", () => {
+  it("shows auto state and toggles a meeting exclusion", async () => {
+    const client = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", autoJoin: true, lastSyncAt: null, meetings: [{ id: "event/1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted", autoJoinExcluded: false }] } });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    expect(await view.findByText("Auto")).toBeDefined();
+    fireEvent.click(view.getByRole("button", { name: "Skip auto-record for Planning" }));
+    expect(await view.findByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+    expect(client.requests).toContainEqual({ path: "/calendar/meetings/event%2F1", method: "PATCH", body: { excluded: true } });
+    expect(view.queryByRole("button", { name: "Add samograph to Planning" })).toBeNull();
+  });
   it("shows one primary Connect CTA in the available-calendar empty state", async () => {
     const client = createFakeAppApiClient({
       googleCalendarEnabled: true,

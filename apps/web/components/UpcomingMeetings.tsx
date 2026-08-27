@@ -55,6 +55,17 @@ function MeetingActions({ client, meetingUrl, title, onAuthFailure, onCreated }:
   </span>;
 }
 
+function AutoMeetingActions({ client, meetingId, meetingUrl, title, initialExcluded, onAuthFailure }: { client: AppApiClient; meetingId: string; meetingUrl: string; title: string; initialExcluded: boolean; onAuthFailure: () => void }) {
+  const [excluded, setExcluded] = useState(initialExcluded); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
+  async function toggle() {
+    const previous = excluded, next = !previous; setExcluded(next); setBusy(true); setError(null);
+    try { await client.setCalendarMeetingExcluded(meetingId, next); }
+    catch (err) { setExcluded(previous); if (isSessionInvalid(err)) onAuthFailure(); else setError("Auto-record couldn’t be updated. Try again."); }
+    finally { setBusy(false); }
+  }
+  return <span><span className="samograph-chip">Auto</span> <button type="button" className="samograph-btn samograph-btn--secondary samograph-btn--sm" disabled={busy} aria-busy={busy} aria-label={`${excluded ? "Undo skip" : "Skip"} auto-record for ${title}`} onClick={() => void toggle()}>{excluded ? "Undo skip" : "Skip"}</button> <a className="samograph-btn samograph-btn--secondary samograph-btn--sm" href={meetingUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title}`}>Open</a>{error ? <span role="alert" className="samograph-alert samograph-alert--error">{error}</span> : null}</span>;
+}
+
 export function UpcomingMeetings({ client, onAuthFailure, onCreated, locale, timeZone }: UpcomingMeetingsProps) {
   const [snapshot, setSnapshot] = useState<CalendarMeetingsSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +112,7 @@ export function UpcomingMeetings({ client, onAuthFailure, onCreated, locale, tim
             <span className="samograph-meeting-title" title={meeting.title}>{meeting.title}</span>
             <span className="samograph-meeting-meta">{meeting.allDay ? "All day" : formatDateTime(meeting.startsAt, { locale, timeZone })} · {minutes} min{meeting.meetingProvider ? ` · ${meeting.meetingProvider === "google_meet" ? "Google Meet" : "Zoom"}` : ""}</span>
           </span>
-          {declined ? <span className="samograph-meeting-meta">Declined</span> : meetingUrl ? <MeetingActions client={client} meetingUrl={meetingUrl} title={meeting.title} onAuthFailure={onAuthFailure} onCreated={onCreated} /> : null}
+          {declined ? <span className="samograph-meeting-meta">Declined</span> : meetingUrl ? snapshot.autoJoin === true ? <AutoMeetingActions client={client} meetingId={meeting.id} meetingUrl={meetingUrl} title={meeting.title} initialExcluded={meeting.autoJoinExcluded === true} onAuthFailure={onAuthFailure} /> : <MeetingActions client={client} meetingUrl={meetingUrl} title={meeting.title} onAuthFailure={onAuthFailure} onCreated={onCreated} /> : null}
         </li>;
       })}
     </ul>}

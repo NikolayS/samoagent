@@ -52,6 +52,17 @@ d("calendar_events migration", () => {
     expect(await sql`SELECT status,broken_reason,last_sync_at FROM calendar_connections WHERE id=${row.connectionId}` as unknown).toEqual([{ status: "connected", broken_reason: null, last_sync_at: newer }]);
   });
 
+  it("preserves an auto-join exclusion when sync upserts the event", async () => {
+    const row = await owner(); const store = new PostgresCalendarConnectionStore(sql);
+    const first = await store.startSync(row.connectionId); const second = await store.startSync(row.connectionId);
+    const at = new Date("2026-08-21T12:00:00Z"); const bounds = { windowStart: at, windowEnd: new Date("2026-09-20T00:00:00Z"), syncStartedAt: at };
+    const normalized = (title: string): NormalizedCalendarEvent => ({ providerEventId: "excluded", recurringEventId: null, title, organizerEmail: null, startsAt: new Date("2026-08-24T10:00:00Z"), endsAt: new Date("2026-08-24T11:00:00Z"), allDay: false, attendeeResponse: "accepted", meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", sourceUpdatedAt: null });
+    await store.reconcile(first!, [normalized("before")], bounds);
+    await sql`UPDATE calendar_events SET auto_join_excluded=true WHERE connection_id=${row.connectionId} AND provider_event_id='excluded'`;
+    await store.reconcile(second!, [normalized("after")], { ...bounds, syncStartedAt: new Date(at.getTime() + 1) });
+    expect(await sql`SELECT title,auto_join_excluded FROM calendar_events WHERE connection_id=${row.connectionId} AND provider_event_id='excluded'` as unknown).toEqual([{ title: "after", auto_join_excluded: true }]);
+  });
+
   it("keeps the newer snapshot when an older reconciliation commits last at the same timestamp", async () => {
     const row = await owner(); const store = new PostgresCalendarConnectionStore(sql);
     const older = await store.startSync(row.connectionId); const newer = await store.startSync(row.connectionId);

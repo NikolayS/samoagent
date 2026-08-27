@@ -20,10 +20,12 @@ export interface CalendarConnectionStore {
   get(userId: string, tenantId: string): Promise<CalendarConnection | null>;
   save(row: CalendarConnection): Promise<void>;
   delete(userId: string, tenantId: string): Promise<void>;
+  updateAutoJoin?(userId: string, tenantId: string, autoJoin: boolean): Promise<CalendarConnection | null>;
+  excludeMeeting?(userId: string, tenantId: string, eventId: string, excluded: boolean): Promise<boolean>;
   meetings?(userId: string, tenantId: string, limit: number, now: Date): Promise<CalendarMeetingsSnapshot>;
 }
-export interface CalendarMeeting { id: string; title: string; startsAt: Date; endsAt: Date; allDay: boolean; meetingUrl: string | null; meetingProvider: "google_meet" | "zoom" | null; organizerEmail: string | null; attendeeResponse: "needsAction" | "declined" | "tentative" | "accepted" | null; }
-export interface CalendarMeetingsSnapshot { connection: Pick<CalendarConnection, "status" | "lastSyncAt"> | null; meetings: CalendarMeeting[]; }
+export interface CalendarMeeting { id: string; title: string; startsAt: Date; endsAt: Date; allDay: boolean; meetingUrl: string | null; meetingProvider: "google_meet" | "zoom" | null; organizerEmail: string | null; attendeeResponse: "needsAction" | "declined" | "tentative" | "accepted" | null; autoJoinExcluded?: boolean; }
+export interface CalendarMeetingsSnapshot { connection: (Pick<CalendarConnection, "status" | "lastSyncAt"> & Partial<Pick<CalendarConnection, "autoJoin">>) | null; meetings: CalendarMeeting[]; }
 export interface CalendarServiceDeps {
   provider?: GoogleCalendarOAuthPort; store: CalendarConnectionStore; rateLimiter: RateLimiter;
   sessionSecret: string; clock: () => number; randomValue?: () => string;
@@ -92,6 +94,8 @@ export class CalendarService {
   }
   async status(userId: string, tenantId: string) { return this.#deps.store.get(userId, tenantId); }
   async meetings(userId: string, tenantId: string, limit: number) { return this.#deps.store.meetings?.(userId, tenantId, limit, new Date(this.#deps.clock())) ?? { connection: null, meetings: [] }; }
+  async updateAutoJoin(userId: string, tenantId: string, autoJoin: boolean) { return this.#deps.store.updateAutoJoin?.(userId, tenantId, autoJoin) ?? null; }
+  async excludeMeeting(userId: string, tenantId: string, eventId: string, excluded: boolean) { return this.#deps.store.excludeMeeting?.(userId, tenantId, eventId, excluded) ?? false; }
   async disconnect(userId: string, tenantId: string): Promise<"ok" | "failed" | "not_configured" | "not_connected"> {
     const row = await this.#deps.store.get(userId, tenantId);
     if (!row) return "not_connected";
