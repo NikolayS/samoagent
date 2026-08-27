@@ -50,6 +50,21 @@ describe("Dashboard — fetches and renders the tenant's calls (SPEC §3 Story 1
     expect(await findByText("https://meet.google.com/abc-defg-hij")).toBeDefined();
   });
 
+  it("re-fetches calls after adding samograph from an upcoming meeting", async () => {
+    const client = createFakeAppApiClient({ seedCalendarMeetings: {
+      connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "meeting-1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted" },
+      ],
+    } });
+    const view = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await view.findByText("No calls yet.");
+
+    fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
+
+    await view.findByRole("link", { name: /Starting call https:\/\/meet\.google\.com\/abc-defg-hij/ });
+    expect(client.requests.filter((request) => request.path === "/calls" && request.method === "GET")).toHaveLength(2);
+  });
+
   it("leaves account identity and logout controls to AppShell", async () => {
     const client = createFakeAppApiClient({ seedCalls: SEED, seedAccountEmail: "person@example.com" });
     const { findByText, queryByRole, queryByText } = render(

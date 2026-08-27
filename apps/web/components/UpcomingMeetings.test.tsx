@@ -88,6 +88,39 @@ describe("Dashboard upcoming meetings", () => {
     expect(open.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
+  it("notifies the dashboard after adding samograph so its calls can be refreshed", async () => {
+    const onCreated = mock(() => {});
+    const client = createFakeAppApiClient({ seedCalendarMeetings: {
+      connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted" },
+      ],
+    } });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} onCreated={onCreated} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({
+      meetingUrl: "https://meet.google.com/abc-defg-hij",
+    }));
+  });
+
+  it("hands session-invalid create-call failures to the auth failure path", async () => {
+    const onAuthFailure = mock(() => {});
+    const client = createFakeAppApiClient({
+      seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [
+        { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://zoom.us/j/123456789", meetingProvider: "zoom", organizerEmail: null, attendeeResponse: "accepted" },
+      ] },
+      failCreateCallWith: { code: "SAMO-AUTH-005", message: "Session invalid.", status: 401 },
+    });
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={onAuthFailure} />);
+
+    fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
+
+    await waitFor(() => expect(onAuthFailure).toHaveBeenCalledTimes(1));
+    expect(view.queryByRole("alert")).toBeNull();
+  });
+
   it("shows the create-call error and lets the user retry", async () => {
     const client = createFakeAppApiClient({
       seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [

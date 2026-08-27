@@ -38,15 +38,17 @@ d("calendar meetings cache query", () => {
     await sql`INSERT INTO tenants(id,owner_user_id) VALUES (${tenant},${user})`;
     const bytes = Buffer.alloc(32), iv = Buffer.alloc(12), tag = Buffer.alloc(16);
     await sql`INSERT INTO calendar_connections(id,user_id,tenant_id,encrypted_refresh_token,refresh_token_iv,refresh_token_tag,encryption_key_version,granted_scopes) VALUES (${connection},${user},${tenant},${bytes},${iv},${tag},1,ARRAY['scope'])`;
-    const allDay = randomUUID(), linkless = randomUUID(), declined = randomUUID(), accepted = randomUUID();
+    const allDay = randomUUID(), linkless = randomUUID(), declined = randomUUID(), noResponse = randomUUID(), accepted = randomUUID();
     const startsAt = new Date("2026-08-21T13:00:00Z"), endsAt = new Date("2026-08-21T14:00:00Z");
     await sql`INSERT INTO calendar_events(id,tenant_id,connection_id,provider_event_id,title,starts_at,ends_at,all_day,attendee_response,meeting_url) VALUES
-      (${allDay},${tenant},${connection},'all-day','All day',${startsAt},${endsAt},true,'accepted',NULL),
+      (${allDay},${tenant},${connection},'all-day','All day',${startsAt},${endsAt},true,'accepted','https://zoom.us/j/all-day'),
       (${linkless},${tenant},${connection},'linkless','Linkless',${startsAt},${endsAt},false,'accepted',NULL),
       (${declined},${tenant},${connection},'declined','Declined',${startsAt},${endsAt},false,'declined','https://zoom.us/j/3'),
+      (${noResponse},${tenant},${connection},'no-response','No response',${startsAt},${endsAt},false,NULL,'https://zoom.us/j/5'),
       (${accepted},${tenant},${connection},'accepted','Accepted',${startsAt},${endsAt},false,'accepted','https://zoom.us/j/4')`;
 
     const snapshot = await new PostgresCalendarConnectionStore(sql).meetings(user, tenant, 20, new Date("2026-08-21T12:00:00Z"));
-    expect(snapshot.meetings.map((row) => row.id)).toEqual([accepted]);
+    expect(snapshot.meetings.map((row) => row.id)).toHaveLength(2);
+    expect(snapshot.meetings.map((row) => row.id)).toEqual(expect.arrayContaining([noResponse, accepted]));
   });
 });

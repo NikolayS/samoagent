@@ -1,18 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppApiError, type AppApiClient, type CalendarMeetingsSnapshot } from "../lib/appApiClient.ts";
-import { isSessionInvalid, SESSION_INVALID_MESSAGE } from "../lib/apiError.ts";
+import { AppApiError, type AppApiClient, type Call, type CalendarMeetingsSnapshot } from "../lib/appApiClient.ts";
+import { isSessionInvalid } from "../lib/apiError.ts";
 import { authErrorMessage } from "../lib/authErrors.ts";
 import { safeExternalUrl } from "../lib/safeExternalUrl.ts";
 import { formatDateTime, type DateTimeFormatOptions } from "../lib/formatDateTime.ts";
 import { useCalendarConnect } from "../lib/useCalendarConnect.ts";
 
-type UpcomingMeetingsProps = DateTimeFormatOptions & { client: AppApiClient; onAuthFailure: () => void };
+type UpcomingMeetingsProps = DateTimeFormatOptions & {
+  client: AppApiClient;
+  onAuthFailure: () => void;
+  onCreated?: (call: Call) => void;
+};
 
 type AddMeetingPhase = "idle" | "creating" | "created" | "error";
 
-function MeetingActions({ client, meetingUrl, title }: { client: AppApiClient; meetingUrl: string; title: string }) {
+function MeetingActions({ client, meetingUrl, title, onAuthFailure, onCreated }: {
+  client: AppApiClient;
+  meetingUrl: string;
+  title: string;
+  onAuthFailure: () => void;
+  onCreated?: (call: Call) => void;
+}) {
   const [phase, setPhase] = useState<AddMeetingPhase>("idle");
   const [callId, setCallId] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -24,8 +34,14 @@ function MeetingActions({ client, meetingUrl, title }: { client: AppApiClient; m
       const call = await client.createCall({ meetingUrl });
       setCallId(call.id);
       setPhase("created");
+      onCreated?.(call);
     } catch (err) {
-      setCreateError(isSessionInvalid(err) ? SESSION_INVALID_MESSAGE : err instanceof AppApiError ? err.message : "Couldn't add samograph to that call. Try again.");
+      if (isSessionInvalid(err)) {
+        setPhase("error");
+        onAuthFailure();
+        return;
+      }
+      setCreateError(err instanceof AppApiError ? err.message : "Couldn't add samograph to that call. Try again.");
       setPhase("error");
     }
   }
@@ -39,7 +55,7 @@ function MeetingActions({ client, meetingUrl, title }: { client: AppApiClient; m
   </span>;
 }
 
-export function UpcomingMeetings({ client, onAuthFailure, locale, timeZone }: UpcomingMeetingsProps) {
+export function UpcomingMeetings({ client, onAuthFailure, onCreated, locale, timeZone }: UpcomingMeetingsProps) {
   const [snapshot, setSnapshot] = useState<CalendarMeetingsSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [calendarAvailable, setCalendarAvailable] = useState<boolean | null>(null);
@@ -85,7 +101,7 @@ export function UpcomingMeetings({ client, onAuthFailure, locale, timeZone }: Up
             <span className="samograph-meeting-title" title={meeting.title}>{meeting.title}</span>
             <span className="samograph-meeting-meta">{meeting.allDay ? "All day" : formatDateTime(meeting.startsAt, { locale, timeZone })} · {minutes} min{meeting.meetingProvider ? ` · ${meeting.meetingProvider === "google_meet" ? "Google Meet" : "Zoom"}` : ""}</span>
           </span>
-          {declined ? <span className="samograph-meeting-meta">Declined</span> : meetingUrl ? <MeetingActions client={client} meetingUrl={meetingUrl} title={meeting.title} /> : null}
+          {declined ? <span className="samograph-meeting-meta">Declined</span> : meetingUrl ? <MeetingActions client={client} meetingUrl={meetingUrl} title={meeting.title} onAuthFailure={onAuthFailure} onCreated={onCreated} /> : null}
         </li>;
       })}
     </ul>}

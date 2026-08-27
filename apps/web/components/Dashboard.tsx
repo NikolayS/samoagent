@@ -159,7 +159,7 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
     <>
       <h1>Your calls</h1>
       <AddToCallForm client={client} initialUrl={initialUrl} autoFocus={calls.length === 0} onCreated={() => void load()} />
-      <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} />
+      <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} onCreated={() => void load()} />
       {calls.length === 0 ? (
         <section aria-label="Your calls" className="samograph-empty-state">
           <p className="samograph-empty-title">No calls yet.</p>
