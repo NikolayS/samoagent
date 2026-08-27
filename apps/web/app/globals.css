@@ -1319,9 +1319,9 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   scrollbar-color: var(--panel-gutter) var(--panel-ground);
 }
 
-.samograph-transcript-row {
+.samograph-instrument-lines > li.samograph-transcript-row {
   display: grid;
-  grid-template-columns: 56px minmax(88px, max-content) minmax(96px, max-content) minmax(0, 1fr);
+  grid-template-columns: 56px 19ch fit-content(22ch) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
   min-height: 34px;
@@ -1333,6 +1333,11 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   line-height: 1.6;
   overflow-wrap: anywhere;
   word-break: normal;
+}
+
+.samograph-transcript-row > * {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .samograph-percall .samograph-transcript-row::before,
@@ -1354,7 +1359,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 }
 
 .samograph-line-speaker {
-  max-width: 200px;
+  min-width: 8ch;
   white-space: nowrap;
   overflow: hidden;
   color: var(--speaker-0);
@@ -1495,8 +1500,14 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
     flex-direction: column;
   }
 
-  .samograph-transcript-row {
-    grid-template-columns: 42px minmax(74px, 11ch) minmax(82px, max-content) minmax(0, 1fr);
+  .samograph-share-state {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 40rem) {
+  .samograph-instrument-lines > li.samograph-transcript-row {
+    grid-template-columns: 42px 10ch fit-content(22ch) minmax(0, 1fr);
     gap: 8px;
     font-size: 0.72rem;
   }
@@ -1505,14 +1516,6 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
     white-space: normal;
     overflow-wrap: normal;
     word-break: normal;
-  }
-
-  .samograph-line-speaker {
-    max-width: 160px;
-  }
-
-  .samograph-share-state {
-    justify-content: flex-start;
   }
 }
 
