@@ -18,21 +18,25 @@ import type { SQL } from "bun";
 import { signToken, type Keyring, type TokenPayload } from "../../../packages/shared/tokens/signing.ts";
 import { mintShareToken, revokeToken } from "../../../packages/shared/tokens/store.ts";
 import { setTenant } from "../../../packages/shared/db/client.ts";
-import { resolveKeyterms } from "../../../packages/shared/settings/index.ts";
-import { readTenantSettings } from "../settings/store.ts";
 import { authorizeCall, type AuthorizeDeps } from "../../../packages/shared/auth/index.ts";
 import { verifySession, SESSION_COOKIE_NAME } from "../auth/session.ts";
 import {
   resolveOwnerSession as resolveOwnerSessionDb,
   sessionInvalidResponse,
-  tenantActive,
 } from "../auth/owner-session.ts";
 import { eraseCallRecording, purgeCallRows } from "./erase.ts";
 import type { OrchestratorJob } from "../../bot-orchestrator/index.ts";
 import type { CallRecordingControl } from "../../bot-orchestrator/recallClient.ts";
-import { validateMeetingUrl } from "./validate.ts";
 import { errorResponse, CALL_URL_INVALID } from "./errors.ts";
 import { InMemoryRateLimiter, type RateLimiter } from "../auth/rate-limit.ts";
+import {
+  createCallForTenant,
+  BOT_CREATE_PER_TENANT_LIMIT,
+  BOT_CREATE_WINDOW_MS,
+  RECALL_COST_CODE,
+} from "./create-call.ts";
+
+export { BOT_CREATE_PER_TENANT_LIMIT, BOT_CREATE_WINDOW_MS, RECALL_COST_CODE } from "./create-call.ts";
 
 /** Default TTL for a minted share token's `expires_at` (§5.7): 30 days. */
 const DEFAULT_SHARE_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -44,12 +48,6 @@ const DEFAULT_SHARE_TTL_SECONDS = 30 * 24 * 60 * 60;
  * from the share-scoped connection cap `SAMO-RATE-001` (§5.7), which this route
  * must NOT overload. A sensible v1 value: 30 bot creates per hour per tenant.
  */
-export const BOT_CREATE_PER_TENANT_LIMIT = 30;
-/** Bot-creation rate window: 1 hour. */
-export const BOT_CREATE_WINDOW_MS = 60 * 60 * 1000;
-/** §5.16 code for the per-tenant active-call / minutes guardrail (429, retryable). */
-export const RECALL_COST_CODE = "SAMO-RECALL-COST" as const;
-
 /**
  * The 429 the per-tenant bot-creation guardrail returns (§5.16 `SAMO-RECALL-COST`).
  * Carries a `Retry-After` in WHOLE seconds (≥ 1) so a rejected client backs off,
@@ -276,12 +274,6 @@ export function createCallsHandler(
         body = null;
       }
       const candidate = (body as { meeting_url?: unknown } | null)?.meeting_url;
-      const valid = validateMeetingUrl(candidate);
-      if (!valid.ok) return errorResponse(CALL_URL_INVALID);
-
-      // 3) Privileged existence check (#114, §5.14): a stale session for a DELETED
-      //    tenant → 401 clear-cookie, never the uncaught FK 500 it used to throw.
-      if (!(await tenantActive(sql, claims.tenantId))) return sessionInvalidResponse();
 
       // 3.5) Per-tenant bot-creation guardrail (§5.16 `SAMO-RECALL-COST`, §8).
       //    RESERVE-BEFORE-CREATE: record the slot with a COMMITTING `hit` UP FRONT,
@@ -293,62 +285,30 @@ export function createCallsHandler(
       //    reservations serialize and never exceed the cap. Keyed strictly by
       //    tenant, so one tenant at cap never blocks another. This is the per-tenant
       //    guardrail — NOT the share-scoped `SAMO-RATE-001` cap (§5.7).
-      const rateKey = `bot-create:${claims.tenantId}`;
-      const rateNow = nowMs();
-      const reservation = await rateLimiter.hit(
-        rateKey,
-        BOT_CREATE_PER_TENANT_LIMIT,
-        BOT_CREATE_WINDOW_MS,
-        rateNow,
-      );
-      if (!reservation.allowed) {
-        // Over cap: the blocked `hit` consumed no slot and reports the back-off.
-        return recallCostResponse(reservation.retryAfterMs);
-      }
-
-      // 4) Create the PENDING call + audit entry under the tenant, as samograph_app.
-      //    If the tenant is deleted in the race between (3) and here, the FK
-      //    violation (calls.tenant_id → tenants, SQLSTATE 23503) maps to the SAME
-      //    401 clear-cookie path — defence in depth, still never a bare 500.
-      //    On ANY create failure we REFUND the reserved slot (the guardrail counts
-      //    real creates, not failed attempts — §8), so a transient DB error or a
-      //    raced tenant-delete does not burn a tenant's budget.
-      let created: { id: string; status: string };
+      // 4–6) Shared create path: reserve cost, insert + audit, resolve settings,
+      // and enqueue. Manual HTTP calls have no external source event identity.
       try {
-        created = await sql.begin(async (tx) => {
-          await tx.unsafe("SET LOCAL ROLE samograph_app");
-          await setTenant(tx, claims.tenantId);
-          const rows = await tx`
-            INSERT INTO calls (tenant_id, meeting_url, status, ingest_degraded)
-            VALUES (${claims.tenantId}, ${valid.url}, 'PENDING', false)
-            RETURNING id, status`;
-          const row = rows[0] as { id: string; status: string };
-          await tx`
-            INSERT INTO audit_log (tenant_id, call_id, actor, action)
-            VALUES (${claims.tenantId}, ${row.id}, ${`user:${claims.userId}`}, 'call.create')`;
-          return row;
+        const result = await createCallForTenant({
+          tenantId: claims.tenantId,
+          actor: `user:${claims.userId}`,
+          meetingUrl: candidate,
+          source: "manual",
+          sourceEventId: null,
+        }, {
+          sql,
+          enqueue,
+          rateLimiter,
+          now: nowMs,
         });
+        if (result.kind === "invalid_url") return errorResponse(CALL_URL_INVALID);
+        if (result.kind === "tenant_inactive") return sessionInvalidResponse();
+        if (result.kind === "cost_cap") return recallCostResponse(result.retryAfterMs);
+        if (result.kind === "duplicate") throw new Error("manual call unexpectedly duplicated");
+        return Response.json({ id: result.call.id, status: result.call.status }, { status: 201 });
       } catch (err) {
-        // Refund the slot the failed create reserved (best-effort; never masks the
-        // original error).
-        await rateLimiter.refund(rateKey, BOT_CREATE_WINDOW_MS, rateNow);
         if ((err as { errno?: string }).errno === FK_VIOLATION) return sessionInvalidResponse();
         throw err;
       }
-
-      // 5) Resolve the tenant's §5.12 transcription settings (RLS-scoped) so the
-      //    bot's Deepgram config carries the tenant's OWN keyterms + language,
-      //    not the hardwired `multi` / no-keyterms default. Missing row → defaults.
-      const settings = await readTenantSettings(sql, claims.tenantId);
-
-      // 6) Enqueue the bot-orchestrator join job (§5.2). Return id + status.
-      await enqueue({
-        callId: created.id,
-        meetingUrl: valid.url,
-        keyterms: resolveKeyterms(settings),
-        language: settings.language,
-      });
-      return Response.json({ id: created.id, status: created.status }, { status: 201 });
     }
 
     // ── GET /calls — list the caller's tenant's calls (RLS-scoped, §5.10) ─────

@@ -21,3 +21,9 @@ export {
   type CallsHandlerDeps,
   createCallsHandler,
 } from "./http.ts";
+export {
+  createCallForTenant,
+  type CreateCallDeps,
+  type CreateCallInput,
+  type CreateCallResult,
+} from "./create-call.ts";

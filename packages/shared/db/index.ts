@@ -15,3 +15,4 @@ export {
   assertRoleName,
   renderBootstrapSql,
 } from "./bootstrap.ts";
+export { callFromRow, type CallRow, type CallSource, type SharedCall } from "./calls.ts";
