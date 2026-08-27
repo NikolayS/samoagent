@@ -1372,6 +1372,40 @@ The stable Calendar errors added to §5.16 are:
 
 **Why:** Reserving green for live state protects its meaning, while ink-based interaction states provide stronger contrast in both themes.
 
+### S5-7. §5.2 / §5.10 / §5.12 — Calendar meetings and opt-in auto-join — *Extension*
+
+**Amends:** §5.2 (call creation and bot join path), §5.10 (data model), and
+§5.12 (Calendar settings). PRs **#242, #243, #244, #245, #246, #249**, **#264**, **#265**, **#269**, and
+**#271**; follow-ups **#266** and **#270**.
+
+**What differs:** The S5-3 incremental Google Calendar connection now backs a
+meetings-only upcoming list with an explicit **“Add samograph”** action (#264),
+and an owner-controlled `auto_join` switch plus durable per-event exclusions
+(#271). The poller auto-joins eligible, non-declined, non-all-day events with a
+validated Meet or Zoom URL from 10 minutes behind the current time through 6
+minutes ahead (#269). Calendar creation uses the shared `createCallForTenant`
+path (#265), so it retains normal URL validation, tenant settings, audit and
+enqueue behavior, but has a separate 10/hour/tenant limiter. Its idempotency key
+is connection-scoped (`<connection_id>:<provider_event_id>`).
+
+For both manual and Calendar creation, an advisory transaction lock enforces one
+active bot per tenant and normalized meeting URL. A conflicting `POST /calls`
+returns HTTP 409 `SAMO-CALL-ACTIVE` with the existing call id; Calendar poller
+conflicts are skipped. `calls.source` (`manual | calendar`) and
+`calls.source_event_id` record provenance, with a unique non-null
+tenant/source/event identity.
+
+**Schema additions:** migration `0016_calls_source.sql` adds `calls.source` and
+`calls.source_event_id`; `0017_calendar_autojoin.sql` adds
+`calendar_connections.auto_join`; and
+`0018_calendar_event_autojoin_exclusion.sql` adds the RLS-protected
+`calendar_event_exclusions` table keyed by connection + provider event. These
+extend S5-3's `calendar_connections` / `calendar_events` schema.
+
+**Why:** This deliberately ships the §5.12 Calendar auto-join capability after
+v1 while preserving incremental consent and routing every join through the same
+cost, tenancy, validation, and lifecycle boundary as pasted-URL calls.
+
 ### S6-1. Landing page — radical simplification — *Deviation (post-v1)*
 
 **Amends:** `SPEC.md` §5 landing description and the Refined landing composition in `DESIGN.md` / `design-ref/RefinedLight.dc.html` + `RefinedDark.dc.html`, which specify a hero with a simulated live "instrument" panel, a four-card differentiators grid, a four-step "From link to live page" list, a heritage/CLI section, and a closing band.
