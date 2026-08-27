@@ -1507,7 +1507,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 
 @media (max-width: 40rem) {
   .samograph-instrument-lines > li.samograph-transcript-row {
-    grid-template-columns: 42px 10ch fit-content(22ch) minmax(0, 1fr);
+    grid-template-columns: 42px 10ch fit-content(12ch) minmax(0, 1fr);
     gap: 8px;
     font-size: 0.72rem;
   }

@@ -15,7 +15,7 @@ describe("Slice 3 transcript instrument CSS", () => {
     );
     expect(section).toMatch(/\.samograph-line-time\s*\{[^}]*white-space\s*:\s*nowrap/s);
     expect(section).toMatch(
-      /@media\s*\(max-width:\s*40rem\)[\s\S]*?\.samograph-instrument-lines\s*>\s*li\.samograph-transcript-row\s*\{[^}]*grid-template-columns\s*:\s*42px\s+10ch\s+fit-content\(22ch\)\s+minmax\(0\s*,\s*1fr\)/,
+      /@media\s*\(max-width:\s*40rem\)[\s\S]*?\.samograph-instrument-lines\s*>\s*li\.samograph-transcript-row\s*\{[^}]*grid-template-columns\s*:\s*42px\s+10ch\s+fit-content\(12ch\)\s+minmax\(0\s*,\s*1fr\)/,
     );
     expect(section).toMatch(
       /@media\s*\(max-width:\s*40rem\)[\s\S]*?\.samograph-line-time\s*\{[^}]*white-space\s*:\s*normal[^}]*overflow-wrap\s*:\s*normal[^}]*word-break\s*:\s*normal/s,
