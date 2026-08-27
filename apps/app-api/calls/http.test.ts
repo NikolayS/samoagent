@@ -117,6 +117,26 @@ describe("POST /calls — URL validation (§5.2, §5.16)", () => {
   });
 });
 
+describe("POST /calls — active-call invariant", () => {
+  it("returns 409 SAMO-CALL-ACTIVE with the existing id and status", async () => {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const tag: any = (strings: TemplateStringsArray) => {
+      const query = strings.join(" ");
+      if (query.includes("FROM tenants")) return Promise.resolve([{ ok: 1 }]);
+      if (query.includes("FROM calls") && query.includes("meeting_url")) return Promise.resolve([{ id: "active-call" }]);
+      if (query.includes("SELECT status FROM calls")) return Promise.resolve([{ status: "IN_CALL" }]);
+      return Promise.resolve([]);
+    };
+    tag.unsafe = () => Promise.resolve([]);
+    tag.begin = async (fn: (tx: SQL) => unknown) => fn(tag as SQL);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    const handler = createCallsHandler({ sql: tag as SQL, sessionSecret: SESSION_SECRET, enqueue: () => {} });
+    const res = await handler(postCalls(cookieHeader(validSessionCookie()), { meeting_url: "https://zoom.us/j/123456789" }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ code: "SAMO-CALL-ACTIVE", id: "active-call", status: "IN_CALL" });
+  });
+});
+
 describe("/calls — routing", () => {
   it("returns 404 for an unknown route", async () => {
     const { handler } = makeHandler();

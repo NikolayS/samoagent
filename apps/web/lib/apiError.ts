@@ -10,13 +10,16 @@ export class AppApiError extends Error {
   readonly retryable: boolean;
   /** HTTP status of the failed response, when known (e.g. 401 → re-auth). */
   readonly status?: number;
+  /** Existing resource id supplied by conflict responses such as SAMO-CALL-ACTIVE. */
+  readonly id?: string;
 
-  constructor(code: string, message: string, retryable = false, status?: number) {
+  constructor(code: string, message: string, retryable = false, status?: number, id?: string) {
     super(message);
     this.name = "AppApiError";
     this.code = code;
     this.retryable = retryable;
     this.status = status;
+    this.id = id;
   }
 }
 
@@ -50,6 +53,7 @@ interface ApiErrorBody {
   code?: unknown;
   message?: unknown;
   retryable?: unknown;
+  id?: unknown;
 }
 
 /** Throw a typed AppApiError from a failed Response (body code/message/retryable, else fallback). */
@@ -64,5 +68,6 @@ export async function throwTyped(res: Response, fallbackCode: string): Promise<n
   const message =
     typeof parsed.message === "string" ? parsed.message : "Request failed.";
   const retryable = parsed.retryable === true;
-  throw new AppApiError(code, message, retryable, res.status);
+  const id = typeof parsed.id === "string" ? parsed.id : undefined;
+  throw new AppApiError(code, message, retryable, res.status, id);
 }

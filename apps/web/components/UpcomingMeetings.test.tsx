@@ -3,6 +3,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react";
 import { Dashboard } from "./Dashboard.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { createFakeAppApiClient } from "../lib/fakeAppApiClient.ts";
+import { AppApiError } from "../lib/appApiClient.ts";
 import { installDom } from "../test/setup.tsx";
 installDom();
 
@@ -184,6 +185,20 @@ describe("Dashboard upcoming meetings", () => {
     fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
     expect((await view.findByRole("alert")).textContent).toBe("Could not create call.");
     expect(view.getByRole("button", { name: "Add samograph to Planning" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("links to the existing call without an alert on SAMO-CALL-ACTIVE", async () => {
+    const client = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "connected", lastSyncAt: null, meetings: [
+      { id: "1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://zoom.us/j/123456789", meetingProvider: "zoom", organizerEmail: null, attendeeResponse: "accepted" },
+    ] } });
+    client.createCall = async () => {
+      throw new AppApiError("SAMO-CALL-ACTIVE", "Request failed.", false, 409, "active-2");
+    };
+    const view = render(<UpcomingMeetings client={client} onAuthFailure={() => {}} />);
+    fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
+    const link = await view.findByRole("link", { name: "samograph is already in this call" });
+    expect(link.getAttribute("href")).toBe("/calls/active-2");
+    expect(view.queryByRole("alert")).toBeNull();
   });
 
   it("starts Google Calendar connect from the dashboard when the capability is available", async () => {

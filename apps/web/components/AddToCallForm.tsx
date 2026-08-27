@@ -39,6 +39,7 @@ export function AddToCallForm({ client, initialUrl = "", onCreated, autoFocus = 
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [call, setCall] = useState<Call | null>(null);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
 
   useEffect(() => {
     if (autoFocus) urlRef.current?.focus();
@@ -53,6 +54,7 @@ export function AddToCallForm({ client, initialUrl = "", onCreated, autoFocus = 
       return;
     }
     setError(null);
+    setActiveCallId(null);
     setPhase("creating");
     try {
       const created = await client.createCall({ meetingUrl: validation.url });
@@ -60,6 +62,11 @@ export function AddToCallForm({ client, initialUrl = "", onCreated, autoFocus = 
       setPhase("created");
       onCreated?.(created);
     } catch (err) {
+      if (err instanceof AppApiError && err.code === "SAMO-CALL-ACTIVE" && err.id) {
+        setActiveCallId(err.id);
+        setPhase("created");
+        return;
+      }
       // A stale/absent session (deleted tenant → SAMO-AUTH-005, or any 401) gets a
       // DISTINCT "you've been signed out" copy, not the generic failure (#114).
       if (isSessionInvalid(err)) {
@@ -101,6 +108,7 @@ export function AddToCallForm({ client, initialUrl = "", onCreated, autoFocus = 
           Call {call.id} created — status: <strong>{call.status}</strong>
         </p>
       ) : null}
+      {activeCallId ? <p><a href={`/calls/${encodeURIComponent(activeCallId)}`}>samograph is already in this call</a></p> : null}
     </section>
   );
 }

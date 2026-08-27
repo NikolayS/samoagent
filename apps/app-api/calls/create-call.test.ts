@@ -72,7 +72,7 @@ describe("createCallForTenant", () => {
     expect(result).toEqual({ kind: "already_active", callId: "active-call" });
     expect(queries).toContainEqual({
       query: expect.stringContaining("pg_advisory_xact_lock"),
-      values: [tenantId, "https://zoom.us/j/123"],
+      values: [`${tenantId}:https://zoom.us/j/123`],
     });
     expect(queries).toContainEqual({
       query: expect.stringContaining("FROM calls"),
@@ -82,7 +82,7 @@ describe("createCallForTenant", () => {
     expect(d.jobs).toEqual([]);
   });
 
-  it("does not issue the calendar advisory lock or active-call check for manual calls", async () => {
+  it("locks and re-checks active calls for manual calls", async () => {
     const queries: QueryRecord[] = [];
     const d = deps(fakeSql({ activeCall: { id: "active-call" } }, queries));
 
@@ -93,9 +93,16 @@ describe("createCallForTenant", () => {
       source: "manual",
     }, d);
 
-    expect(result.kind).toBe("created");
-    expect(queries.some(({ query }) => query.includes("pg_advisory_xact_lock"))).toBe(false);
-    expect(queries.some(({ query }) => query.includes("FROM calls") && query.includes("meeting_url"))).toBe(false);
+    expect(result).toEqual({ kind: "already_active", callId: "active-call" });
+    expect(queries).toContainEqual({
+      query: expect.stringContaining("pg_advisory_xact_lock"),
+      values: [`${tenantId}:https://zoom.us/j/123`],
+    });
+    expect(queries).toContainEqual({
+      query: expect.stringContaining("FROM calls"),
+      values: [tenantId, "https://zoom.us/j/123"],
+    });
+    expect(queries.some(({ query }) => query.includes("INSERT INTO calls"))).toBe(false);
   });
 
   it("creates, audits, resolves settings, and enqueues", async () => {
