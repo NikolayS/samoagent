@@ -1,8 +1,10 @@
 import type { SQL } from "bun";
 import type { MetricsRegistry } from "../../../packages/shared/observe/registry.ts";
 import { GoogleCalendarFailure, type GoogleCalendarFailureKind } from "./google-calendar-client.ts";
+import type { CreateCallInput, CreateCallResult } from "../calls/create-call.ts";
 
 export const CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+export const AUTOJOIN_LEAD_MS = 6 * 60 * 1000;
 const CONCURRENCY = 4;
 
 export interface CalendarSyncPollerDeps {
@@ -13,6 +15,45 @@ export interface CalendarSyncPollerDeps {
   schedule?: (fn: () => void, ms: number) => { stop(): void };
   logger?: { warn(message: string): void };
   metrics?: MetricsRegistry;
+  autoJoinStore?: CalendarAutoJoinStore;
+  createCall?: (input: CreateCallInput) => Promise<CreateCallResult>;
+}
+
+export interface CalendarAutoJoinEvent { providerEventId: string; meetingUrl: string; startsAt: Date }
+export interface CalendarAutoJoinStore {
+  candidates(connectionId: string, tenantId: string, from: Date, to: Date): Promise<CalendarAutoJoinEvent[]>;
+}
+interface AutoJoinConnection { id: string; tenantId: string; autoJoin: boolean }
+interface CalendarAutoJoinDeps {
+  store: CalendarAutoJoinStore;
+  createCall(input: Extract<CreateCallInput, { source: "calendar" }>): Promise<CreateCallResult>;
+  now?: () => Date;
+  logger?: { warn(message: string): void };
+  metrics?: MetricsRegistry;
+}
+
+function sqlstate(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  for (const key of ["code", "errno"]) {
+    try { const value = Reflect.get(error, key); if (typeof value === "string" && /^[0-9A-Z]{5}$/.test(value)) return value; } catch {}
+  }
+  return null;
+}
+
+export async function runCalendarAutoJoin(connection: AutoJoinConnection, deps: CalendarAutoJoinDeps): Promise<void> {
+  if (!connection.autoJoin) return;
+  const from = deps.now?.() ?? new Date();
+  const events = await deps.store.candidates(connection.id, connection.tenantId, from, new Date(from.getTime() + AUTOJOIN_LEAD_MS));
+  for (const event of events) {
+    try {
+      const result = await deps.createCall({ tenantId: connection.tenantId, actor: "calendar-autojoin", meetingUrl: event.meetingUrl, source: "calendar", sourceEventId: event.providerEventId });
+      deps.metrics?.incCalendarAutoJoin(result.kind);
+      if (result.kind !== "created" && result.kind !== "duplicate") deps.logger?.warn(`[calendar-autojoin] connection ${connection.id} event ${event.providerEventId} result: ${result.kind}`);
+    } catch (error) {
+      deps.metrics?.incCalendarAutoJoin("unexpected");
+      deps.logger?.warn(`[calendar-autojoin] connection ${connection.id} event ${event.providerEventId} result: unexpected sqlstate=${sqlstate(error) ?? "unknown"}`);
+    }
+  }
 }
 
 export interface CalendarSyncPollerHandle {
@@ -51,13 +92,22 @@ export function startCalendarSyncPoller(deps: CalendarSyncPollerDeps): CalendarS
     deps.metrics.setCalendarSyncAgeSeconds(ages.length ? Math.max(0, Math.max(...ages)) : 0);
   }
 
-  async function syncOne(id: string): Promise<void> {
+  async function syncOne(connection: { id: string; tenant_id?: string; auto_join?: boolean }): Promise<void> {
+    const id = connection.id;
     if ((retryUntil.get(id) ?? 0) > clock()) return;
     try {
       const events = await deps.syncConnection(id);
       retryUntil.delete(id);
       deps.metrics?.incCalendarSync("ok");
       deps.metrics?.incCalendarSyncEvents(events ?? 0);
+      if (connection.auto_join && connection.tenant_id && deps.autoJoinStore && deps.createCall) {
+        try {
+          await runCalendarAutoJoin({ id, tenantId: connection.tenant_id, autoJoin: true }, { store: deps.autoJoinStore, createCall: deps.createCall, now: () => new Date(clock()), logger: deps.logger, metrics: deps.metrics });
+        } catch (error) {
+          deps.metrics?.incCalendarAutoJoin("unexpected");
+          deps.logger?.warn(`[calendar-autojoin] connection ${id} result: unexpected sqlstate=${sqlstate(error) ?? "unknown"}`);
+        }
+      }
     } catch (error) {
       const failure = category(error);
       if (error instanceof GoogleCalendarFailure && error.retryAfterMs !== undefined) {
@@ -73,7 +123,7 @@ export function startCalendarSyncPoller(deps: CalendarSyncPollerDeps): CalendarS
     inFlight = true;
     try {
       const rows = await deps.sql`
-        SELECT id FROM calendar_connections WHERE status = 'connected' ORDER BY id` as unknown as Array<{ id: string }>;
+        SELECT id,tenant_id,auto_join FROM calendar_connections WHERE status = 'connected' ORDER BY id` as unknown as Array<{ id: string; tenant_id?: string; auto_join?: boolean }>;
       const selectedIds = new Set(rows.map((row) => row.id));
       const now = clock();
       for (const [id, deadline] of retryUntil) {
@@ -83,7 +133,7 @@ export function startCalendarSyncPoller(deps: CalendarSyncPollerDeps): CalendarS
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, async () => {
         while (next < rows.length) {
           const row = rows[next++];
-          if (row) await syncOne(row.id);
+          if (row) await syncOne(row);
         }
       }));
       await refreshGauges();

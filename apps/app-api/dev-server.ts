@@ -60,6 +60,8 @@ import { resolveCalendarConfig, formatCalendarStartupLine } from "./calendar/res
 import { startCalendarSyncPoller } from "./calendar/poller.ts";
 import { CalendarSyncService } from "./calendar/sync.ts";
 import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
+import { createCallForTenant } from "./calls/create-call.ts";
+import { InMemoryRateLimiter } from "./auth/rate-limit.ts";
 
 /**
  * DEV-ONLY guard: this file carries the local shortcuts (Secure-strip, dev
@@ -190,10 +192,14 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
     googleCalendarOAuth: GOOGLE_CALENDAR_OAUTH,
     calendarTokenEncryption: CALENDAR_TOKEN_ENCRYPTION,
   } = resolveCalendarConfig(env, WEB_ORIGIN);
+  const calendarStore = new PostgresCalendarConnectionStore(sql);
+  const calendarAutoJoinRateLimiter = new InMemoryRateLimiter();
   const calendarPoller = GOOGLE_CALENDAR_OAUTH && CALENDAR_TOKEN_ENCRYPTION && GOOGLE_CALENDAR_OAUTH.apiClient
     ? startCalendarSyncPoller({
         sql,
-        syncConnection: (connectionId) => new CalendarSyncService({ store: new PostgresCalendarConnectionStore(sql), client: GOOGLE_CALENDAR_OAUTH.apiClient!, decryptionKeys: CALENDAR_TOKEN_ENCRYPTION.decryptionKeys }).sync(connectionId),
+        syncConnection: (connectionId) => new CalendarSyncService({ store: calendarStore, client: GOOGLE_CALENDAR_OAUTH.apiClient!, decryptionKeys: CALENDAR_TOKEN_ENCRYPTION.decryptionKeys }).sync(connectionId),
+        autoJoinStore: { candidates: (...args) => calendarStore.autoJoinCandidates(...args) },
+        createCall: (input) => createCallForTenant(input, { sql, enqueue, rateLimiter: calendarAutoJoinRateLimiter, now: Date.now }),
         metrics: registry,
         logger: { warn: (message) => console.warn(message) },
       })
@@ -279,6 +285,7 @@ export function startDevServer(env: EnvLike = process.env): ReturnType<typeof Bu
     googleCalendarOAuth: GOOGLE_CALENDAR_OAUTH,
     calendarTokenEncryption: CALENDAR_TOKEN_ENCRYPTION,
     enqueue,
+    callRateLimiter: calendarAutoJoinRateLimiter,
     // §5.14 per-call delete: force-leave a live bot + erase its Recall recording
     // (the in-repo fake locally; real acts only when RECALL_LIVE).
     recall: getCallRecordingControl(),
