@@ -113,7 +113,7 @@ d("pgCallStore.markCouldNotJoin — join failure persistence (§5.2, §5.16, Sto
     await sql`INSERT INTO calls (id, tenant_id, meeting_url, status)
               VALUES (${pendingCall}, ${tenantId}, ${MEETING_URL}, 'PENDING')`;
     await sql`INSERT INTO calls (id, tenant_id, meeting_url, status, status_reason, ended_at)
-              VALUES (${endedCall}, ${tenantId}, ${MEETING_URL}, 'ENDED', NULL, now())`;
+              VALUES (${endedCall}, ${tenantId}, 'https://meet.google.com/end-edca-lla', 'ENDED', NULL, now())`;
   });
 
   afterAll(async () => {
