@@ -73,6 +73,10 @@ import { PostgresCalendarConnectionStore } from "./calendar/pg-store.ts";
 import { createCallForTenant } from "./calls/create-call.ts";
 import { InMemoryRateLimiter } from "./auth/rate-limit.ts";
 
+process.on("unhandledRejection", (reason) => {
+  console.error("[app-api] unhandledRejection:", reason);
+});
+
 /**
  * Prod email fallback: if `RESEND_API_KEY` is not configured there is NO dev
  * fake in prod, so a magic-link request fails LOUDLY rather than silently

@@ -521,6 +521,10 @@ export function startStatusPoller(deps: StatusPollerDeps): StatusPollerHandle {
           continue;
         }
       }
+    } catch (err) {
+      deps.logger?.warn(
+        `[status-poller] sweep failed: ${(err as Error).message} — retrying next sweep`,
+      );
     } finally {
       inFlight = false;
     }

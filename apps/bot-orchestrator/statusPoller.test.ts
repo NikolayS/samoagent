@@ -312,6 +312,28 @@ describe("startStatusPoller scheduler seam", () => {
     release?.();
     await first;
   });
+
+  it("contains sweep query failures and logs a warning", async () => {
+    const warnings: string[] = [];
+    const sql = ((first: unknown) => {
+      if (Array.isArray(first) && "raw" in first) {
+        return Promise.reject(new Error("57P03 the database system is starting up"));
+      }
+      return [];
+    }) as never;
+    const poller = startStatusPoller({
+      sql,
+      source: createFakeBotStatusSource(),
+      actions: spyActions(),
+      logger: { warn: (message) => warnings.push(message) },
+      schedule: () => ({ stop() {} }),
+    });
+
+    await expect(poller.tick()).resolves.toBeUndefined();
+    expect(warnings).toEqual([
+      "[status-poller] sweep failed: 57P03 the database system is starting up — retrying next sweep",
+    ]);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
