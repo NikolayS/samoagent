@@ -362,6 +362,20 @@ textarea {
   line-height: var(--leading-normal);
 }
 
+/* iOS Safari ZOOMS the page whenever a focused field's text is under 16px —
+   and it does not zoom back out on blur, so the rest of the form ends up
+   off-screen. `--text-base` is 14px, so every field on this app tripped it.
+   Below --bp-md the field font is therefore 16px: a viewport fix, not a change
+   to the type scale (mobile audit M8, "Forms on mobile"). The same block drops
+   `--field-max` (below), so a mobile field is full-column at 16px. */
+@media (max-width: 767.98px) {
+  input:where(:not([type="checkbox"], [type="radio"])),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 .samograph-keyterms {
   font-family: var(--font-mono);
 }
@@ -556,6 +570,15 @@ button:hover {
   .samograph-app-nav-right { margin-left: auto; }
 }
 
+/* The PUBLIC shell (/auth, /auth/callback, /c/<token>) has no menu to disclose:
+   no primary links, no account line, no Log out — only the theme control. It
+   therefore renders no hamburger and no panel; the theme control is a direct
+   child of the bar and rides inline at every width (mobile audit M8, from the
+   #284 review). */
+.samograph-app-nav-inner > .samograph-app-nav-right {
+  margin-left: auto;
+}
+
 .samograph-skip-link {
   position: absolute;
   top: 0;
@@ -652,7 +675,7 @@ button:hover {
    painted in --muted, so it is correct in both themes. Both pseudo-elements are
    pointer-events: none — the whole control stays one hit target. The mask must
    stay on its own element: masking the cap would erase its hairline and fill. */
-.samograph-select { position: relative; display: block; width: 100%; max-width: var(--field-max); }
+.samograph-select { position: relative; display: block; width: 100%; }
 .samograph-select > select {
   appearance: none; -webkit-appearance: none;
   display: block; width: 100%; height: var(--control-h); margin: 0;
@@ -661,6 +684,22 @@ button:hover {
   border: 1px solid var(--control-border); border-radius: var(--radius-control);
   cursor: pointer;
 }
+/* Both halves of the mobile field contract for the styled select, and they sit
+   HERE — after `.samograph-select > select` — on purpose. A media query adds no
+   specificity, so the `font: inherit` above (0,1,1, and a shorthand, so it
+   re-resets font-size) would win on source order over the shared 16px rule in
+   the base field block. `--field-max` is likewise a DESKTOP affordance: it
+   stops a four-character enum spanning a 1120px column, but on a 350px phone
+   the column is already narrower than the 22rem cap and any cap there reads as
+   a broken field (mobile audit M8). */
+@media (max-width: 767.98px) {
+  .samograph-select > select { font-size: 16px; }
+}
+
+@media (min-width: 768px) {
+  .samograph-select { max-width: var(--field-max); }
+}
+
 .samograph-select::before {
   content: ""; position: absolute; inset-block: 1px; inset-inline-end: 1px;
   width: calc(var(--control-h) - 2px); pointer-events: none;
@@ -1099,6 +1138,24 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   max-width: var(--width-form);
   margin-inline: auto;
   gap: var(--space-4);
+}
+
+/* ONE field geometry on /auth (mobile audit M8 §6).
+   The page used to stack three different controls in a 480px column: a 40px
+   input, a 36px submit and a 40px Google button. All three are now the 44px
+   control recipe at full column width — `--control-h` for height (which also
+   clears Google's stated 40px minimum, so branding is honored, not bent) and
+   `width: 100%` so the stack has one left and one right edge. The radii still
+   differ by 2px because Google's 4px is mandated; that is the one deviation.
+   `display: block` is deliberate — the label/input pair carries its own
+   rhythm through `margin-top`, and a grid gap would double it. */
+.samograph-auth-form {
+  display: block;
+}
+
+.samograph-auth-form > .samograph-btn {
+  width: 100%;
+  margin-top: var(--space-3);
 }
 
 .samograph-auth-sent {
