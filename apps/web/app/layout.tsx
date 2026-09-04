@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -33,6 +33,21 @@ export const metadata: Metadata = {
       "An agent that joins your Zoom or Google Meet call and transcribes it live.",
     type: "website",
   },
+};
+
+/*
+ * Mobile audit M6. Next's default viewport tag is
+ * `width=device-width, initial-scale=1` with no `viewport-fit`, and iOS reports
+ * `env(safe-area-inset-*)` as 0 unless the document opts in with
+ * `viewport-fit=cover`. Without this export the `--safe-*` tokens in
+ * globals.css are inert and the sticky settings savebar and the jump-to-live
+ * pill sit under the home indicator. Width and scale are restated because
+ * declaring `viewport` replaces the default entirely.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
