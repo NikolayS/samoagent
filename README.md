@@ -38,8 +38,8 @@ samograph gives an AI agent a small set of meeting tools:
 - `chat` - send a deliberate message into the meeting chat (plays a soft chime into the call audio so people notice it).
 - `intro` - post a short self-introduction into the meeting chat (also available as `join --intro`).
 - `presence` - update the bot camera state shown in the meeting.
-- `whisper` - send a message only the wearer sees; never posted to the meeting.
-- `cue` - record the wearer's semantic reply to a whisper (confirm/dismiss/next/more).
+- `g2-whisper` - send a message only the wearer sees; never posted to the meeting.
+- `g2-cue` - record the wearer's semantic reply to a whisper (confirm/dismiss/next/more).
 - `frame` - export the current call view on demand.
 - `leave` - remove the bot and clean up local state.
 - `status` - show the current Recall bot state.
@@ -133,13 +133,13 @@ Presence is in-memory runtime state. It is meant for lightweight meeting signali
 
 ## Private Whisper Channel
 
-`chat` and `presence` are both *visible to the meeting*: chat posts into the meeting with an audible chime, presence repaints the camera everyone can see. `whisper` is the private counterpart — an agent-to-wearer channel the meeting never sees.
+`chat` and `presence` are both *visible to the meeting*: chat posts into the meeting with an audible chime, presence repaints the camera everyone can see. `g2-whisper` is the private counterpart — an agent-to-wearer channel the meeting never sees.
 
 ```bash
-samograph whisper "Ask about the index bloat on orders"
-samograph whisper "Wrap up - 2 min left" --priority high --ttl 30
-samograph whisper "A longer note for the wearer" --sink fake-hud
-samograph cue confirm
+samograph g2-whisper "Ask about the index bloat on orders"
+samograph g2-whisper "Wrap up - 2 min left" --priority high --ttl 30
+samograph g2-whisper "A longer note for the wearer" --sink fake-hud
+samograph g2-cue confirm
 ```
 
 It is fully useful with no hardware attached. `--sink console` (the default) prints the whisper to stderr; `--sink fake-hud` renders the Even Realities G2 screen — 576x288 px with a 27 px LVGL line height, so 10 lines — as a bounded box, so text that does not fit is *visible* rather than silently dropped:
@@ -164,7 +164,7 @@ Every delivered whisper, and every cue, is appended to the active transcript as 
 
 So an agent already running `samograph watch` receives whispers and the wearer's back-channel with no new contract. The `SAMOGRAPH-`/`SAMOGRAPH_` speaker namespace is reserved: a meeting participant who renames themselves `SAMOGRAPH-WHISPER` (or `-CUE`, `-WARNING`) is normalized to the unknown speaker `?`, so nobody in the call can forge a control line. Cues are **semantic** (`confirm`, `dismiss`, `next`, `more`), never physical (`tap`, `double-tap`), so a different input device is a driver swap and nothing above it moves. Both commands require an active session: without one they print `Error: no active session. Run 'samograph join' first.` and exit non-zero.
 
-Whispers carry a priority (`low|normal|high`) and an optional `--ttl SECONDS`. Both are recorded on the whisper and delivered to the sink. The queue policy — a `high` whisper preempts the one currently displayed and is never dropped, `low` is shed first when the queue is full, a whisper with a ttl expires after it — is implemented in `WhisperQueue` and applies inside a long-lived sink process (an embedded agent loop or a device driver). That process does not exist yet: today's one-shot `samograph whisper` builds a fresh queue per invocation, so it always delivers immediately and nothing is ever preempted, shed or expired from the CLI.
+Whispers carry a priority (`low|normal|high`) and an optional `--ttl SECONDS`. Both are recorded on the whisper and delivered to the sink. The queue policy — a `high` whisper preempts the one currently displayed and is never dropped, `low` is shed first when the queue is full, a whisper with a ttl expires after it — is implemented in `WhisperQueue` and applies inside a long-lived sink process (an embedded agent loop or a device driver). That process does not exist yet: today's one-shot `samograph g2-whisper` builds a fresh queue per invocation, so it always delivers immediately and nothing is ever preempted, shed or expired from the CLI.
 
 ## Google Doc Notes
 

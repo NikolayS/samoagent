@@ -46,8 +46,8 @@ commands:
   intro [--intro-text TEXT] [--context] [--bot-id ID]
   chimes
   presence <listening|thinking|speaking|acting|idle> [message]
-  whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud]
-  cue <confirm|dismiss|next|more>
+  g2-whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud]
+  g2-cue <confirm|dismiss|next|more>
   transcript [--local] [--file FILE] [--cursor N] [--limit N] [bot_id]
   dicts
   watch
@@ -167,7 +167,7 @@ examples:
   samograph presence thinking "Checking the migration plan"
   samograph presence speaking "Answering in chat"
 `,
-  whisper: `usage: samograph whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud]
+  "g2-whisper": `usage: samograph g2-whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud]
 
 Send a private message to the wearer. Unlike 'chat' (posted to the meeting with
 an audible chime) and 'presence' (repainted on the bot camera), a whisper is
@@ -193,11 +193,11 @@ options:
   --sink NAME    Output sink: console|fake-hud (default: console)
 
 examples:
-  samograph whisper "Ask about the index bloat"
-  samograph whisper "Wrap up - 2 min left" --priority high --ttl 30
-  samograph whisper "A longer note for the wearer" --sink fake-hud
+  samograph g2-whisper "Ask about the index bloat"
+  samograph g2-whisper "Wrap up - 2 min left" --priority high --ttl 30
+  samograph g2-whisper "A longer note for the wearer" --sink fake-hud
 `,
-  cue: `usage: samograph cue <confirm|dismiss|next|more>
+  "g2-cue": `usage: samograph g2-cue <confirm|dismiss|next|more>
 
 Record the wearer's back-channel reply to a whisper. The cue is appended to the
 active transcript as a SAMOGRAPH-CUE control line, so 'samograph watch' relays
@@ -208,10 +208,10 @@ so swapping the input device (glasses touchpad, a ring, a keyboard) is a driver
 change and nothing above it moves.
 
 examples:
-  samograph cue confirm
-  samograph cue dismiss
-  samograph cue next
-  samograph cue more
+  samograph g2-cue confirm
+  samograph g2-cue dismiss
+  samograph g2-cue next
+  samograph g2-cue more
 `,
   notes: `usage: samograph notes <init|point|decision|action|transcript> [options]
 
@@ -280,8 +280,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     chat: new Set(["--bot-id", "--chime"]),
     chimes: new Set(),
     presence: new Set(),
-    whisper: new Set(["--priority", "--ttl", "--sink"]),
-    cue: new Set(),
+    "g2-whisper": new Set(["--priority", "--ttl", "--sink"]),
+    "g2-cue": new Set(),
     transcript: new Set(["--cursor", "--file", "--limit"]),
     dicts: new Set(),
     watch: new Set(),
@@ -300,8 +300,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     chat: new Set(["--list-chimes"]),
     chimes: new Set(),
     presence: new Set(),
-    whisper: new Set(),
-    cue: new Set(),
+    "g2-whisper": new Set(),
+    "g2-cue": new Set(),
     transcript: new Set(["--local"]),
     dicts: new Set(),
     watch: new Set(),
@@ -499,7 +499,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       result.message = positionals.slice(1).join(" ") || undefined;
       break;
     }
-    case "whisper": {
+    case "g2-whisper": {
       if (positionals.length < 1) {
         throw new ArgError("the following arguments are required: text");
       }
@@ -542,7 +542,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       }
       break;
     }
-    case "cue": {
+    case "g2-cue": {
       if (positionals.length < 1) {
         throw new ArgError("the following arguments are required: semantic");
       }
@@ -625,9 +625,9 @@ async function dispatch(args: ParsedArgs): Promise<void> {
       return cmdChimes();
     case "presence":
       return cmdPresence(args);
-    case "whisper":
+    case "g2-whisper":
       return cmdWhisper(args);
-    case "cue":
+    case "g2-cue":
       return cmdCue(args);
     case "frame":
       return cmdFrame(args);

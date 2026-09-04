@@ -51,7 +51,7 @@ describe("cmdWhisper", () => {
     const delivered: Whisper[] = [];
     const { run, out } = collect("stdout", () =>
       cmdWhisper(
-        { command: "whisper", message: "Ask about the index bloat" },
+        { command: "g2-whisper", message: "Ask about the index bloat" },
         { sink: { deliver: (x) => void delivered.push(x) }, now: () => AT },
       ),
     );
@@ -76,7 +76,7 @@ describe("cmdWhisper", () => {
     const { run } = collect("stdout", () =>
       cmdWhisper(
         {
-          command: "whisper",
+          command: "g2-whisper",
           message: "Wrap up",
           whisper_priority: "high",
           whisper_ttl_ms: 30_000,
@@ -97,7 +97,7 @@ describe("cmdWhisper", () => {
     const { run, out } = collect("stdout", () =>
       cmdWhisper(
         {
-          command: "whisper",
+          command: "g2-whisper",
           message: "alpha bravo charlie delta echo",
           whisper_sink: "fake-hud",
         },
@@ -123,7 +123,7 @@ describe("cmdWhisper", () => {
     const { run, out } = collect("stderr", async () => {
       await expect(
         cmdWhisper(
-          { command: "whisper", message: "hi", whisper_priority: "urgent" },
+          { command: "g2-whisper", message: "hi", whisper_priority: "urgent" },
           { now: () => AT },
         ),
       ).rejects.toBeInstanceOf(ExitError);
@@ -139,7 +139,7 @@ describe("cmdWhisper", () => {
     const { run, out } = collect("stderr", async () => {
       await expect(
         cmdWhisper(
-          { command: "whisper", message: "hi", whisper_sink: "hologram" },
+          { command: "g2-whisper", message: "hi", whisper_sink: "hologram" },
           { now: () => AT },
         ),
       ).rejects.toBeInstanceOf(ExitError);
@@ -152,7 +152,7 @@ describe("cmdWhisper", () => {
   it("rejects empty whisper text", async () => {
     const { run, out } = collect("stderr", async () => {
       await expect(
-        cmdWhisper({ command: "whisper", message: "   " }, { now: () => AT }),
+        cmdWhisper({ command: "g2-whisper", message: "   " }, { now: () => AT }),
       ).rejects.toBeInstanceOf(ExitError);
     });
     await run;
@@ -165,7 +165,7 @@ describe("cmdWhisper", () => {
     const { run, out } = collect("stderr", async () => {
       await expect(
         cmdWhisper(
-          { command: "whisper", message: "hi" },
+          { command: "g2-whisper", message: "hi" },
           { sink: { deliver: (x) => void delivered.push(x) }, now: () => AT },
         ),
       ).rejects.toBeInstanceOf(ExitError);
@@ -202,7 +202,7 @@ describe("cmdCue", () => {
 
   it("appends the SAMOGRAPH-CUE control line on the existing transcript stream", async () => {
     const { run, out } = collect("stdout", () =>
-      cmdCue({ command: "cue", cue: "confirm" }, { now: () => AT }),
+      cmdCue({ command: "g2-cue", cue: "confirm" }, { now: () => AT }),
     );
     await run;
     expect(readFileSync(transcript, "utf-8")).toBe(
@@ -214,7 +214,7 @@ describe("cmdCue", () => {
   it("accepts every semantic cue and nothing physical", async () => {
     for (const semantic of ["confirm", "dismiss", "next", "more"]) {
       const { run } = collect("stdout", () =>
-        cmdCue({ command: "cue", cue: semantic }, { now: () => AT }),
+        cmdCue({ command: "g2-cue", cue: semantic }, { now: () => AT }),
       );
       await run;
     }
@@ -229,7 +229,7 @@ describe("cmdCue", () => {
   it("rejects a physical (non-semantic) cue without writing", async () => {
     const { run, out } = collect("stderr", async () => {
       await expect(
-        cmdCue({ command: "cue", cue: "double-tap" }, { now: () => AT }),
+        cmdCue({ command: "g2-cue", cue: "double-tap" }, { now: () => AT }),
       ).rejects.toBeInstanceOf(ExitError);
     });
     await run;
@@ -243,7 +243,7 @@ describe("cmdCue", () => {
     writeFileSync(join(tmp, "state.json"), JSON.stringify({ bot_id: "bot-123" }));
     const { run, out } = collect("stderr", async () => {
       await expect(
-        cmdCue({ command: "cue", cue: "next" }, { now: () => AT }),
+        cmdCue({ command: "g2-cue", cue: "next" }, { now: () => AT }),
       ).rejects.toBeInstanceOf(ExitError);
     });
     await run;

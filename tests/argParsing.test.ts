@@ -529,28 +529,28 @@ describe("argParsing", () => {
     expect(args.bot_id).toBeNull();
   });
 
-  it("whisper joins its positional words into the message", () => {
-    const args = parseArgs(["whisper", "Ask", "about", "the", "index"]);
-    expect(args.command).toBe("whisper");
+  it("g2-whisper joins its positional words into the message", () => {
+    const args = parseArgs(["g2-whisper", "Ask", "about", "the", "index"]);
+    expect(args.command).toBe("g2-whisper");
     expect(args.message).toBe("Ask about the index");
   });
 
-  it("whisper defaults: normal priority, no ttl, console sink", () => {
-    const args = parseArgs(["whisper", "hi"]);
+  it("g2-whisper defaults: normal priority, no ttl, console sink", () => {
+    const args = parseArgs(["g2-whisper", "hi"]);
     expect(args.whisper_priority).toBe("normal");
     expect(args.whisper_ttl_ms).toBeNull();
     expect(args.whisper_sink).toBe("console");
   });
 
-  it("whisper requires text", () => {
-    expect(() => parseArgs(["whisper"])).toThrow(
+  it("g2-whisper requires text", () => {
+    expect(() => parseArgs(["g2-whisper"])).toThrow(
       "the following arguments are required: text",
     );
   });
 
-  it("whisper parses --priority, --ttl and --sink", () => {
+  it("g2-whisper parses --priority, --ttl and --sink", () => {
     const args = parseArgs([
-      "whisper",
+      "g2-whisper",
       "Wrap up",
       "--priority",
       "high",
@@ -565,50 +565,50 @@ describe("argParsing", () => {
     expect(args.whisper_sink).toBe("fake-hud");
   });
 
-  it("whisper rejects an invalid priority at parse time", () => {
-    expect(() => parseArgs(["whisper", "hi", "--priority", "urgent"])).toThrow(
+  it("g2-whisper rejects an invalid priority at parse time", () => {
+    expect(() => parseArgs(["g2-whisper", "hi", "--priority", "urgent"])).toThrow(
       "argument --priority: invalid choice: 'urgent' (choose from low, normal, high)",
     );
   });
 
-  it("whisper rejects an invalid sink at parse time", () => {
-    expect(() => parseArgs(["whisper", "hi", "--sink", "hologram"])).toThrow(
+  it("g2-whisper rejects an invalid sink at parse time", () => {
+    expect(() => parseArgs(["g2-whisper", "hi", "--sink", "hologram"])).toThrow(
       "argument --sink: invalid choice: 'hologram' (choose from console, fake-hud)",
     );
   });
 
-  it("whisper rejects a non-positive or non-numeric ttl", () => {
-    expect(() => parseArgs(["whisper", "hi", "--ttl", "0"])).toThrow(
+  it("g2-whisper rejects a non-positive or non-numeric ttl", () => {
+    expect(() => parseArgs(["g2-whisper", "hi", "--ttl", "0"])).toThrow(
       "argument --ttl: invalid positive integer: '0'",
     );
-    expect(() => parseArgs(["whisper", "hi", "--ttl", "abc"])).toThrow(
+    expect(() => parseArgs(["g2-whisper", "hi", "--ttl", "abc"])).toThrow(
       "argument --ttl: invalid positive integer: 'abc'",
     );
   });
 
-  it("cue parses a semantic back-channel event", () => {
-    const args = parseArgs(["cue", "confirm"]);
-    expect(args.command).toBe("cue");
+  it("g2-cue parses a semantic back-channel event", () => {
+    const args = parseArgs(["g2-cue", "confirm"]);
+    expect(args.command).toBe("g2-cue");
     expect(args.cue).toBe("confirm");
   });
 
-  it("cue requires a semantic", () => {
-    expect(() => parseArgs(["cue"])).toThrow(
+  it("g2-cue requires a semantic", () => {
+    expect(() => parseArgs(["g2-cue"])).toThrow(
       "the following arguments are required: semantic",
     );
   });
 
-  it("cue rejects a physical (non-semantic) event at parse time", () => {
-    expect(() => parseArgs(["cue", "double-tap"])).toThrow(
+  it("g2-cue rejects a physical (non-semantic) event at parse time", () => {
+    expect(() => parseArgs(["g2-cue", "double-tap"])).toThrow(
       "argument semantic: invalid choice: 'double-tap' (choose from confirm, dismiss, next, more)",
     );
   });
 
-  it("whisper --help shows command-specific help", () => {
-    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "whisper", "--help"], { cwd: repoRoot });
+  it("g2-whisper --help shows command-specific help", () => {
+    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "g2-whisper", "--help"], { cwd: repoRoot });
     const stdout = new TextDecoder().decode(proc.stdout);
     expect(proc.exitCode).toBe(0);
-    expect(stdout).toContain("usage: samograph whisper <text>");
+    expect(stdout).toContain("usage: samograph g2-whisper <text>");
     expect(stdout).toContain("--priority P");
     expect(stdout).toContain("--ttl SECONDS");
     expect(stdout).toContain("--sink NAME");
@@ -616,11 +616,11 @@ describe("argParsing", () => {
     expect(stdout).toContain("examples:");
   });
 
-  it("whisper --help is truthful about what a one-shot CLI call can enforce", () => {
+  it("g2-whisper --help is truthful about what a one-shot CLI call can enforce", () => {
     // A fresh queue is built per invocation, so preemption / depth shedding /
     // TTL expiry cannot take effect from the CLI. The flags are still recorded
     // on the whisper and handed to the sink; the help must not promise more.
-    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "whisper", "--help"], { cwd: repoRoot });
+    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "g2-whisper", "--help"], { cwd: repoRoot });
     const stdout = new TextDecoder().decode(proc.stdout);
     expect(proc.exitCode).toBe(0);
     expect(stdout).toContain("Recorded on the whisper and delivered to the sink.");
@@ -632,19 +632,31 @@ describe("argParsing", () => {
     expect(stdout).not.toContain("Auto-expire the whisper this many seconds after it was");
   });
 
-  it("cue --help shows command-specific help", () => {
-    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "cue", "--help"], { cwd: repoRoot });
+  it("g2-cue --help shows command-specific help", () => {
+    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "g2-cue", "--help"], { cwd: repoRoot });
     const stdout = new TextDecoder().decode(proc.stdout);
     expect(proc.exitCode).toBe(0);
-    expect(stdout).toContain("usage: samograph cue <confirm|dismiss|next|more>");
+    expect(stdout).toContain("usage: samograph g2-cue <confirm|dismiss|next|more>");
     expect(stdout).toContain("SAMOGRAPH-CUE");
     expect(stdout).toContain("examples:");
+  });
+
+  it("bare whisper/cue are not commands: only the g2- names exist", () => {
+    expect(() => parseArgs(["whisper", "hi"])).toThrow("invalid choice: 'whisper'");
+    expect(() => parseArgs(["cue", "confirm"])).toThrow("invalid choice: 'cue'");
+  });
+
+  it("bare whisper fails at parse time from the CLI with the standard error", () => {
+    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "whisper", "hi"], { cwd: repoRoot });
+    const stderr = new TextDecoder().decode(proc.stderr);
+    expect(proc.exitCode).toBe(2);
+    expect(stderr).toBe("samograph: error: invalid choice: 'whisper'\n");
   });
 
   it("--help lists the private whisper/cue channel", () => {
     const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "--help"], { cwd: repoRoot });
     const stdout = new TextDecoder().decode(proc.stdout);
-    expect(stdout).toContain("whisper <text>");
-    expect(stdout).toContain("cue <confirm|dismiss|next|more>");
+    expect(stdout).toContain("g2-whisper <text>");
+    expect(stdout).toContain("g2-cue <confirm|dismiss|next|more>");
   });
 });
