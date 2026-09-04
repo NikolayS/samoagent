@@ -19,9 +19,9 @@ function rule(selector: string, scope = css): string {
   return normalize(scope.match(new RegExp(`(?:^|[};])\\s*${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? "");
 }
 
-/** The body of the `@media (max-width: 40rem)` block that owns the dashboard. */
+/** The body of the `@media (max-width: 767.98px)` block that owns the dashboard. */
 const narrow = (() => {
-  const start = css.indexOf("@media (max-width: 40rem) {\n  .samograph-dash-hero-form");
+  const start = css.indexOf("@media (max-width: 767.98px) {\n  .samograph-dash-hero-form");
   if (start === -1) return "";
   return css.slice(start, css.indexOf("\n}", start));
 })();
@@ -64,7 +64,7 @@ describe("the dashboard call row (M7)", () => {
     expect(rule(".samograph-call-time")).toMatch(/white-space\s*:\s*nowrap/);
   });
 
-  it("stacks the row and keeps a 44px CTA below 40rem", () => {
+  it("stacks the row and keeps a 44px CTA below --bp-md", () => {
     expect(narrow).not.toBe("");
     expect(rule(".samograph-call-row, .samograph-meeting-item", narrow)).toMatch(
       /grid-template-columns\s*:\s*minmax\(0, 1fr\)/,

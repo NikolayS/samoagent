@@ -55,7 +55,7 @@ the conflict surface — PRs touching disjoint regions can run in parallel.
 | **M6** | **merged (#292)** | `fix(web): savebar stops overlapping content; safe-area insets` | `globals.css`, `app/layout.tsx` | savebar block + `:root` | M1, M2, M4, M5 |
 | **M7** | **merged (#285)** | `fix(web): dashboard row — title, meta, no query strings` | `globals.css`, `Dashboard.tsx`, `Dashboard.test.tsx` | dashboard row block | M1–M6, M8, M9 — also delivered desktop PR 11 |
 | **M8** | **merged (#289)** | `fix(web): iOS-safe form fields (16px, full-width, one geometry)` | `globals.css` | base + auth blocks | M1, M2, M4, M5, M7 |
-| M9 | **not started (deliberately last)** | `chore(web): tokenise breakpoints and the fluid gutter` | `globals.css` | `:root` + every `@media` header | last — rebase others onto it |
+| **M9** | **in review (#305)** | `refactor(web): canonical breakpoints and fluid gutter` | `globals.css` | `:root` + every `@media` header | last — rebase others onto it |
 
 **Scope per PR**
 
@@ -86,8 +86,14 @@ the conflict surface — PRs touching disjoint regions can run in parallel.
 - **M8 — form fields.** `input/select/textarea` → 16px font below 480px (iOS zoom fix), full
   width; unifies the `/auth` stack around one reference height. Does not touch `--google-btn-*`
   (pinned by `test/greenroom-tokens.test.ts`).
-- **M9 — breakpoint tokens** (last). Documents `--bp-sm/md/lg` in the `:root` comment block;
-  normalises `59.99rem`/`48rem`/`40rem` to the new pixel breakpoints; makes `--gutter` fluid.
+- **M9 — breakpoint tokens** (last). Documents `--bp-sm/md/lg` in the `:root` comment block and
+  in `apps/web/lib/breakpoints.ts` (the JS-readable source of truth, since `@media` cannot read a
+  custom property); normalises `40rem`/`48rem`/`59.99rem`/`63.99rem` to the pixel set, one unit
+  and one direction convention, guarded by `test/breakpoints.test.ts`; makes `--gutter` fluid.
+  Three boundaries were consolidated rather than preserved: `40rem` (640) → `--bp-md`, because
+  the blocks it guarded are nav-collapse and list-row-stacking, both `--bp-md` roles; `59.99rem`
+  (959.84) → `--bp-lg`; `48rem` (768, *inclusive*, so it overlapped `min-width: 768px` at exactly
+  768px) → `767.98px`.
   Touches every `@media` header — rebase M1–M8 onto it, not the reverse.
 
 ---
