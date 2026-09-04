@@ -1442,8 +1442,8 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 
 .samograph-call-view-heading {
   display: grid;
-  gap: var(--space-2);
-  margin-bottom: var(--space-6);
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
 }
 
 .samograph-call-view-heading h1,
@@ -1460,6 +1460,22 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   color: var(--muted);
   font-size: var(--text-sm);
 }
+
+/* The meeting link, demoted under the H1: one ellipsised mono line, never a
+   wrapped block of URL, and always the query-stripped form (a Zoom `?pwd=` is
+   a join secret — see `lib/meetingUrl.ts`). */
+.samograph-call-view-url {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 
 .samograph-percall.samograph-instrument {
   --speaker-0: #8ecdf3;
@@ -1534,6 +1550,47 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 
 .samograph-percall .samograph-status-code {
   color: color-mix(in srgb, var(--crit) 78%, white);
+}
+
+/* M4 — collapse the call-view header on a phone (mobile audit §1 C/D). The page
+   heading shrinks, and the sticky panel head stays ONE row (call id + state chip
+   + timer) instead of the 161px three-row stack. The `header.` qualifier raises
+   specificity over the later same-width block, which stacks the
+   head and foot into a column — that block sits among the transcript-row rules
+   another change owns, so it is overridden here rather than edited. */
+@media (max-width: 48rem) {
+  .samograph-call-view-heading {
+    margin-bottom: var(--space-3);
+  }
+
+  .samograph-call-view-heading h1 {
+    font-size: var(--text-lg);
+  }
+
+  .samograph-percall header.samograph-status.samograph-instrument-head {
+    display: grid;
+    flex-direction: row;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--space-3);
+    align-items: center;
+    padding: 8px 12px;
+  }
+
+  /* The URL and the dictionary chip already live in the page header above; on a
+     phone they are duplicated chrome above the first transcript line. */
+  .samograph-instrument-url,
+  .samograph-instrument-dictionary {
+    display: none;
+  }
+
+  .samograph-instrument-meta i {
+    display: none;
+  }
+
+  .samograph-percall .samograph-status-message {
+    font-size: var(--text-xs);
+    line-height: 1.4;
+  }
 }
 
 .samograph-status-elapsed,
