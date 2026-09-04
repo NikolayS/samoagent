@@ -1,6 +1,6 @@
 import type { ParsedArgs } from "../args.ts";
 import { makeRecallClient, type RecallClient } from "../recall.ts";
-import { localTranscriptLines } from "../transcript.ts";
+import { isControlLine, localTranscriptLines } from "../transcript.ts";
 import { DEFAULT_INTRO_TEXT } from "../introText.ts";
 import { cmdChat } from "./chat.ts";
 
@@ -11,8 +11,11 @@ export interface IntroDeps {
   transcriptPath?: string;
 }
 
-// A transcript utterance looks like "[timestamp] Speaker: text". Warning lines
-// ("[ts] SAMOGRAPH-WARNING: ...") match the same shape, so they're skipped.
+// A transcript utterance looks like "[timestamp] Speaker: text". samograph's
+// own control lines ("[ts] SAMOGRAPH-WARNING: ...", "[ts] SAMOGRAPH-WHISPER:
+// ...", "[ts] SAMOGRAPH-CUE: ...") match the same shape, so they are skipped
+// through the shared predicate — the result is posted into MEETING CHAT, and a
+// whisper is private to the wearer by definition.
 const UTTERANCE_RE = /^\[[^\]]+\]\s+([^:]+):\s*(.*)$/;
 
 /** First real spoken line in the transcript, or null if none yet. */
@@ -20,11 +23,12 @@ export function firstHeardLine(
   path?: string,
 ): { speaker: string; text: string } | null {
   for (const line of localTranscriptLines(path)) {
+    if (isControlLine(line)) continue;
     const m = line.match(UTTERANCE_RE);
     if (!m) continue;
     const speaker = m[1]!.trim();
     const text = m[2]!.trim();
-    if (!text || speaker.startsWith("SAMOGRAPH-WARNING")) continue;
+    if (!text) continue;
     return { speaker, text };
   }
   return null;

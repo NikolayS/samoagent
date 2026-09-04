@@ -5,7 +5,7 @@ import {
   resolveGoogleDocId,
   type GoogleDocsClient,
 } from "../googleDocs.ts";
-import { streamTranscriptLines, type WatchOpts } from "../transcript.ts";
+import { isControlLine, streamTranscriptLines, type WatchOpts } from "../transcript.ts";
 
 interface NotesDeps {
   docs?: GoogleDocsClient;
@@ -56,9 +56,16 @@ export async function cmdNotes(args: ParsedArgs, deps: NotesDeps = {}): Promise<
     return;
   }
   process.stdout.write(`Writing live notes to Google Doc ${docId}\n`);
+  // The doc is shared with the meeting, so samograph's own control lines are
+  // NEVER mirrored into it: a SAMOGRAPH-WHISPER line is private to the wearer,
+  // a SAMOGRAPH-CUE line is the wearer's back-channel, and a SAMOGRAPH-WARNING
+  // line is operator telemetry — none of it is meeting content. They still go
+  // to stdout so the agent running this command sees them.
   await streamTranscriptLines(
     async (line) => {
-      await docs.appendText(docId, line + "\n");
+      if (!isControlLine(line)) {
+        await docs.appendText(docId, line + "\n");
+      }
       process.stdout.write(line + "\n");
     },
     {

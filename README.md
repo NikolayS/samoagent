@@ -187,6 +187,8 @@ If you really want raw transcript mirroring, make that explicit:
 samograph notes transcript --from-start
 ```
 
+Even in raw mirroring mode, samograph's own control lines (`SAMOGRAPH-WHISPER`, `SAMOGRAPH-CUE`, `SAMOGRAPH-WARNING`, the `SAMOGRAPH_CALL_ENDED` sentinel) are never written to the doc: a whisper is private to the wearer, a cue is the wearer's back-channel, and a warning is operator telemetry. They still appear on the command's stdout. Likewise `intro --context` never quotes a control line as "the first thing I heard".
+
 ## Frames
 
 Frame capture is on by default. Recall sends separate PNG frames over WebSocket; samograph keeps the latest frames in memory, indexed by source, and only writes to disk when you call `frame`.

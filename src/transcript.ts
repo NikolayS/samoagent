@@ -79,6 +79,11 @@ export {
   normalizeTranscriptEvent,
   CHAT_LINE_MARKER,
   CHAT_TRANSCRIPT_EVENT,
+  // The ONE predicate for "is this a samograph control line, not speech?"
+  // (SAMOGRAPH-WARNING / -WHISPER / -CUE / _CALL_ENDED). Every consumer that
+  // forwards transcript text somewhere the meeting can see must use it.
+  isControlLine,
+  isControlSpeaker,
   type NormalizedTranscriptLine,
   type TranscriptLineKind,
 } from "../packages/shared/transcript/index.ts";

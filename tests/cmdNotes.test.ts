@@ -154,6 +154,60 @@ describe("cmdNotes", () => {
     ]);
   });
 
+  it("never mirrors SAMOGRAPH- control lines into the shared doc", async () => {
+    const appended: Array<{ docId: string; text: string }> = [];
+    const printed: string[] = [];
+    writeFileSync(tf, "");
+    writeFileSync(sf, JSON.stringify({ transcript_file: tf }));
+
+    void (async () => {
+      await sleep(80);
+      appendFileSync(tf, "[2026-06-03 04:20:00] SAMOGRAPH-WHISPER: Ask about the index bloat\n");
+      appendFileSync(tf, "[2026-06-03 04:20:01] SAMOGRAPH-CUE: confirm\n");
+      appendFileSync(tf, "[2026-06-03 04:20:02] SAMOGRAPH-WARNING: tunnel unreachable (ERR_NGROK_727)\n");
+      appendFileSync(tf, "[2026-06-03 04:20:03] Alice: a real note\n");
+      await sleep(80);
+      appendFileSync(tf, "[2026-06-03 04:21:00] SAMOGRAPH_CALL_ENDED\n");
+    })();
+
+    const origWrite = process.stdout.write.bind(process.stdout);
+    (process.stdout.write as unknown) = (s: string) => {
+      printed.push(s);
+      return true;
+    };
+    try {
+      await withTimeout(
+        cmdNotes(
+          { command: "notes", notes_action: "transcript", doc_id: "doc-arg" },
+          {
+            docs: {
+              appendText: async (docId, text) => {
+                appended.push({ docId, text });
+              },
+              appendToSection: async () => {},
+            },
+            watch: FAST,
+          },
+        ),
+        4000,
+      );
+    } finally {
+      (process.stdout.write as unknown) = origWrite;
+    }
+
+    expect(appended).toEqual([
+      { docId: "doc-arg", text: "[2026-06-03 04:20:03] Alice: a real note\n" },
+    ]);
+    // The agent's own stdout still relays every line, control lines included.
+    expect(printed).toEqual([
+      "Writing live notes to Google Doc doc-arg\n",
+      "[2026-06-03 04:20:00] SAMOGRAPH-WHISPER: Ask about the index bloat\n",
+      "[2026-06-03 04:20:01] SAMOGRAPH-CUE: confirm\n",
+      "[2026-06-03 04:20:02] SAMOGRAPH-WARNING: tunnel unreachable (ERR_NGROK_727)\n",
+      "[2026-06-03 04:20:03] Alice: a real note\n",
+    ]);
+  });
+
   it("can replay existing transcript lines with --from-start", async () => {
     const texts: string[] = [];
     writeFileSync(

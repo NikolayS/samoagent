@@ -70,6 +70,26 @@ describe("firstHeardLine / --context", () => {
     expect(firstHeardLine(p)).toEqual({ speaker: "Alice", text: "First real line." });
   });
 
+  it("never treats a SAMOGRAPH-WHISPER line as speech (private text)", () => {
+    const p = writeTranscript([
+      "[2026-06-18 17:50:00] SAMOGRAPH-WHISPER: Ask about the index bloat",
+    ]);
+    expect(firstHeardLine(p)).toBeNull();
+    const msg = buildIntroMessage({ command: "intro", context: true }, p);
+    expect(msg).toBe(DEFAULT_INTRO_TEXT);
+    expect(msg).not.toContain("index bloat");
+  });
+
+  it("skips every SAMOGRAPH- control line and returns the first real one", () => {
+    const p = writeTranscript([
+      "[2026-06-18 17:50:00] SAMOGRAPH-WHISPER: Wrap up - 2 min left",
+      "[2026-06-18 17:50:01] SAMOGRAPH-CUE: confirm",
+      "[2026-06-18 17:50:02] SAMOGRAPH-WARNING: tunnel unreachable (ERR_NGROK_727)",
+      "[2026-06-18 17:50:03] Alice: First real line.",
+    ]);
+    expect(firstHeardLine(p)).toEqual({ speaker: "Alice", text: "First real line." });
+  });
+
   it("returns null when there is no transcript yet", () => {
     expect(firstHeardLine(join(tmp, "missing.txt"))).toBeNull();
   });

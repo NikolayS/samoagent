@@ -40,6 +40,38 @@ export function sanitizeTranscriptField(value: string): string {
 }
 
 /**
+ * The reserved speaker namespace for samograph's OWN transcript lines: the
+ * tunnel watchdog's `SAMOGRAPH-WARNING:`, the private `SAMOGRAPH-WHISPER:`
+ * channel, the wearer's `SAMOGRAPH-CUE:` back-channel and the
+ * `SAMOGRAPH_CALL_ENDED` sentinel. Case-insensitive on purpose: a lookalike
+ * must not slip past a consumer that compares exact uppercase markers.
+ */
+const CONTROL_SPEAKER_RE = /^SAMOGRAPH[-_]/i;
+
+/**
+ * Whether `speaker` is in samograph's reserved control namespace. Meeting
+ * participants can never legitimately carry such a name: the normalizers
+ * replace it with the unknown-speaker default `?`, so this predicate is also
+ * the ONE test every consumer uses to tell a control line from speech.
+ */
+export function isControlSpeaker(speaker: string): boolean {
+  return CONTROL_SPEAKER_RE.test(speaker);
+}
+
+/** A framed transcript line whose speaker slot is a reserved control marker. */
+const CONTROL_LINE_RE = /^\[[^\]]*\]\s+SAMOGRAPH[-_]/i;
+
+/**
+ * Whether one on-disk / wire transcript line is a samograph control line
+ * (`[ts] SAMOGRAPH-…: …` or the `[ts] SAMOGRAPH_CALL_ENDED` sentinel) rather
+ * than speech or chat. Only the speaker slot counts: text that merely mentions
+ * a marker is still speech.
+ */
+export function isControlLine(line: string): boolean {
+  return CONTROL_LINE_RE.test(line);
+}
+
+/**
  * Normalize one Recall `transcript.data` payload to the canonical line, or
  * `null` when the payload is not a `transcript.data` event with words (e.g. a
  * different event, a partial with an empty `words[]`, or malformed input —
