@@ -1,0 +1,16 @@
+{
+  "name": "@samograph/g2-hub-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bunx vite@7.1.4",
+    "build": "tsc --noEmit && bunx vite@7.1.4 build"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "0.0.14"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

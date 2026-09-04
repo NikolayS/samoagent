@@ -33,13 +33,16 @@ import {
 import { createTranscriptHandler, createTranscriptTextHandler } from "./transcript-http.ts";
 import { SESSION_COOKIE_NAME } from "../app-api/auth/session.ts";
 import { stopServerBounded } from "../../packages/shared/serverLifecycle.ts";
+import { createG2Mount, type G2SocketData } from "./g2Mount.ts";
 
 /** What an upgraded socket carries until {@link WebSocketHandler.open} wires it. */
 interface StreamSocketData {
+  kind?: "stream";
   prepared: Extract<PrepareStreamResult, { ok: true }>;
   conn?: StreamConnection;
   recheck?: ReturnType<typeof setInterval>;
 }
+type WsSocketData = StreamSocketData | G2SocketData;
 
 export interface WsHubServerDeps {
   /** Privileged connection able to `SET LOCAL ROLE samograph_app`. */
@@ -70,7 +73,7 @@ export interface WsHubServerDeps {
 }
 
 export interface WsHubServerHandle {
-  server: Server<StreamSocketData>;
+  server: Server<StreamSocketData | G2SocketData>;
   hub: Hub;
   port: number;
   url: string;
@@ -80,6 +83,8 @@ export interface WsHubServerHandle {
 const STREAM_PATH = /^\/calls\/([^/]+)\/stream$/;
 const TRANSCRIPT_PATH = /^\/calls\/([^/]+)\/transcript$/;
 const TRANSCRIPT_TXT_PATH = /^\/calls\/([^/]+)\/transcript\.txt$/;
+
+export { g2ClientIp } from "./g2Mount.ts";
 
 /** Start the ws-hub HTTP+WS server. Returns the live server + its shared Hub. */
 export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
@@ -93,6 +98,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
   // unbounded full-transcript reads while the WS surface is capped (§5.7). One
   // instance shared by both handlers; default so the surface is never uncapped.
   const restCaps = deps.restCaps ?? new RequestRateCaps();
+  const g2 = createG2Mount();
 
   const transcriptHandler = createTranscriptHandler({
     sql: deps.sql,
@@ -110,7 +116,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
     clockMs: authDeps.clockMs,
   });
 
-  const server = Bun.serve<StreamSocketData>({
+  const server = Bun.serve<StreamSocketData | G2SocketData>({
     port: deps.port ?? 0,
     hostname: deps.hostname,
     // Long silences are normal on a live call; hold the socket at Bun's max
@@ -121,6 +127,8 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
     async fetch(req, srv): Promise<Response | undefined> {
       const url = new URL(req.url);
       if (url.pathname === "/health") return new Response("ok", { status: 200 });
+      const g2Response = await g2.fetch(req, srv);
+      if (g2Response !== null) return g2Response;
       // The `.txt` download must be matched BEFORE the JSON `/transcript` route.
       if (TRANSCRIPT_TXT_PATH.test(url.pathname)) return transcriptTextHandler(req);
       if (TRANSCRIPT_PATH.test(url.pathname)) return transcriptHandler(req);
@@ -141,7 +149,9 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
     },
 
     websocket: {
-      async open(ws: ServerWebSocket<StreamSocketData>) {
+      async open(ws: ServerWebSocket<WsSocketData>) {
+        if (ws.data.kind === "g2-app" || ws.data.kind === "g2-agent") { g2.open(ws as ServerWebSocket<G2SocketData>); return; }
+        const streamData = ws.data as StreamSocketData;
         const socket: StreamSocket = {
           send: (data) => {
             try {
@@ -159,7 +169,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
           },
         };
         try {
-          const conn = await openStream(socket, ws.data.prepared, {
+          const conn = await openStream(socket, streamData.prepared, {
             sql: deps.sql,
             hub,
             authDeps,
@@ -168,12 +178,12 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
             readCaps,
             clockMs: authDeps.clockMs,
           });
-          ws.data.conn = conn;
+          streamData.conn = conn;
           // Per-connection revoke recheck (no cache): closes the socket ≤ 1 s after
           // a revoke (§6.2 #4). The close handler clears this timer.
           const timer = setInterval(() => void conn.recheck(), recheckMs);
           (timer as unknown as { unref?: () => void }).unref?.();
-          ws.data.recheck = timer;
+          streamData.recheck = timer;
         } catch {
           // openStream already closed the connection (freed the slot + unsubscribed).
           try {
@@ -184,8 +194,9 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
         }
       },
 
-      message(ws: ServerWebSocket<StreamSocketData>, _message) {
-        const conn = ws.data.conn;
+      message(ws: ServerWebSocket<WsSocketData>, _message) {
+        if (ws.data.kind === "g2-app" || ws.data.kind === "g2-agent") { g2.message(ws as ServerWebSocket<G2SocketData>, _message); return; }
+        const conn = (ws.data as StreamSocketData).conn;
         if (!conn) return;
         // Account every client→server command against the share command-rate cap
         // (§5.7); over-cap → a SAMO-RATE-001 frame and the command is ignored. v1
@@ -208,9 +219,11 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
         }
       },
 
-      close(ws: ServerWebSocket<StreamSocketData>) {
-        if (ws.data.recheck) clearInterval(ws.data.recheck);
-        ws.data.conn?.close();
+      close(ws: ServerWebSocket<WsSocketData>) {
+        if (ws.data.kind === "g2-app" || ws.data.kind === "g2-agent") { g2.close(ws as ServerWebSocket<G2SocketData>); return; }
+        const data = ws.data as StreamSocketData;
+        if (data.recheck) clearInterval(data.recheck);
+        data.conn?.close();
       },
     },
   });

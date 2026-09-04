@@ -139,10 +139,11 @@ Presence is in-memory runtime state. It is meant for lightweight meeting signali
 samograph g2-whisper "Ask about the index bloat on orders"
 samograph g2-whisper "Wrap up - 2 min left" --priority high --ttl 30
 samograph g2-whisper "A longer note for the wearer" --sink fake-hud
-samograph g2-cue confirm
+samograph g2-pair 483920
+samograph g2-listen
 ```
 
-It is fully useful with no hardware attached. `--sink console` (the default) prints the whisper to stderr; `--sink fake-hud` renders the Even Realities G2 screen — 576x288 px with a 27 px LVGL line height, so 10 lines — as a bounded box, so text that does not fit is *visible* rather than silently dropped:
+With no pairing file, `--sink console` is the default; `--sink fake-hud` renders the Even Realities G2 screen — 576x288 px with a 27 px LVGL line height, so 10 lines — as a bounded box. Once paired, `g2` becomes the default sink (and can also be selected explicitly with `--sink g2`).
 
 ```text
 ┌────────────────────────────────────────────────┐
@@ -164,7 +165,9 @@ Every delivered whisper, and every cue, is appended to the active transcript as 
 
 So an agent already running `samograph watch` receives whispers and the wearer's back-channel with no new contract. The `SAMOGRAPH-`/`SAMOGRAPH_` speaker namespace is reserved: a meeting participant who renames themselves `SAMOGRAPH-WHISPER` (or `-CUE`, `-WARNING`) is normalized to the unknown speaker `?`, so nobody in the call can forge a control line. Cues are **semantic** (`confirm`, `dismiss`, `next`, `more`), never physical (`tap`, `double-tap`), so a different input device is a driver swap and nothing above it moves. Both commands require an active session: without one they print `Error: no active session. Run 'samograph join' first.` and exit non-zero.
 
-Whispers carry a priority (`low|normal|high`) and an optional `--ttl SECONDS`. Both are recorded on the whisper and delivered to the sink. The queue policy — a `high` whisper preempts the one currently displayed and is never dropped, `low` is shed first when the queue is full, a whisper with a ttl expires after it — is implemented in `WhisperQueue` and applies inside a long-lived sink process (an embedded agent loop or a device driver). That process does not exist yet: today's one-shot `samograph g2-whisper` builds a fresh queue per invocation, so it always delivers immediately and nothing is ever preempted, shed or expired from the CLI.
+Open the Even Hub app first: it displays the six-digit code that the wearer types into `g2-pair`. Credentials are stored mode 0600 in `~/.samograph/g2.json` (override with `SAMOGRAPH_G2_FILE`); the relay defaults to `https://samograph.samo.team` (override with `SAMOGRAPH_G2_RELAY`). Run `g2-listen` during the call to append glass gestures through the existing `SAMOGRAPH-CUE` transcript path, and `g2-unpair` to delete the relay room and local credentials.
+
+Whispers carry a priority (`low|normal|high`) and optional `--ttl SECONDS`. The relay and long-lived phone app each apply `WhisperQueue`: preferred depth 8, urgent messages first, low priority shed first, lazy TTL expiry, and a hard bound of 32 where the oldest message is dropped regardless of priority. A full offline relay queue rejects new whispers with HTTP 429. The relay is intentionally in-memory for v1, so a service restart makes the app display a new pairing code.
 
 ## Google Doc Notes
 

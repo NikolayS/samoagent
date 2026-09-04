@@ -145,7 +145,7 @@ describe("cmdWhisper", () => {
       ).rejects.toBeInstanceOf(ExitError);
     });
     await run;
-    expect(out.join("")).toBe("Error: whisper sink must be one of: console, fake-hud\n");
+    expect(out.join("")).toBe("Error: whisper sink must be one of: console, fake-hud, g2\n");
     expect(readFileSync(transcript, "utf-8")).toBe("");
   });
 

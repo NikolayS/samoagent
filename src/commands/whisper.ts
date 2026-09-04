@@ -15,9 +15,10 @@ import {
   type Whisper,
   type WhisperSink,
 } from "../whisper.ts";
+import { createG2Sink, loadG2Config } from "./g2.ts";
 
 /** The sinks reachable from the CLI today. A device sink lands behind the same port. */
-export const WHISPER_SINK_NAMES = ["console", "fake-hud"] as const;
+export const WHISPER_SINK_NAMES = ["console", "fake-hud", "g2"] as const;
 
 export interface WhisperDeps {
   /** Override the sink entirely (tests, embedders). Bypasses --sink. */
@@ -60,7 +61,7 @@ export async function cmdWhisper(
     throw new ExitError(1);
   }
 
-  const sinkName = args.whisper_sink ?? "console";
+  const sinkName = args.whisper_sink ?? (loadG2Config() ? "g2" : "console");
   if (!(WHISPER_SINK_NAMES as readonly string[]).includes(sinkName)) {
     process.stderr.write(
       `Error: whisper sink must be one of: ${WHISPER_SINK_NAMES.join(", ")}\n`,
@@ -73,7 +74,7 @@ export async function cmdWhisper(
   const transcriptPath = transcriptFileFromState();
 
   const hud = sinkName === "fake-hud" ? createFakeHudSink(deps.hudGeometry ?? {}) : null;
-  const sink = deps.sink ?? hud ?? createConsoleSink();
+  const sink = deps.sink ?? hud ?? (sinkName === "g2" ? createG2Sink() : createConsoleSink());
 
   // A one-shot CLI invocation builds a FRESH queue, so preemption, depth
   // shedding and TTL expiry can never take effect here: with one whisper in
@@ -85,8 +86,9 @@ export async function cmdWhisper(
   queue.push(makeWhisper({ text, priority, ttlMs: args.whisper_ttl_ms ?? null }, now().getTime()));
 
   let delivered: Whisper | null;
+  let queued = false;
   while ((delivered = queue.take()) !== null) {
-    await sink.deliver(delivered);
+    queued = (await sink.deliver(delivered)) === true;
     appendLine(transcriptPath, formatWhisperTranscriptLine(delivered.text, now()));
   }
 
@@ -103,5 +105,5 @@ export async function cmdWhisper(
       }
     }
   }
-  process.stdout.write(`Whispered: ${text}\n`);
+  process.stdout.write(queued ? `Whispered (queued: glasses not connected): ${text}\n` : `Whispered: ${text}\n`);
 }

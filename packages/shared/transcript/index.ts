@@ -30,14 +30,8 @@ interface TranscriptDataPayload {
   };
 }
 
-/**
- * Collapse CR/LF and runs of whitespace to single spaces and trim the edges.
- * Keeps a transcript line on exactly one physical line and free of stray
- * indentation, while preserving all non-whitespace (incl. Unicode) verbatim.
- */
-export function sanitizeTranscriptField(value: string): string {
-  return value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
-}
+export { sanitizeTranscriptField } from "../whisper/index.ts";
+import { sanitizeTranscriptField } from "../whisper/index.ts";
 
 /**
  * The reserved speaker namespace for samograph's OWN transcript lines: the

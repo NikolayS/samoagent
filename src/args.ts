@@ -36,6 +36,7 @@ export interface ParsedArgs {
   whisper_ttl_ms?: number | null;
   whisper_sink?: string | null;
   cue?: string;
+  g2_code?: string;
   doc_id?: string | null;
   credentials?: string | null;
   from_start?: boolean;

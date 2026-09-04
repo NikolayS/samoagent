@@ -19,6 +19,7 @@ import { cmdNotes } from "./commands/notes.ts";
 import { cmdPresence } from "./commands/presence.ts";
 import { cmdWhisper, WHISPER_SINK_NAMES } from "./commands/whisper.ts";
 import { cmdCue } from "./commands/cue.ts";
+import { cmdG2Listen, cmdG2Pair, cmdG2Unpair } from "./commands/g2.ts";
 import { cmdChimes } from "./commands/chimes.ts";
 import { chimeNames, isChimeName, normalizeChimeName } from "./chime.ts";
 import {
@@ -46,7 +47,10 @@ commands:
   intro [--intro-text TEXT] [--context] [--bot-id ID]
   chimes
   presence <listening|thinking|speaking|acting|idle> [message]
-  g2-whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud]
+  g2-pair <code>
+  g2-whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud|g2]
+  g2-listen
+  g2-unpair
   g2-cue <confirm|dismiss|next|more>
   transcript [--local] [--file FILE] [--cursor N] [--limit N] [bot_id]
   dicts
@@ -281,6 +285,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
     chimes: new Set(),
     presence: new Set(),
     "g2-whisper": new Set(["--priority", "--ttl", "--sink"]),
+    "g2-pair": new Set(),
+    "g2-listen": new Set(),
+    "g2-unpair": new Set(),
     "g2-cue": new Set(),
     transcript: new Set(["--cursor", "--file", "--limit"]),
     dicts: new Set(),
@@ -301,6 +308,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
     chimes: new Set(),
     presence: new Set(),
     "g2-whisper": new Set(),
+    "g2-pair": new Set(),
+    "g2-listen": new Set(),
+    "g2-unpair": new Set(),
     "g2-cue": new Set(),
     transcript: new Set(["--local"]),
     dicts: new Set(),
@@ -538,10 +548,20 @@ export function parseArgs(argv: string[]): ParsedArgs {
         }
         result.whisper_sink = String(rawSink);
       } else {
-        result.whisper_sink = "console";
+        result.whisper_sink = null;
       }
       break;
     }
+    case "g2-pair": {
+      if (positionals.length !== 1 || !/^\d{6}$/.test(positionals[0]!)) {
+        throw new ArgError("g2-pair requires a 6-digit code");
+      }
+      result.g2_code = positionals[0];
+      break;
+    }
+    case "g2-listen":
+    case "g2-unpair":
+      break;
     case "g2-cue": {
       if (positionals.length < 1) {
         throw new ArgError("the following arguments are required: semantic");
@@ -627,6 +647,12 @@ async function dispatch(args: ParsedArgs): Promise<void> {
       return cmdPresence(args);
     case "g2-whisper":
       return cmdWhisper(args);
+    case "g2-pair":
+      return cmdG2Pair(args);
+    case "g2-listen":
+      return cmdG2Listen(args);
+    case "g2-unpair":
+      return cmdG2Unpair(args);
     case "g2-cue":
       return cmdCue(args);
     case "frame":
