@@ -405,7 +405,11 @@ describe("Slice 5 — Settings section rules and save bar", () => {
 
   it("varies the three visible skeleton bars, not the visually-hidden label", () => {
     // `.samograph-visually-hidden` is span nth-of-type(1); the bars are 2..4.
-    expect(CSS).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }');
-    expect(CSS).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }');
+    // Scoped to `--form`/`--page` (design PR 10 review): the selector is
+    // (0,3,1) and out-specifies the shaped variants' bar modifiers, so against
+    // the bare base class it re-sized whatever sat in the row skeleton's span
+    // slots 3 and 4. See `apps/web/test/skeleton-width.test.tsx`.
+    expect(CSS).toContain('.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(3), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }');
+    expect(CSS).toContain('.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(4), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }');
   });
 });

@@ -216,6 +216,43 @@
   --btn-disabled-bg: var(--field-bg-disabled);
   --btn-disabled-fg: var(--muted);
   --btn-disabled-border: var(--line-strong);
+
+  /* Motion (DESIGN-MODEL §3). The switch knob is the first state change in the
+     app that animates, so it introduces the shared pair; anything that
+     animates next uses these rather than inventing a third curve. */
+  --dur-base: 180ms;
+  --ease: cubic-bezier(.2, 0, 0, 1);
+
+  /* Switch (design PR 9, DESIGN-MODEL §4 "Checkbox / Toggle"). `role="switch"`
+     announced a switch and drew a 13px UA checkbox. These five numbers are one
+     geometry: pad + knob + travel + pad = width, and pad*2 + knob = height, so
+     changing the track means changing exactly one of them and the rest follow.
+     The hit area is NOT this box — the whole `<label>` is, and it takes
+     `--tap-min` on a coarse pointer (see the touch-target block below). */
+  --switch-w: 40px;
+  --switch-h: 24px;
+  --switch-knob: 18px;
+  --switch-pad: 3px;
+  --switch-travel: 16px;
+
+  /* Skeletons (design PR 10, DESIGN-MODEL §4 "Skeleton"). One grey, one
+     rhythm, one shimmer for all four variants. The four heights are the things
+     a skeleton stands in for — a line of body text, an `<h1>`, an `<h2>`, a
+     control, a call row — so a placeholder can be built to the height of the
+     content that is coming instead of jumping when it arrives. */
+  --skeleton-bg: color-mix(in srgb, var(--muted) 15%, transparent);
+  --skeleton-radius: var(--radius-md);
+  --skeleton-gap: var(--space-3);
+  --skeleton-dur: 1.4s;
+  --skeleton-bar-h: 16px;
+  --skeleton-title-h: 34px;
+  --skeleton-head-h: 25px;
+  --skeleton-control-h: var(--control-h);
+  --skeleton-area-h: 157px;
+  --skeleton-row-h: 71px;
+  --skeleton-para-h: 43px;
+  --skeleton-hero-h: 134px;
+  --skeleton-block-h: 245px;
 }
 
 /* Public landing (simplified, issue #241) plus the transcript-panel primitives
@@ -1178,6 +1215,106 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-toggle input { margin-top: 0.2rem; }
 .samograph-toggle span { display: grid; gap: var(--space-1); }
 .samograph-toggle .samograph-field-hint { display: block; }
+/* ----- Switch vs checkbox (design PR 9) -------------------------------------
+   Two forms, one class family (DESIGN-MODEL §4). They are told apart by the
+   ARIA attribute rather than by an extra class, so the pixels cannot drift
+   from the announced semantics — you cannot add `role="switch"` and forget to
+   add the class, which is exactly the bug the audit found ("`role="switch"` on
+   auto-record rendered as a plain checkbox").
+
+   Both keep their implicit `<label>` association: the input stays a real
+   `<input type="checkbox">` inside the label, so the accessible name, the
+   whole-label hit target, Space-to-toggle and the checked/disabled semantics
+   are the browser's, not ours. */
+.samograph-toggle input[type="checkbox"]:not([role="switch"]) {
+  accent-color: var(--ink);
+  width: 18px;
+  height: 18px;
+}
+
+.samograph-toggle input[role="switch"] {
+  appearance: none;
+  -webkit-appearance: none;
+  /* A long hint beside it must not squeeze the track in the flex row. */
+  flex: none;
+  /* The knob is absolutely positioned; the track is its containing block. */
+  position: relative;
+  /* Overrides the 0.2rem nudge that aligns a small square box with the first
+     line of the label — a 24px track next to a ~22px line needs none. */
+  margin-top: 0;
+  /* The forced-colours block below gives the track a real border; without this
+     the border would come out of the 40x24 box (there is no blanket
+     `* { box-sizing }` in this sheet). */
+  box-sizing: border-box;
+  width: var(--switch-w);
+  height: var(--switch-h);
+  border: 0;
+  border-radius: var(--radius-pill);
+  /* DEVIATION from DESIGN-MODEL §4, which names `--line-strong`: the OFF track
+     and the knob are a state indicator (WCAG 2.2 SC 1.4.11, 3:1). `--ground`
+     on `--line-strong` is 1.9:1 in dark mode (#111110 on #45433d) — the knob
+     disappears. `--muted` is the same neutral one step further from the ground
+     and measures 5.0:1 light (#f4f2ed on #6b675c) and 5.6:1 dark (#111110 on
+     #918c80) with a single declaration. */
+  background: var(--muted);
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease);
+}
+
+.samograph-toggle input[role="switch"]::before {
+  content: "";
+  position: absolute;
+  top: var(--switch-pad);
+  left: var(--switch-pad);
+  width: var(--switch-knob);
+  height: var(--switch-knob);
+  border-radius: var(--radius-pill);
+  /* The page ground, so the knob reads as a hole punched through the track in
+     both themes and against both track colours. */
+  background: var(--ground);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.samograph-toggle input[role="switch"]:checked { background: var(--ink); }
+.samograph-toggle input[role="switch"]:checked::before { transform: translateX(var(--switch-travel)); }
+.samograph-toggle input[role="switch"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Disabled, WITHOUT the `opacity: .45` the rest of the system uses. Opacity
+   composites the track back toward the page ground: measured light-theme, the
+   OFF track goes #6b675c -> #b6b4ac against an unchanged #f4f2ed knob, i.e.
+   5.0:1 -> 1.9:1, and a disabled switch stops saying whether it is on. Since
+   the whole point of the control is that its two states are legible, the
+   colours keep their contrast and "you cannot change this" is carried by the
+   three other signals: the cursor, a hairline ring on the track, and the label
+   text stepping down to `--muted`. */
+.samograph-toggle input[role="switch"]:disabled {
+  cursor: not-allowed;
+  box-shadow: inset 0 0 0 var(--border) var(--btn-disabled-border);
+}
+.samograph-toggle:has(input[role="switch"]:disabled) {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+/* Forced-colours modes (Windows high contrast) replace author colours
+   wholesale, so a track whose state lives in `background` reads as one flat box
+   in both states. Give it a real border and paint the knob and the ON track in
+   system colours, which those modes keep. */
+@media (forced-colors: active) {
+  .samograph-toggle input[role="switch"] {
+    border: var(--border) solid ButtonText;
+    background: ButtonFace;
+  }
+  .samograph-toggle input[role="switch"]::before { background: ButtonText; }
+  .samograph-toggle input[role="switch"]:checked { background: Highlight; }
+  .samograph-toggle input[role="switch"]:checked::before { background: HighlightText; }
+  .samograph-toggle input[role="switch"]:disabled { border-color: GrayText; }
+  .samograph-toggle input[role="switch"]:disabled::before { background: GrayText; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samograph-toggle input[role="switch"],
+  .samograph-toggle input[role="switch"]::before { transition: none; }
+}
 .samograph-chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0.15rem 0.45rem; font-size: var(--text-xs); font-weight: 700; }
 .samograph-danger-zone { border-top: var(--border-strong) solid var(--crit); padding-top: var(--space-5); }
 .samograph-danger-zone-title { color: var(--crit); }
@@ -1709,27 +1846,150 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   overflow-wrap: anywhere;
 }
 
+/* ----- Skeletons (design PR 10) ---------------------------------------------
+   "Loading is a skeleton of the thing that is coming" (DESIGN-MODEL §1.4). The
+   audit found the opposite (finding #8): one wired fallback and three bare
+   `<p role="status">Loading …</p>` sentences — a ~20px paragraph standing in
+   for ~1090px of settings form, so the whole page jumped the moment the fetch
+   resolved.
+
+   A placeholder can only avoid that jump if it is the SHAPE of the page that is
+   arriving, so the two shaped variants are page-shaped on purpose: `--panel` is
+   the settings page (title / sections of label+control+hint fields / savebar)
+   and `--row` is the dashboard (title / add-to-call hero / upcoming block /
+   call rows / danger zone). Their spacing is not hand-tuned pixels — a group is
+   built from the same `--space-5` padding and `--border-strong` rule as
+   `.samograph-settings-section`, and a field from the same `--space-3` rhythm
+   as `.samograph-field`, so the two move together when the page rhythm moves.
+   `apps/web/test/skeleton-layout.test.ts` pins the heights; the ≤8px no-jump
+   measurement is in the PR body. */
 .samograph-skeleton {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--skeleton-gap);
   width: 100%;
 }
 
-.samograph-skeleton > span[aria-hidden="true"] {
-  height: var(--space-4);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--muted) 15%, transparent);
-  animation: samograph-skeleton-shimmer 1.4s ease-in-out infinite alternate;
+/* A descendant selector, not a child one: the shaped variants nest their bars
+   inside groups and fields. */
+.samograph-skeleton span[aria-hidden="true"] {
+  height: var(--skeleton-bar-h);
+  border-radius: var(--skeleton-radius);
+  background: var(--skeleton-bg);
+  animation: samograph-skeleton-shimmer var(--skeleton-dur) ease-in-out infinite alternate;
 }
 
-.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }
-.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }
+/* `--form` and `--page` are three anonymous lines; the 70%/85% taper is what
+   keeps them from reading as a table. Scoped to those two variants ON PURPOSE:
+   the selector is (0,3,1) — two classes, the attribute, `:nth-of-type` AND the
+   `span` type — so written against the base class it out-specifies every
+   three-class modifier below and lands on whatever the shaped variants happen
+   to have in span slots 3 and 4. In `--row` that was the 245px upcoming slab
+   (rendered at 70%) and the first 30% section heading (rendered at 85%).
+   `apps/web/test/skeleton-width.test.tsx` replays the cascade and fails if this
+   ever loses its scope again. */
+.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(3), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }
+.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(4), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }
+
+/* The named bars. Three classes deep (0,3,0) on purpose: both the base bar rule
+   and the `:nth-of-type` widths above out-specify a lone modifier class, so a
+   single-class rule here would silently lose and every bar would render 16px
+   tall — which is exactly what the first cut of this PR did. */
+.samograph-skeleton .samograph-skeleton-bar { width: 100%; }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--title { height: var(--skeleton-title-h); width: 45%; }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--head { height: var(--skeleton-head-h); width: 30%; }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--label { height: var(--skeleton-bar-h); width: 35%; }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--control { height: var(--skeleton-control-h); max-width: var(--field-max); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--area { height: var(--skeleton-area-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--para { height: var(--skeleton-para-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--row { height: var(--skeleton-row-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--hero { height: var(--skeleton-hero-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--block { height: var(--skeleton-block-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--savebar { height: var(--savebar-h); }
+
+/* A section of the page: the geometry of `.samograph-settings-section`, so the
+   placeholder's rules land where the loaded page's rules land. The rule is
+   `--line` rather than `--line-strong` because a shimmering placeholder should
+   not draw a heavier line than the content it stands in for. */
+.samograph-skeleton-group {
+  display: grid;
+  gap: var(--space-5);
+  padding-block: var(--space-5);
+  border-top: var(--border-strong) solid var(--line);
+}
+
+/* One field inside a section: label → control → hint, on `.samograph-field`'s
+   own `--space-3` rhythm. */
+.samograph-skeleton-field {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* An `<h1>` carries margins the grid gap does not; `<h2>` likewise. Matching
+   them here is what keeps the section rules in the skeleton at the same
+   y-offsets as the section rules in the loaded page. */
+/* The page header: title over a description line, then the header's own
+   `--space-8` rail before the first section — `.samograph-page-header`'s
+   geometry, so the first rule of the skeleton lands where the first rule of the
+   page lands. */
+.samograph-skeleton-header {
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-5) var(--space-8);
+}
+.samograph-skeleton .samograph-skeleton-bar--head { margin-block: var(--space-2); }
+.samograph-skeleton .samograph-skeleton-bar--para { margin-block: var(--space-3); }
+/* The trailing rail a real section gets from the last `.samograph-field`'s
+   `margin-block` sitting against the section's own padding — the grid `gap`
+   only spaces fields from each other, never from the section edge. */
+.samograph-skeleton-field:last-child { margin-bottom: var(--space-2); }
+/* The upcoming-meetings block carries its own heading, so it stands alone on
+   the section rhythm. */
+/* The hero and the upcoming block are both full-width slabs and would read as
+   one if they touched; the 8px comes back out of the hero's own height, so the
+   pair still measures the 142.28 + 245.28 the loaded page measures. */
+.samograph-skeleton--row .samograph-skeleton-bar--hero { margin-bottom: var(--space-2); }
+.samograph-skeleton--row .samograph-skeleton-bar--head { margin-block: var(--space-5); }
+.samograph-skeleton--row .samograph-skeleton-bar--row { margin-bottom: var(--space-4); }
+/* The dashboard's danger zone is a field plus a lone action button. The child
+   combinator matters: the confirm field holds a control of its own, and it must
+   not take the standalone button's leading rail. */
+.samograph-skeleton--row .samograph-skeleton-field { margin-block: var(--space-5); }
+.samograph-skeleton--row > .samograph-skeleton-bar--control { margin-top: var(--space-5); }
+
 /* Centred, because `<main>` no longer centres it: `--page-max` keeps the page
    at the app width and the form column centres itself (see `--content-max`).
    Without this the /auth placeholder sat at the page's left edge and the
    loaded card jumped right when it arrived. */
 .samograph-skeleton--form { max-width: var(--width-form); margin-inline: auto; }
 .samograph-skeleton--page { max-width: var(--width-prose); }
+/* Same argument, the other two routes: /settings renders in a `--width-prose`
+   content column and the dashboard list is uncapped, so capping either
+   placeholder at `--width-form` would move the content sideways on arrival.
+   Their own spacing lives in the groups and the bar margins, so the outer grid
+   gap goes to zero. */
+.samograph-skeleton--panel { max-width: var(--width-prose); gap: 0; }
+.samograph-skeleton--row { max-width: none; gap: 0; }
+
+/* Below `--bp-md` the loaded pages grow: the keyterms textarea takes a row, the
+   add-to-call hero stacks, a call row goes to two lines, and prose that fitted
+   one line on a 720px column wraps to two. A skeleton that does not grow with
+   them re-introduces exactly the jump it exists to remove, so these are the
+   same heights measured against the loaded pages at 390 (PR body). */
+@media (max-width: 767.98px) {
+  :root {
+    --skeleton-area-h: 176px;
+    --skeleton-hero-h: 190px;
+    --skeleton-row-h: 119px;
+    --skeleton-para-h: 87px;
+  }
+
+  /* The two single lines that wrap: a field's hint under its control, and the
+     last line of the account block. */
+  .samograph-skeleton-field > .samograph-skeleton-bar:last-child:nth-child(3),
+  .samograph-skeleton-group:last-of-type > .samograph-skeleton-bar:last-child {
+    height: 35px;
+  }
+}
 
 @keyframes samograph-skeleton-shimmer {
   from { opacity: 0.45; }
@@ -1737,7 +1997,7 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .samograph-skeleton > span[aria-hidden="true"] { animation: none; }
+  .samograph-skeleton span[aria-hidden="true"] { animation: none; }
 }
 /* ===== end Slice 5 ===== */
 @keyframes samograph-live-pulse {
