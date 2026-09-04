@@ -164,6 +164,10 @@
   --control-h-xs: 28px;
   --radius-control: var(--radius-md);
   --field-max: 22rem;
+  /* Alert tone rail (DESIGN-MODEL §4 Alert / Banner). The tone lives in this
+     3px inline-start rule, never in the copy — coloured body text is exactly
+     what `test/alert-contrast.test.ts` was written to stop. */
+  --alert-rail: 3px;
   /* The smallest a tap target may be on a touch screen (WCAG 2.2 AA target
      size, iOS HIG, Material). Distinct from `--control-h`: that is how tall a
      control is drawn everywhere; this is the floor a *hit area* must clear on
@@ -1073,11 +1077,35 @@ button:hover {
 .samograph-select:has(> select:disabled)::after { background: var(--faint); }
 input:where(:not([type="checkbox"], [type="radio"])), select, textarea { background: var(--surface); border-color: var(--control-border); }
 textarea { resize: vertical; font-family: var(--font-mono); }
-.samograph-alert { border: 1px solid currentColor; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
-.samograph-alert--error { color: var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
-.samograph-alert--warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
-.samograph-alert--success { color: var(--success-ink); background: color-mix(in srgb, var(--success-ink) 8%, var(--surface)); }
-.samograph-alert--info { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
+/* Alert / Banner (DESIGN-MODEL §4, PLAN desktop PR 8). One box, four tones, and
+   `components/Alert.tsx` is the only thing that writes these class names.
+   The old box drew `border: 1px solid currentColor` around tone-coloured copy,
+   so a warning was a wall of ochre text in an ochre ring. Now the tone is a 3px
+   inline-start rail plus a 8% tint, and the copy stays at `--ink` — one reading
+   colour in both themes. `display: flow-root` and NOT flex: the copy is a
+   sentence that routinely contains an `<a>` or a `<span>`, and a flex root
+   would promote each of those to a flex item and open a `gap` inside the
+   sentence ("link to <email> ." with 16px holes). Title and action get their
+   own block boxes instead. */
+.samograph-alert {
+  --alert-tone: var(--ink-soft);
+  display: flow-root;
+  border: 1px solid var(--line);
+  border-inline-start: var(--alert-rail) solid var(--alert-tone);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+}
+/* The title claims its own line, so the copy starts under it, not beside it. */
+.samograph-alert-title { display: block; font-weight: 600; color: var(--ink); }
+/* `width: fit-content` + `margin-inline-start: auto` parks the action block at
+   the far end of the box — the block-layout equivalent of `justify-self: end`,
+   with no flex context to leak into the sentence above it. */
+.samograph-alert-action { display: block; width: fit-content; margin-block-start: var(--space-3); margin-inline-start: auto; }
+.samograph-alert--error { --alert-tone: var(--crit); color: var(--ink); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
+.samograph-alert--warn { --alert-tone: var(--warn); color: var(--ink); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.samograph-alert--success { --alert-tone: var(--success-ink); color: var(--ink); background: color-mix(in srgb, var(--success-ink) 8%, var(--surface)); }
+.samograph-alert--info { --alert-tone: var(--ink-soft); color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
 .samograph-toggle { display: flex; align-items: flex-start; gap: var(--space-3); margin-block: var(--space-4); cursor: pointer; }
 .samograph-toggle input { margin-top: 0.2rem; }
 .samograph-toggle span { display: grid; gap: var(--space-1); }
@@ -1087,7 +1115,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-danger-zone-title { color: var(--crit); }
 .samograph-danger-confirm { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
 .samograph-danger-delete { margin-top: var(--space-5); }
-.samograph-danger-error, .samograph-delete-error { color: var(--crit); }
 .samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
 /* ----- Touch targets (mobile audit M3) -------------------------------------
    A finger is not a cursor: 24 actions in this product measured under 44 CSS
@@ -1456,12 +1483,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   background: var(--line);
 }
 
-/* Info-tone sign-in note (§5.16 SAMO-AUTH-006 — "you cancelled" is not a
-   failure, so it must not read like the red `[role="alert"]` copy). */
-.samograph-auth-note {
-  color: var(--muted);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .samograph-google-signin {
     transition: none;
@@ -1764,14 +1785,12 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   border-color: var(--green);
 }
 
-/* Never-silent terminal card (SPEC §5.16). */
+/* Never-silent terminal card (SPEC §5.16). This is an `Alert tone="danger"`,
+   so the box — tint, `--line` border, tone rail, radius — comes from
+   `.samograph-alert`. Redeclaring any of it here would win on source order and
+   erase the rail, which is exactly what this rule used to do. Spacing only. */
 .samograph-stream-error {
   margin: 0.75rem 0;
-  padding: 0.9rem 1rem;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--crit) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--crit) 40%, var(--line));
-  border-radius: 10px;
 }
 
 .samograph-stream-error p {

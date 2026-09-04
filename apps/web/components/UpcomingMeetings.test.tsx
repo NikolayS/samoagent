@@ -18,6 +18,19 @@ describe("Dashboard upcoming meetings", () => {
     expect(view.queryByRole("button", { name: "Add samograph to Planning" })).toBeNull();
   });
 
+  it("announces a standing broken-calendar notice politely and a transient failure assertively", async () => {
+    // NB-1 (PR 8 review). The broken-calendar line is a STANDING condition: it
+    // is present on every dashboard load until the user reconnects, so it must
+    // not fire an assertive live region each time. The optimistic-toggle
+    // failure above IS transient, and keeps `role="alert"`.
+    const broken = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "broken", autoJoin: true, lastSyncAt: null, meetings: [] } });
+    const view = render(<UpcomingMeetings client={broken} onAuthFailure={() => {}} />);
+    const notice = await view.findByText(/Google Calendar needs to be reconnected/);
+    expect(notice.hasAttribute("role")).toBe(false);
+    expect(notice.className).toContain("samograph-alert samograph-alert--warn");
+    expect(view.queryByRole("alert")).toBeNull();
+  });
+
   it("rolls an optimistic exclusion toggle back when the request is rejected", async () => {
     const client = createFakeAppApiClient({
       seedCalendarMeetings: { connectionState: "connected", autoJoin: true, lastSyncAt: null, meetings: [{ id: "event-1", title: "Planning", startsAt: "2026-08-21T17:00:00Z", endsAt: "2026-08-21T17:30:00Z", allDay: false, meetingUrl: "https://meet.google.com/abc-defg-hij", meetingProvider: "google_meet", organizerEmail: null, attendeeResponse: "accepted", autoJoinExcluded: false }] },

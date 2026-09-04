@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Alert } from "./Alert.tsx";
 import { AppApiError, type AppApiClient } from "../lib/appApiClient.ts";
 import { authErrorMessage, AUTH_INFRA_MESSAGE } from "../lib/authErrors.ts";
 import { PageSkeleton } from "./PageSkeleton.tsx";
@@ -79,7 +80,7 @@ export function MagicLinkCallback({ token, client }: MagicLinkCallbackProps) {
   return (
     <section className="samograph-auth">
       <h1>Sign-in failed</h1>
-      <p role="alert" className="samograph-alert samograph-alert--error">{state.message}</p>
+      <Alert tone="danger">{state.message}</Alert>
       <a href="/auth">Request a new link</a>
     </section>
   );

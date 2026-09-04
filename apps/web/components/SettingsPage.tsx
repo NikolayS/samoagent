@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { Alert } from "./Alert.tsx";
 import { CalendarConnectionCard } from "./CalendarConnectionCard.tsx";
 import { PageHeader } from "./PageHeader.tsx";
 import {
@@ -270,7 +271,7 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
         </div>
         </section>
 
-        {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+        {error ? <Alert tone="danger">{error}</Alert> : null}
       </form>
 
       {/* OUTSIDE the form on purpose — it has no inputs and must never be
@@ -279,7 +280,7 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
       {calendarAvailable ? <section role="region" aria-labelledby={integrationsHeadingId} className="samograph-section samograph-settings-section"><div className="samograph-section-header"><h2 id={integrationsHeadingId} className="samograph-section-title">Integrations</h2></div><CalendarConnectionCard client={client} onAuthFailure={calendarAuthFailure} nested /></section> : null}
       <div className="samograph-savebar">
         <div className="samograph-savebar-status">
-          {dirty ? "Unsaved changes" : saved ? <span role="status" className="samograph-alert samograph-alert--success">Settings saved.</span> : null}
+          {dirty ? "Unsaved changes" : saved ? <Alert tone="success" as="span">Settings saved.</Alert> : null}
         </div>
         <button form={formId} type="submit" className="samograph-btn samograph-btn--primary" disabled={!dirty || phase === "saving"} aria-busy={phase === "saving"}>
           Save settings
