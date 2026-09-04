@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Refined design-token contract (issue #241).
@@ -14,7 +15,7 @@ import { join } from "node:path";
  * DOM-free: it reads the CSS as text and asserts its structure — no renderer.
  */
 
-const CSS = readFileSync(join(import.meta.dir, "..", "app", "globals.css"), "utf8");
+const CSS = readGlobalsCss();
 // Comments may legitimately mention hex values / token names in prose; strip
 // them so neither the token-presence nor the no-raw-hex scan trips on prose.
 const CSS_NO_COMMENTS = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -192,7 +193,13 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
     const LIGHT = {
       ground: "#f4f2ed", surface: "#faf9f6", ink: "#14130f",
       "ink-soft": "#3a382f", muted: "#6b675c", faint: "#9c978a",
-      line: "#dfdbd1", "line-strong": "#b9b4a6",
+      // Deviation from the mockup, recorded: the mockup's `#dfdbd1` hairline
+      // measures 1.24:1 on `--ground` / 1.31:1 on `--surface` — invisible. The
+      // value below is the smallest lift clearing 1.5:1 on both (1.51 / 1.60)
+      // that keeps the mockup's warm r+4/g/b-10 cast and stays under
+      // `--line-strong`. See `button-states.test.ts` "hairlines are visible in
+      // both themes".
+      line: "#cbc7bd", "line-strong": "#b9b4a6",
     };
     const DARK = {
       ground: "#111110", surface: "#191918", ink: "#edeae2",
@@ -399,7 +406,11 @@ describe("Slice 5 — Settings section rules and save bar", () => {
 
   it("varies the three visible skeleton bars, not the visually-hidden label", () => {
     // `.samograph-visually-hidden` is span nth-of-type(1); the bars are 2..4.
-    expect(CSS).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }');
-    expect(CSS).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }');
+    // Scoped to `--form`/`--page` (design PR 10 review): the selector is
+    // (0,3,1) and out-specifies the shaped variants' bar modifiers, so against
+    // the bare base class it re-sized whatever sat in the row skeleton's span
+    // slots 3 and 4. See `apps/web/test/skeleton-width.test.tsx`.
+    expect(CSS).toContain('.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(3), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }');
+    expect(CSS).toContain('.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(4), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }');
   });
 });

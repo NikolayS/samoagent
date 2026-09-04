@@ -13,7 +13,7 @@ export function SiteNav() {
       </a>
       <div className="samograph-nav-actions">
         <ThemeSwitcher />
-        <a className="samograph-button samograph-button--compact" href="/auth">
+        <a className="samograph-btn samograph-btn--primary samograph-btn--sm" href="/auth">
           Get started
         </a>
       </div>
@@ -56,7 +56,7 @@ export function Landing() {
           <h1>An agent that joins your call and transcribes it live.</h1>
           <p>Zoom and Google Meet. No install.</p>
           <div className="samograph-hero-actions">
-            <a className="samograph-button" href="/auth">
+            <a className="samograph-btn samograph-btn--primary" href="/auth">
               Get started
             </a>
             <a className="samograph-hero-secondary" href={REPO}>

@@ -52,7 +52,8 @@ All other token values below match the source audit as merged with the mobile re
 
 ## 3. Tokens
 
-Additions to `:root` in `apps/web/app/globals.css`. Existing tokens stay; nothing is renamed.
+Additions to `:root` in `apps/web/app/styles/tokens.css` (the registry `apps/web/app/globals.css`
+imports first — see PLAN.md PR 14). Existing tokens stay; nothing is renamed.
 
 ```css
 /* Control geometry — the single answer to "how tall is a control?" */
@@ -118,9 +119,9 @@ are page-level only. Ban raw px in new rules.
 **Radius** — `--radius-control` (6) for every interactive box; `--radius-lg` (8) for cards and
 panels; `--radius-pill` for chips and the switcher.
 
-**Fluid gutter** — `--gutter: clamp(16px, 5vw, var(--space-8))`, replacing the `:root` override
-inside a `40rem` media query with one expression that covers the 20px mobile gutter and the 32px
-desktop gutter.
+**Fluid gutter** — `--gutter: clamp(var(--space-4), 5vw, var(--space-8))`, replacing the `:root`
+override inside a `40rem` media query with one expression: 16px at 320px, ~19.5px at 390px, 24px
+at 480px, and the full 32px from 640px up. Shipped in M9.
 
 ---
 
@@ -207,13 +208,27 @@ Two forms, one class family:
 
 ### Alert / Banner — `.samograph-alert`
 ```
-layout    grid-template-columns: 20px 1fr; gap var(--space-3);
+layout    display: flow-root — NOT flex/grid: alert copy is a sentence that
+          routinely contains an <a>/<span>, and a flex root promotes each of
+          those to a flex item, opening gaps inside the sentence.
           padding var(--space-3) var(--space-4); border-radius var(--radius-control)
-tone      border-left: 3px solid <tone>; border: 1px solid --line; background: 6% tint of <tone>
-          text: var(--ink) — NOT the tone colour. The tone lives in the rail + icon.
-icon      a 16px glyph in the leading column, per tone
-sizes     --inline  single-line, --text-xs, no icon — for the savebar status
+tone      border-inline-start: var(--alert-rail, 3px) solid <tone>;
+          border: 1px solid --line; background: 8% tint of <tone>
+          text: var(--ink) — NOT the tone colour. The tone lives in the rail.
+icon      none. The rail carries the tone; a leading glyph column costs width at
+          390px for no added meaning.
+tones     info | success | warning | danger  (CSS variants: --info --success
+          --warn --error, pinned literally by test/alert-contrast.test.ts)
+live      the tone picks the live region — status for info/success, alert for
+          warning/danger — and `live="polite" | "assertive" | "off"` overrides
+          it. A STANDING condition (re-rendered on every load) must not announce
+          assertively; only transient events may.
+slots     optional `title` (own line, 600) and `action` (block, right-parked)
 ```
+Implemented by `components/Alert.tsx` (desktop PR 8) — the only place that writes
+these class names. A call-site `className` is for geometry only: it ties with
+`.samograph-alert` at (0,1,0) and wins on source order, so setting
+`color`/`background`/`border*` there erases the rail (guarded).
 
 ### Card / Section
 Two containers, and only two:
@@ -295,6 +310,14 @@ base        < 480px    one column, everything full-bleed within the gutter
 ```
 Author new rules `@media (min-width: …)`. Convert legacy `max-width` blocks opportunistically.
 
+**Shipped in M9.** These three numbers are now the ONLY width values `globals.css` may name, in
+ONE unit — px — with `apps/web/lib/breakpoints.ts` as the JS-readable source of truth and
+`apps/web/test/breakpoints.test.ts` as the guard. `@media` cannot read a custom property, so the
+numbers stay literal in each prelude. Two forms only: `(min-width: 768px)` at and above, and
+`(max-width: 767.98px)` strictly below — the `.02px` shim leaves no viewport width matching both
+or neither. `rem` breakpoints were dropped: text zoom moves a `rem` boundary without moving the
+device width the layout was measured against.
+
 ### Nav collapse
 Below `--bp-md`: brand + a single `☰` disclosure (44×44, `aria-expanded`/`aria-controls`) on row
 one; account email, theme switcher and Log out move into the disclosure panel; primary links stay
@@ -351,7 +374,8 @@ only.
 
 | test | what it enforces | implication |
 |---|---|---|
-| `test/no-dead-css.test.ts` | every `samograph-*` class used in a `.tsx` must have a rule in `globals.css` | define a class before using it |
+| `test/no-dead-css.test.ts` | every `samograph-*` class used in a `.tsx` must have a rule in the stylesheet | define a class before using it |
+| `test/stylesheet-split.test.ts` | `globals.css` is an import manifest whose resolved order still matches the pre-split sheet | move rules between `app/styles/*.css` only with the snapshot updated deliberately |
 | `test/css-tokens-defined.test.ts` | every `var(--x)` with no fallback must be defined in the stylesheet | new tokens land in `:root`, not only inside a `@media` block |
 | `test/alert-contrast.test.ts` | alert copy clears 4.5:1 on its tint in light and dark | applies to the Alert component work |
 | `test/greenroom-tokens.test.ts` | the `--google-btn-*` values, literally | never touch these — Google-mandated |

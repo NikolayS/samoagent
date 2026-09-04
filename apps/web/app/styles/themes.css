@@ -1,0 +1,64 @@
+/* Dark by OS preference. The explicit `data-theme` blocks below have higher
+   specificity and therefore override this in both directions. Only the base hue
+   tokens are redefined; the `var()`-chained `--good`/`--state-*` re-resolve. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ground: #111110;
+    --surface: #191918;
+    --ink: #edeae2;
+    --ink-soft: #c6c2b7;
+    --muted: #918c80;
+    --faint: #6a665d;
+    --line: #3a3934;
+    --line-strong: #45433d;
+    --warn: #e2b45a;
+    --crit: #ff7a7a;
+    --success-ink: var(--accent-live);
+    /* Google's approved DARK button set (#209) — not our palette to tune. */
+    --google-btn-bg: #131314;
+    --google-btn-border: #8e918f;
+    --google-btn-ink: #e3e3e3;
+  }
+}
+
+/* Explicit user theme choice — wins over the OS preference above. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ground: #f4f2ed;
+  --surface: #faf9f6;
+  --ink: #14130f;
+  --ink-soft: #3a382f;
+  --muted: #6b675c;
+  --faint: #9c978a;
+  /* Lifted for contrast — see the base :root note above. */
+  --line: #cbc7bd;
+  --line-strong: #b9b4a6;
+  --warn: #8a5a00;
+  --crit: #a63a3a;
+  --success-ink: #1d6b47;
+  /* Google's approved LIGHT button set (#209). */
+  --google-btn-bg: #ffffff;
+  --google-btn-border: #747775;
+  --google-btn-ink: #1f1f1f;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #111110;
+  --surface: #191918;
+  --ink: #edeae2;
+  --ink-soft: #c6c2b7;
+  --muted: #918c80;
+  --faint: #6a665d;
+  --line: #3a3934;
+  --line-strong: #45433d;
+  --warn: #e2b45a;
+  --crit: #ff7a7a;
+  --success-ink: var(--accent-live);
+  /* Google's approved DARK button set (#209). */
+  --google-btn-bg: #131314;
+  --google-btn-border: #8e918f;
+  --google-btn-ink: #e3e3e3;
+}
+

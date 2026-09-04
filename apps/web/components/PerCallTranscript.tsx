@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { Alert } from "./Alert.tsx";
 import {
   formatRenderLine,
   formatTranscriptTimestamp,
@@ -389,9 +390,9 @@ export function PerCallTranscript({
       <DegradedBanner degraded={state.degraded} />
 
       {fatalError || statusMessageMovedToCard ? (
-        <div role="alert" className="samograph-stream-error samograph-alert samograph-alert--error">
+        <Alert tone="danger" as="div" className="samograph-stream-error">
           <p>{fatalError ? streamErrorCopy(fatalError.code, fatalError.message) : view.message}</p>
-        </div>
+        </Alert>
       ) : (
         <ol
           ref={transcriptRef}
@@ -481,8 +482,14 @@ export function PerCallTranscript({
 function TranscriptTime({ ts }: { ts: string }) {
   const formatted = formatTranscriptTimestamp(ts);
   const parts = splitTranscriptTimestamp(formatted);
+  // `formatTranscriptTimestamp` is total: a ts it cannot parse comes back
+  // verbatim, and `splitTranscriptTimestamp` returns null for exactly those
+  // values. Publishing that raw string as `dateTime` would advertise a
+  // machine-readable value that is not one (#288 review), so the attribute is
+  // emitted ONLY for a canonical `YYYY-MM-DD HH:MM:SS` — i.e. only when the ts
+  // parsed. `title` keeps the human string either way.
   return (
-    <time className="samograph-line-time" aria-hidden="true" dateTime={formatted} title={formatted}>
+    <time className="samograph-line-time" aria-hidden="true" {...(parts ? { dateTime: formatted } : {})} title={formatted}>
       {parts ? (
         <>
           <span className="samograph-line-date">{parts.date}</span>

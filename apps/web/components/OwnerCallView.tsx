@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Alert } from "./Alert.tsx";
 import { PerCallTranscript } from "./PerCallTranscript.tsx";
 import { ShareModal } from "./ShareModal.tsx";
 import { PageHeader } from "./PageHeader.tsx";
 import type { TranscriptStreamClient } from "../lib/transcriptStreamClient.ts";
 import type { ShareApiClient } from "../lib/shareApiClient.ts";
 import type { AppApiClient } from "../lib/appApiClient.ts";
+import { isSessionInvalid } from "../lib/apiError.ts";
 import { displayMeetingUrl, meetingTitle } from "../lib/meetingUrl.ts";
 import { safeExternalUrl } from "../lib/safeExternalUrl.ts";
 
@@ -51,11 +53,19 @@ export function OwnerCallView({
     let cancelled = false;
     appClient.getCall(callId).then((call) => {
       if (!cancelled) setMeetingUrl(call.meetingUrl);
-    }).catch(() => {});
+    }).catch((err: unknown) => {
+      if (cancelled) return;
+      // An expired session must send the owner to sign-in, as it does on every
+      // other page — the blanket `.catch(() => {})` swallowed the 401 too and
+      // left them on a page that could not load (#294 review). Any OTHER failure
+      // stays silent by design: the heading falls back to the call id and the
+      // transcript below is the page.
+      if (isSessionInvalid(err)) redirect("/auth");
+    });
     return () => {
       cancelled = true;
     };
-  }, [appClient, callId]);
+  }, [appClient, callId, redirect]);
 
   // `meetingTitle` yields the constant "Meeting" and `displayMeetingUrl` "" for
   // an input they cannot parse (they never echo raw text, so a secret cannot
@@ -158,9 +168,7 @@ export function OwnerCallView({
             its recording. This can&rsquo;t be undone.
           </p>
           {deleteError ? (
-            <p className="samograph-delete-error samograph-alert samograph-alert--error" role="alert">
-              {deleteError}
-            </p>
+            <Alert tone="danger">{deleteError}</Alert>
           ) : null}
           <button
             type="button"

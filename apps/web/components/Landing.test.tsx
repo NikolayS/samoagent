@@ -1,7 +1,9 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { join } from "node:path";
 import { render } from "@testing-library/react";
 import { Landing } from "./Landing.tsx";
 import { installDom } from "../test/setup.tsx";
+import { readGlobalsCss } from "../test/helpers/stylesheet";
 
 installDom();
 
@@ -28,8 +30,11 @@ describe("Landing (simplified)", () => {
   it("renders exactly one primary CTA in the hero, pointing at the auth route", () => {
     const { container } = render(<Landing />);
     const hero = container.querySelector(".samograph-landing-hero")!;
-    const primary = Array.from(hero.querySelectorAll("a.samograph-button"));
+    // PLAN PR 13: the landing's private `.samograph-button` is retired; the
+    // hero CTA is the app's own primary button.
+    const primary = Array.from(hero.querySelectorAll("a.samograph-btn"));
     expect(primary.length).toBe(1);
+    expect(primary[0]!.className).toBe("samograph-btn samograph-btn--primary");
     expect(primary[0]!.getAttribute("href")).toBe("/auth");
     expect(primary[0]!.textContent).toBe("Get started");
     const secondary = hero.querySelector("a.samograph-hero-secondary")!;
@@ -111,4 +116,41 @@ describe("Landing (simplified)", () => {
     const labels = Array.from(getByRole("contentinfo").querySelectorAll("a"), (link) => link.textContent);
     expect(labels).toEqual(["get started", "cli on github", "hello@samograph.dev"]);
   });
+});
+
+/**
+ * PLAN PR 13 — the landing's link reset vs. the app's button.
+ *
+ * `.samograph-landing a { color: inherit }` is (0,1,1); every
+ * `.samograph-btn` colour variant is (0,1,0). Putting the app button on a
+ * landing anchor therefore painted the label `--ink` on the `--primary`
+ * variant's `--ink` fill: a solid black box with no visible label, in both
+ * themes. The retired `.samograph-button` hid this behind
+ * `color: var(--ground) !important`; this asserts the fix instead — the reset
+ * excludes buttons, so label and fill can never collapse to one colour.
+ */
+describe("Landing CTAs are legible against their own fill", () => {
+  let style: HTMLStyleElement;
+  beforeEach(() => {
+    style = document.createElement("style");
+    style.textContent = readGlobalsCss();
+    document.head.append(style);
+  });
+  afterEach(() => style.remove());
+
+  for (const [where, selector] of [
+    ["hero", ".samograph-landing-hero a.samograph-btn"],
+    ["nav", ".samograph-nav-actions a.samograph-btn"],
+  ] as const) {
+    it(`gives the ${where} CTA a label colour different from its background`, () => {
+      const { container } = render(<Landing />);
+      const cta = container.querySelector<HTMLElement>(selector)!;
+      const computed = getComputedStyle(cta);
+      // Exact light-theme values: `--ground: #f4f2ed` on `--ink: #14130f`.
+      // Before the fix both resolved to `#14130f` — ink on ink.
+      expect(computed.color).toBe("#f4f2ed");
+      expect(computed.backgroundColor).toBe("#14130f");
+      expect(computed.textDecoration).toBe("none");
+    });
+  }
 });

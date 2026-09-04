@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { render } from "@testing-library/react";
 import { createElement } from "react";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { Landing } from "../components/Landing.tsx";
 import { installDom } from "./setup.tsx";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 installDom();
 
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const css = readGlobalsCss();
 const clean = css.replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 const root = clean.match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";
@@ -26,7 +25,7 @@ const expected: Record<string, string> = {
   "--radius-sm": "4px", "--radius-md": "6px", "--radius-lg": "8px", "--radius-pill": "999px",
   "--border": "1px", "--border-strong": "2px",
   "--width-app": "1120px", "--width-prose": "720px", "--width-form": "480px",
-  "--gutter": "var(--space-8)", "--focus-ring": "var(--ink)",
+  "--gutter": "clamp(var(--space-4), 5vw, var(--space-8))", "--focus-ring": "var(--ink)",
   "--hover-surface": "color-mix(in srgb, var(--ink) 5%, var(--surface))",
   "--control-border": "var(--line-strong)",
 };
@@ -73,8 +72,12 @@ describe("Slice 1 reset and shell CSS", () => {
     expect(normalize(declaration(root, "--page-max") ?? "")).toBe("var(--width-app)");
     expect(rule(/\.samograph-page--form(?![-\w])/)).toMatch(/--content-max\s*:\s*var\(--width-form\)/);
   });
-  it("reduces the gutter under 40rem", () =>
-    expect(clean).toMatch(/@media\s*\(max-width:\s*40rem\)\s*\{[\s\S]*?:root\s*\{[^}]*--gutter\s*:\s*var\(--space-5\)/));
+  // M9: the stepped `:root { --gutter: var(--space-5) }` override inside a
+  // media query became one fluid expression — 16px at 320px, 32px from 640px up.
+  it("makes the gutter fluid instead of stepped", () => {
+    expect(normalize(declaration(root, "--gutter") ?? "")).toBe("clamp(var(--space-4), 5vw, var(--space-8))");
+    expect(clean).not.toMatch(/@media[^{]*\{[^}]*:root\s*\{[^}]*--gutter\s*:/);
+  });
   it("gives select and textarea the shared focus ring", () => {
     const focusRule = [...clean.matchAll(/([^{}]+:focus-visible[^{}]*)\{([^}]*)\}/g)].find(([, selectors]) => selectors.includes("select:focus-visible") && selectors.includes("textarea:focus-visible"));
     expect(focusRule).toBeDefined();
@@ -94,18 +97,36 @@ describe("Slice 1 typography regressions", () => {
 
   afterEach(() => style.remove());
 
-  it("keeps the landing on the mono stack", () =>
-    expect(rule(/\.samograph-landing(?![-\w])/)).toMatch(/font-family\s*:\s*var\(--font-mono\)/));
-
-  it("overrides the global heading family after the global heading rule", () => {
-    const landingHeadings = rule(/:where\(\.samograph-landing\) h1\s*,\s*:where\(\.samograph-landing\) h2\s*,\s*:where\(\.samograph-landing\) h3/);
-    expect(landingHeadings).toMatch(/font-family\s*:\s*var\(--font-mono\)/);
-
-    const globalHeadingIndex = clean.search(/h1\s*,\s*h2\s*,\s*h3\s*\{/);
-    const landingHeadingIndex = clean.search(/:where\(\.samograph-landing\) h1\s*,\s*:where\(\.samograph-landing\) h2\s*,\s*:where\(\.samograph-landing\) h3\s*\{/);
-    expect(globalHeadingIndex).toBeGreaterThanOrEqual(0);
-    expect(landingHeadingIndex).toBeGreaterThan(globalHeadingIndex);
+  /* REVERSED by PLAN PR 13 ("converge the landing on the app's design
+   * language"; audit finding 7 "two design languages in one product").
+   *
+   * These two cases used to pin the OPPOSITE invariant: `.samograph-landing`
+   * had to carry `font-family: var(--font-mono)`, and a
+   * `:where(.samograph-landing) h1,h2,h3` block had to re-force mono *after*
+   * the global `h1,h2,h3 { font-family: var(--font-display) }` rule so it won
+   * on source order. That was the whole mechanism keeping the landing on a
+   * second type system, and it is what PR 13 removes: the landing renders in
+   * Inter like every app page, and the heading override is deleted rather than
+   * flipped, because with mono gone its `font-weight`/`line-height` were
+   * already restated by `h1` and `.samograph-landing-hero h1`.
+   *
+   * The pair is kept — inverted, not deleted — so the landing's type family
+   * stays under guard in both directions: neither rule may come back. Mono
+   * survives where it carries meaning, which the `--call-url` / `--keyterms` /
+   * `.samograph-instrument` cases below and in `landing-converge.test.ts`
+   * pin. */
+  it("puts the landing on the app body stack, not a private mono stack", () => {
+    expect(rule(/\.samograph-landing(?![-\w])/)).not.toMatch(/font-family/);
+    expect(rule(/\.samograph-site-footer(?![-\w])/)).not.toMatch(/font-family/);
   });
+
+  it("has no landing-only override of the global heading family", () => {
+    expect(clean).not.toMatch(/:where\(\.samograph-landing\)\s*h[123]/);
+    expect(rule(/h1\s*,\s*h2\s*,\s*h3/)).toMatch(/font-family\s*:\s*var\(--font-display\)/);
+  });
+
+  it("keeps mono on the landing's transcript-instrument demo", () =>
+    expect(rule(/\.samograph-instrument(?![-\w])/)).toMatch(/font-family\s*:\s*var\(--font-mono\)/));
 
   it("pins the landing heading weight and historical line heights", () => {
     const { container } = render(createElement(Landing));
@@ -121,9 +142,9 @@ describe("Slice 1 typography regressions", () => {
 });
 
 describe("Slice 4 responsive dashboard CSS", () => {
-  it("stacks call and meeting rows into one column under 40rem", () => {
+  it("stacks call and meeting rows into one column under --bp-md", () => {
     const slice4 = css.match(/\/\* ===== Slice 4 — Dashboard ===== \*\/([\s\S]*?)\/\* ===== end Slice 4 ===== \*\//)?.[1] ?? "";
-    const mobile = slice4.match(/@media\s*\(max-width:\s*40rem\)\s*\{([\s\S]*)\}\s*$/)?.[1] ?? "";
+    const mobile = slice4.match(/@media\s*\(max-width:\s*767\.98px\)\s*\{([\s\S]*)\}\s*$/)?.[1] ?? "";
     expect(mobile).toMatch(/\.samograph-call-row\s*,\s*\.samograph-meeting-item\s*\{[^}]*grid-template-columns\s*:\s*minmax\(0\s*,\s*1fr\)/s);
   });
 

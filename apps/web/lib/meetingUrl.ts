@@ -64,7 +64,10 @@ export function meetingTitle(url: string): string {
     const id = /^\/(?:j|s|w)\/(\d{9,11})$/.exec(parsed.pathname)?.[1];
     if (id) return `Zoom · ${groupZoomId(id)}`;
     // A personal meeting room is named by its vanity id instead of a number.
-    const vanity = /^\/my\/([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(parsed.pathname)?.[1];
+    // Capped at 64 characters (#288 review): the capture was unbounded, so any
+    // `/my/<anything>` path became a title rendered into a row heading, an
+    // aria-label and a tooltip. A longer path is not a vanity id — fall back.
+    const vanity = /^\/my\/([A-Za-z0-9][A-Za-z0-9._-]{0,63})$/.exec(parsed.pathname)?.[1];
     if (vanity) return `Zoom · ${vanity}`;
   }
 

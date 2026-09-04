@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * The app shell has a real mobile nav (mobile audit M2).
@@ -19,7 +19,7 @@ import { join } from "node:path";
  * This guard fails if the collapsed header grows back or the email is allowed
  * to wrap again.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 
 /** Every `@media` block with this query, concatenated (the stylesheet has more
@@ -62,7 +62,13 @@ describe("the collapsed mobile shell", () => {
   it("drops the old wrap-and-hope patch", () => {
     // `flex-wrap: wrap` on the inner row is what stacked the header into three
     // rows; the only wrapping left is the menu's own full-width flex-basis.
-    expect(block("(max-width: 40rem)")).not.toMatch(/samograph-app-nav-inner|samograph-app-nav-right/);
+    // M9 note: this used to read the now-deleted `(max-width: 40rem)` block,
+    // where it matched nothing and passed vacuously. Stated against the rules
+    // that actually carry the invariant: the row still wraps (that is how the
+    // menu takes its own full-width line) but contributes NO vertical gap when
+    // it does, and the desktop row does not wrap at all.
+    expect(rule(".samograph-app-nav-inner")).toMatch(/row-gap\s*:\s*0/);
+    expect(rule(".samograph-app-nav-inner", desktop)).toMatch(/flex-wrap\s*:\s*nowrap/);
   });
 
   it("holds the bar at 56px so opening the panel does not shift the brand", () => {

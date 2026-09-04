@@ -247,4 +247,49 @@ describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", ()
     const { container } = await renderOwner({ callId: "call_abcdefgh", seedCalls: [] });
     expect(container.querySelector("h1")?.textContent).toBe("Call call_abc");
   });
+
+  it("sends an expired session to /auth instead of swallowing the 401", async () => {
+    // The owner read's `.catch(() => {})` swallowed EVERY failure, 401 included,
+    // so a session that expired while the page was open left the owner staring
+    // at a "Call call_abc" heading with no way to know they were signed out —
+    // while every other page redirects (#294 review). A denial that is NOT an
+    // auth failure still stays silent: the transcript below is the page.
+    const redirected: string[] = [];
+    const app = createFakeAppApiClient({
+      failGetCallWith: { code: "SAMO-AUTH-003", message: "Session invalid.", status: 401 },
+    });
+    await act(async () => {
+      render(
+        <OwnerCallView
+          streamClient={createFakeTranscriptStreamClient({ callDetail: detail() })}
+          shareClient={createFakeShareApiClient()}
+          appClient={app}
+          callId="call_1"
+          redirect={(p) => redirected.push(p)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    expect(redirected).toEqual(["/auth"]);
+  });
+
+  it("stays put on a non-auth read failure", async () => {
+    const redirected: string[] = [];
+    const app = createFakeAppApiClient({
+      failGetCallWith: { code: "SAMO-AUTHZ-001", message: "Request failed.", status: 403 },
+    });
+    await act(async () => {
+      render(
+        <OwnerCallView
+          streamClient={createFakeTranscriptStreamClient({ callDetail: detail() })}
+          shareClient={createFakeShareApiClient()}
+          appClient={app}
+          callId="call_1"
+          redirect={(p) => redirected.push(p)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    expect(redirected).toEqual([]);
+  });
 });

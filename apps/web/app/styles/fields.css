@@ -1,0 +1,92 @@
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* The one control recipe. Checkboxes and radios are excluded on purpose: they
+   are not control BOXES, and the old blanket `input` selector stretched them to
+   the full column width. */
+input:where(:not([type="checkbox"], [type="radio"])),
+select,
+textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 0.25rem;
+  font: inherit;
+  line-height: var(--leading-tight);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+}
+
+/* Height comes from `height` + zero block padding, never from padding + font
+   metrics, so every field is exactly var(--control-h) tall. */
+input:where(:not([type="checkbox"], [type="radio"])),
+select {
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+}
+
+textarea {
+  min-height: calc(var(--control-h) * 2);
+  padding: var(--space-3);
+  /* --leading-tight pins a ONE-line control to an exact height; a textarea
+     wraps, so its lines stay on the body rhythm. */
+  line-height: var(--leading-normal);
+}
+
+/* iOS Safari ZOOMS the page whenever a focused field's text is under 16px —
+   and it does not zoom back out on blur, so the rest of the form ends up
+   off-screen. `--text-base` is 14px, so every field on this app tripped it.
+   Below --bp-md the field font is therefore 16px: a viewport fix, not a change
+   to the type scale (mobile audit M8, "Forms on mobile"). The same block drops
+   `--field-max` (below), so a mobile field is full-column at 16px. */
+@media (max-width: 767.98px) {
+  input:where(:not([type="checkbox"], [type="radio"])),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+.samograph-keyterms {
+  font-family: var(--font-mono);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--ink);
+}
+
+button {
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+button:hover {
+  background: var(--hover-surface);
+  border-color: var(--line-strong);
+}
+

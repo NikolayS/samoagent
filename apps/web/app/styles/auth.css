@@ -1,0 +1,83 @@
+/* =============================================================================
+ * Sign-in page — "Continue with Google" + the divider above the magic-link form
+ * (issue #209, SPEC.amendments S5-1)
+ *
+ * This block is BRANDING, not taste. Google's "Sign in with Google" guidelines
+ * fix the geometry (40px minimum height, 4px corner radius, the 18px mark, 8-12px
+ * gap) and the colour sets (`--google-btn-*` above). The one recorded deviation
+ * is the typeface: Google specifies Roboto Medium 14px; this app loads no
+ * webfont and will not start loading one for a single button, so it renders
+ * `var(--font-body)` at 14px/500 (S5-1 item 11).
+ *
+ * Deliberately NOT tinted with Greenroom hues: an "on-brand" green Google button
+ * is exactly what the guidelines forbid.
+ * ========================================================================== */
+
+.samograph-google-signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem; /* 12px — inside Google's 8–12px mark-to-label range */
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-h); /* 44px — clears Google's stated 40px minimum */
+  margin-top: 1rem;
+  padding: 0 0.75rem;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--google-btn-ink);
+  background: var(--google-btn-bg);
+  border: 1px solid var(--google-btn-border);
+  border-radius: 4px; /* Google's stated radius */
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+/* Google permits a hover/focus state; it must stay within the same colour set,
+   so tint the button's own surface with its own ink rather than a brand hue. */
+.samograph-google-signin:hover,
+.samograph-google-signin:focus-visible {
+  color: var(--google-btn-ink);
+  background: color-mix(in srgb, var(--google-btn-ink) 8%, var(--google-btn-bg));
+}
+
+.samograph-google-signin:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* The mark is a fixed-size asset — never scaled by the flex layout. */
+.samograph-google-mark {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+/* "or" between the two credentials, with a rule either side. `aria-hidden` in
+   the markup, so this is purely visual. */
+.samograph-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.samograph-auth-divider::before,
+.samograph-auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samograph-google-signin {
+    transition: none;
+  }
+}
+

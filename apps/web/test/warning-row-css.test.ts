@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Follow-up from the #280 review. An inline `SAMOGRAPH-WARNING` line is rendered
@@ -15,12 +14,27 @@ import { join } from "node:path";
  * warning row did not, so the whole transcript scrolled horizontally at 390px
  * the moment a warning existed. The warning row is one full-width cell instead.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const css = readGlobalsCss();
+
+/**
+ * The rule body for `selector`, or `null` when the sheet does not declare it.
+ *
+ * Anchored on `selector` followed by `{` (#288 review NB1). A bare `indexOf`
+ * matched a PREFIX, so renaming the class to `.samograph-warning-row-2` — which
+ * detaches every assertion below from the markup — still found the rule and the
+ * guard stayed green. `ruleIn` takes the sheet as an argument so the anchoring
+ * itself is testable against a fixture.
+ */
+function ruleIn(sheet: string, selector: string): string | null {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+  const match = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(sheet);
+  return match ? match[0] : null;
+}
 
 function rule(selector: string): string {
-  const start = css.indexOf(selector);
-  expect(start).toBeGreaterThan(-1);
-  return css.slice(start, css.indexOf("}", start) + 1);
+  const found = ruleIn(css, selector);
+  expect(found).not.toBeNull();
+  return found as string;
 }
 
 describe("SAMOGRAPH-WARNING transcript row CSS", () => {
@@ -51,5 +65,19 @@ describe("SAMOGRAPH-WARNING transcript row CSS", () => {
 
   it("keeps the warn-toned system-note styling on the line itself", () => {
     expect(rule(".samograph-warning-line")).toMatch(/color\s*:\s*var\(--warn\)/);
+  });
+});
+
+describe("the guard's own selector anchoring (#288 review NB1)", () => {
+  const renamed = ".samograph-instrument-lines > li.samograph-warning-row-2 { display: block; }";
+
+  it("does not match a rule whose class merely STARTS with the selector", () => {
+    expect(ruleIn(renamed, ".samograph-instrument-lines > li.samograph-warning-row")).toBeNull();
+  });
+
+  it("still matches the real selector, whitespace-insensitively", () => {
+    expect(
+      ruleIn(".samograph-instrument-lines>li.samograph-warning-row{display:block}", ".samograph-instrument-lines > li.samograph-warning-row"),
+    ).not.toBeNull();
   });
 });

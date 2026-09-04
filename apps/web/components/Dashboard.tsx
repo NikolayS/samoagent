@@ -5,6 +5,7 @@ import { AddToCallForm } from "./AddToCallForm.tsx";
 import { PageHeader } from "./PageHeader.tsx";
 import { AccountDangerZone } from "./AccountDangerZone.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
+import { PageSkeleton } from "./PageSkeleton.tsx";
 import { AppApiError, type AppApiClient, type Call } from "../lib/appApiClient.ts";
 import { statusView, type StatusView } from "../lib/callStatusView.ts";
 import { displayMeetingUrl, meetingTitle } from "../lib/meetingUrl.ts";
@@ -165,11 +166,8 @@ export function Dashboard({ client, redirect, retryCallId }: DashboardProps) {
   }, [load]);
 
   if (status === "loading") {
-    return (
-      <section aria-live="polite" aria-busy="true">
-        <p role="status">Loading your dashboard…</p>
-      </section>
-    );
+    // Design PR 10: the list that is coming, not a sentence about it.
+    return <PageSkeleton variant="row" count={3} label="Loading calls" />;
   }
 
   if (status === "redirecting") {
@@ -198,7 +196,12 @@ export function Dashboard({ client, redirect, retryCallId }: DashboardProps) {
         title="Your calls"
         description="Every call samograph has joined, live and finished. Open one to watch or read its transcript."
       />
-      <AddToCallForm client={client} initialUrl={retryUrl} autoFocus={calls.length === 0} onCreated={() => void load()} />
+      {/* `initialUrl` lands on an UNCONTROLLED `defaultValue`, which React reads
+          once, at mount. Keying the form by the resolved URL makes the prefill
+          explicit: a different retry target is a different form instance, so
+          the value cannot be stale because of when the list happened to arrive
+          (#294 review — it used to rely on the loading gate above for that). */}
+      <AddToCallForm key={retryUrl} client={client} initialUrl={retryUrl} autoFocus={calls.length === 0} onCreated={() => void load()} />
       <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} onCreated={() => void load()} />
       {calls.length === 0 ? (
         <section aria-label="Your calls" className="samograph-empty-state">

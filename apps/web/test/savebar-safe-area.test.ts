@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Mobile audit M6 — "savebar + safe area"
@@ -33,7 +34,7 @@ import { join } from "node:path";
  * on browsers that do not know the keyword, which drops the whole declaration —
  * the #255 failure mode `css-tokens-defined.test.ts` guards).
  */
-const cssRaw = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const cssRaw = readGlobalsCss();
 const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, "");
 const root = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";
 const layout = readFileSync(join(import.meta.dir, "../app/layout.tsx"), "utf8");
@@ -72,6 +73,15 @@ const gutterRule = normalize(
 );
 
 const INLINE_INSET = "max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right))";
+
+/** The five containers that own the page gutter and therefore yield it to a notch. */
+const GUTTER_OWNERS = [
+  ".samograph-page",
+  ".samograph-app-nav-inner",
+  ".samograph-site-nav",
+  ".samograph-landing-hero",
+  ".samograph-site-footer",
+] as const;
 
 describe("viewport-fit=cover (M6, audit §7)", () => {
   it("exports a viewport from app/layout.tsx that opts into the safe area", () => {
@@ -150,16 +160,46 @@ describe("horizontal insets — landscape on a notched phone (M6 review)", () =>
     // containers that own the --gutter have to give it back. One grouped rule,
     // placed after the @media blocks that restate those paddings (all of which
     // carry the same --gutter inline and vary only the block padding).
-    for (const selector of [
-      ".samograph-page",
-      ".samograph-app-nav-inner",
-      ".samograph-site-nav",
-      ".samograph-landing-hero",
-      ".samograph-site-footer",
-    ]) {
+    for (const selector of GUTTER_OWNERS) {
       expect(gutterRule).toContain(selector);
     }
     expect(gutterRule).toContain(`padding-inline: ${INLINE_INSET}`);
+  });
+
+  it("places the grouped rule AFTER every @media that restates those gutters (#292 NB6)", () => {
+    // The grouped rule wins by SOURCE ORDER, not specificity: every restatement
+    // below carries the same `var(--gutter)` inline half, so a media block that
+    // came later would silently re-pin the un-inset gutter at that width and
+    // the notch would eat the content again — with this file's other assertions
+    // still green. Pin the ordering, not just the existence.
+    const groupedAt = css.indexOf(`padding-inline: ${INLINE_INSET}`);
+    expect(groupedAt).toBeGreaterThan(-1);
+
+    const restatements: string[] = [];
+    for (const media of css.matchAll(/@media[^{]*/g)) {
+      const open = css.indexOf("{", media.index! + media[0].length - 1);
+      let depth = 0;
+      let end = css.length;
+      for (let i = open; i < css.length; i += 1) {
+        if (css[i] === "{") depth += 1;
+        else if (css[i] === "}" && --depth === 0) {
+          end = i;
+          break;
+        }
+      }
+      for (const inner of css.slice(open, end).matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+        const restatesGutter = /padding[^;]*var\(--gutter\)/.test(inner[2]);
+        const ownsGutter = GUTTER_OWNERS.some((selector) => inner[1].includes(selector));
+        if (restatesGutter && ownsGutter) {
+          restatements.push(`${normalize(media[0])} ${normalize(inner[1])} (index ${media.index})`);
+          expect(media.index!).toBeLessThan(groupedAt);
+        }
+      }
+    }
+    // The four the CSS comment names: the landing hero below --bp-lg, the hero
+    // and the footer below --bp-md, the app nav at --bp-md. Fails loudly if a fifth appears
+    // and is never checked.
+    expect(restatements).toHaveLength(4);
   });
 
   it("uses --safe-left and --safe-right somewhere, not just defines them", () => {
@@ -191,8 +231,24 @@ describe("the savebar's bleed is exact at every width (M6 review NB3)", () => {
   });
 });
 
-describe("the jump-to-live pill clears the home indicator (M6, audit §7)", () => {
-  it("adds the bottom inset to its offset", () => {
-    expect(rule(".samograph-jump-live")).toMatch(/bottom\s*:\s*calc\(78px \+ var\(--safe-bottom\)\)/);
+describe("the jump-to-live pill carries no dead safe-area maths (#292 NB4)", () => {
+  // The pill is `position: absolute` inside `.samograph-percall`
+  // (`position: relative`), so its `bottom` is measured from the PANEL's
+  // padding box, never the viewport — the home indicator is not in that
+  // coordinate space and `+ var(--safe-bottom)` moved it by an amount that
+  // could only ever be wrong. Its real job is clearing the panel's own foot
+  // rail, which is a fixed 78px. The inset stays where it is real: the sticky
+  // savebar above, which IS pulled to the viewport edge.
+  it("offsets from the panel's foot rail alone", () => {
+    expect(rule(".samograph-jump-live")).toMatch(/bottom\s*:\s*78px\s*;/);
+  });
+
+  it("does not pretend to know where the home indicator is", () => {
+    expect(rule(".samograph-jump-live")).toMatch(/position\s*:\s*absolute/);
+    expect(rule(".samograph-jump-live")).not.toMatch(/--safe-bottom/);
+  });
+
+  it("keeps the panel as the pill's containing block, so `absolute` means the panel", () => {
+    expect(rule(".samograph-percall.samograph-instrument")).toMatch(/position\s*:\s*relative/);
   });
 });

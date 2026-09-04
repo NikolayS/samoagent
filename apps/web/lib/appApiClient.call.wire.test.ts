@@ -12,7 +12,10 @@ import { afterAll, describe, expect, it } from "bun:test";
 import { AppApiError, createHttpAppApiClient } from "./appApiClient.ts";
 
 let status = 200;
-let body: Record<string, unknown> = {};
+// `null` means a BODYLESS response — how the real route renders both of its
+// denials (`denied()` / the share route's 404), which is the shape the client
+// has to survive without a JSON parse error.
+let body: Record<string, unknown> | null = {};
 let requestPath = "";
 
 const server = Bun.serve({
@@ -20,7 +23,7 @@ const server = Bun.serve({
   fetch(req) {
     requestPath = new URL(req.url).pathname;
     if (req.method === "GET" && requestPath.startsWith("/calls/")) {
-      return Response.json(body, { status });
+      return body === null ? new Response(null, { status }) : Response.json(body, { status });
     }
     return new Response("not found", { status: 404 });
   },
@@ -65,18 +68,23 @@ describe("getCall — one call over the wire (#286)", () => {
     expect((await client.getCall("call_google")).provider).toBe("google_meet");
   });
 
-  it("rejects a 404 with an AppApiError carrying status 404", async () => {
-    status = 404;
-    body = { code: "SAMO-CALL-404", message: "Call not found." };
-    let thrown: unknown;
-    try {
-      await client.getCall("missing");
-    } catch (err) {
-      thrown = err;
-    }
-    expect(thrown).toBeInstanceOf(AppApiError);
-    expect((thrown as AppApiError).status).toBe(404);
-  });
+  // The status the real route actually renders for an unknown / cross-tenant id
+  // is `denied()` — a bodyless 403 (#294 review). 404 is kept alongside it
+  // because the share route still uses it for a call with no live token.
+  for (const denial of [403, 404] as const) {
+    it(`rejects a ${denial} with an AppApiError carrying status ${denial}`, async () => {
+      status = denial;
+      body = null;
+      let thrown: unknown;
+      try {
+        await client.getCall("missing");
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(AppApiError);
+      expect((thrown as AppApiError).status).toBe(denial);
+    });
+  }
 
   it("maps a withheld meeting_url to an empty meetingUrl", async () => {
     status = 200;

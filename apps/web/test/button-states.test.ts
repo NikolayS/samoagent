@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Button borders + a legible disabled state (design PR 7, plus PR 12's
@@ -36,7 +37,7 @@ import { join } from "node:path";
  *     separators simply vanished in dark mode (PLAN PR 12: "Lifts `--line` in
  *     dark").
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 
@@ -152,9 +153,17 @@ describe("button states (DESIGN-MODEL §4 Button — states)", () => {
   it("hovers only when enabled — no :hover rule may apply to a disabled button", () => {
     // Every member of every grouped selector list, not just the one that
     // happens to sit last before the brace.
+    //
+    // `:not(.samograph-btn)` is stripped first (PLAN PR 13): the landing's link
+    // reset is written `.samograph-landing a:not(.samograph-btn):hover`, which
+    // mentions the class in order to EXCLUDE buttons — the opposite of what
+    // this guard hunts for. Matching it on the raw string flagged the one rule
+    // in the sheet that guarantees no hover reaches a button at all. Note the
+    // strip is exact: `:not([disabled])`, the token this guard requires, is
+    // untouched.
     const hovers = [...css.matchAll(/([^{}]+)\{/g)]
       .flatMap((m) => m[1].split(","))
-      .map((s) => s.trim())
+      .map((s) => s.trim().replaceAll(":not(.samograph-btn)", ""))
       .filter((s) => s.includes(".samograph-btn") && s.includes(":hover"));
     expect(hovers.length).toBeGreaterThan(0);
     expect(hovers.filter((s) => !s.includes(":not([disabled])"))).toEqual([]);
@@ -197,21 +206,39 @@ describe("disabled buttons are legible (PLAN PR 7)", () => {
   }
 });
 
-describe("dark hairlines (PLAN PR 12)", () => {
-  for (const against of ["--ground", "--surface"] as const) {
-    it(`--line reaches 1.5:1 against ${against} in dark mode`, () => {
-      expect(ratio("var(--line)", `var(${against})`, "dark")).toBeGreaterThanOrEqual(1.5);
+/**
+ * Hairlines, BOTH themes (PLAN PR 12 + its D7 follow-up).
+ *
+ * #293 lifted the dark `--line` and left the light one at the mockup's
+ * `#dfdbd1`, which measures 1.24:1 on `--ground` and 1.31:1 on `--surface` —
+ * the SAME defect the dark fix was for, one theme over. `#cbc7bd` is the
+ * smallest lift that clears 1.5:1 on both grounds while keeping the token's
+ * warm cast (the mockup's exact r+4 / g / b-10 offsets) and staying LIGHTER
+ * than `--line-strong`, so the two-step hairline scale survives:
+ *
+ *   #cbc7bd on --ground  #f4f2ed → 1.51:1   (was #dfdbd1 → 1.24:1)
+ *   #cbc7bd on --surface #faf9f6 → 1.60:1   (was #dfdbd1 → 1.31:1)
+ *   --line-strong #b9b4a6 on --ground → 1.85:1, still the stronger step.
+ */
+describe("hairlines are visible in both themes (PLAN PR 12, D7)", () => {
+  for (const theme of ["light", "dark"] as const) {
+    for (const against of ["--ground", "--surface"] as const) {
+      it(`--line reaches 1.5:1 against ${against} in ${theme} mode`, () => {
+        expect(ratio("var(--line)", `var(${against})`, theme)).toBeGreaterThanOrEqual(1.5);
+      });
+    }
+
+    it(`keeps --line-strong above --line in ${theme} mode so the two-step scale survives`, () => {
+      expect(ratio("var(--line-strong)", "var(--ground)", theme)).toBeGreaterThan(
+        ratio("var(--line)", "var(--ground)", theme),
+      );
     });
   }
 
-  it("keeps --line-strong above --line so the two-step hairline scale survives", () => {
-    expect(ratio("var(--line-strong)", "var(--ground)", "dark")).toBeGreaterThan(
-      ratio("var(--line)", "var(--ground)", "dark"),
-    );
-  });
-
-  it("leaves the light hairline alone", () => {
-    expect(themes.light["--line"]).toBe("#dfdbd1");
+  it("pins the exact lifted light hairline and its measured ratios", () => {
+    expect(themes.light["--line"]).toBe("#cbc7bd");
+    expect(ratio("var(--line)", "var(--ground)", "light")).toBe(1.51);
+    expect(ratio("var(--line)", "var(--surface)", "light")).toBe(1.6);
   });
 });
 

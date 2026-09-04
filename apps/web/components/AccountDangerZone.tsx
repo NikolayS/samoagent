@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Alert } from "./Alert.tsx";
 import type { AppApiClient } from "../lib/appApiClient.ts";
 
 /**
@@ -86,9 +87,7 @@ export function AccountDangerZone({ client, redirect }: AccountDangerZoneProps) 
         />
       </label>
       {error ? (
-        <p className="samograph-danger-error samograph-alert samograph-alert--error" role="alert">
-          {error}
-        </p>
+        <Alert tone="danger">{error}</Alert>
       ) : null}
       <button
         type="button"

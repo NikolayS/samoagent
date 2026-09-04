@@ -513,8 +513,16 @@ describe("Dashboard — first-run empty & loading states (Sprint-3 polish)", () 
     const client = createFakeAppApiClient({ seedCalls: SEED });
     const { getByRole } = render(<Dashboard client={client} redirect={noopRedirect} />);
     // Before the GET /calls promise settles, a status region announces loading.
-    const status = getByRole("status");
-    expect(status.textContent).toBe("Loading your dashboard…");
+    // Design PR 10: the announcement is unchanged in kind, but the pixels are
+    // now the list that is coming (title + three call rows) rather than a
+    // one-line sentence that the arriving list shoves down the page.
+    // The announcement names the page, not just the act (PR #303 review): a
+    // bare "Loading" on four routes tells a screen-reader user nothing.
+    const status = getByRole("status", { name: "Loading calls" });
+    expect(status.getAttribute("aria-busy")).toBe("true");
+    expect(status.textContent).toBe("Loading calls…");
+    expect(status.className).toBe("samograph-skeleton samograph-skeleton--row");
+    expect(status.querySelectorAll(".samograph-skeleton-bar--row").length).toBe(3);
   });
 
   it("gives first-run guidance (not just 'No calls yet') when there are no calls", async () => {
@@ -561,6 +569,27 @@ describe("Dashboard — Story-4 retry call pre-fill (SPEC §5.2, Story 4)", () =
         client.requests.filter((r) => r.path === "/calls" && r.method === "POST"),
       ).toHaveLength(1);
     });
+  });
+
+  it("re-fills when the selected retry call changes, instead of trusting mount order", async () => {
+    // The prefill reaches an UNCONTROLLED `defaultValue`, which React reads only
+    // at mount. Today it happens to be right because the loading gate keeps
+    // `AddToCallForm` unmounted until `calls` has arrived — a load-order
+    // accident, not a stated contract (#294 review). `key={retryUrl}` states it:
+    // a different resolved URL is a different form instance. This test changes
+    // the resolved URL on an ALREADY-MOUNTED dashboard, which is exactly what a
+    // removed gate would produce, and it fails without the key.
+    const other = "https://meet.google.com/qpd-zbkg-jfo";
+    const client = createFakeAppApiClient({
+      seedCalls: [RETRY_CALL, { id: "c2", meetingUrl: other, provider: "google_meet", status: "COULD_NOT_JOIN" }],
+    });
+    const view = render(<Dashboard client={client} redirect={noopRedirect} retryCallId="c1" />);
+    const input = (await view.findByLabelText("Meeting link")) as HTMLInputElement;
+    expect(input.value).toBe(URL);
+
+    view.rerender(<Dashboard client={client} redirect={noopRedirect} retryCallId="c2" />);
+    const refilled = (await view.findByLabelText("Meeting link")) as HTMLInputElement;
+    expect(refilled.value).toBe(other);
   });
 
   it("leaves the input blank when no retryCallId is given", async () => {

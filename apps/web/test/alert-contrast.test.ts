@@ -1,13 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 // Alert copy is body text, so it must clear WCAG AA (4.5:1) against the tint it
 // sits on — in BOTH themes. `--accent-live` mint fails this on the light
 // surface, which is why DESIGN.md keeps it inside the instrument panel.
 const MIN_CONTRAST = 4.5;
 
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
 function block(selector: string): Record<string, string> {
   const body = css.match(new RegExp(`${selector.replace(/[[\]"^$.*+?()\\|{}]/g, "\\$&")}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
@@ -85,6 +84,25 @@ const mediaDark = (() => {
 describe("dark theme paths", () => {
   it("defines the same tokens whether dark comes from the OS or an explicit choice", () =>
     expect(mediaDark).toEqual(block(':root[data-theme="dark"]')));
+});
+
+/**
+ * Hairlines are not text, so 4.5:1 does not apply — but a 1px rule that does not
+ * reach ~1.5:1 against the surface it divides is invisible, which is what #293
+ * fixed in dark and this guard extends to light (`--line` was `#dfdbd1`, 1.24:1
+ * on `--ground`). Measured with the same math as the alerts above.
+ */
+const HAIRLINE_MIN = 1.5;
+
+describe("hairline visibility", () => {
+  for (const theme of ["light", "dark"] as const) {
+    for (const against of ["--ground", "--surface"] as const) {
+      it(`--line clears ${HAIRLINE_MIN}:1 against ${against} in ${theme} mode`, () => {
+        const value = contrast(color("var(--line)", themes[theme]), color(`var(${against})`, themes[theme]));
+        expect(Number(value.toFixed(2))).toBeGreaterThanOrEqual(HAIRLINE_MIN);
+      });
+    }
+  }
 });
 
 describe("alert contrast", () => {

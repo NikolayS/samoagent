@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const css = readGlobalsCss();
 const heading = "/* ===== Slice 3 — Transcript instrument (calls/[id], c/[token]) ===== */";
 
 describe("Slice 3 transcript instrument CSS", () => {
@@ -31,10 +30,10 @@ describe("Slice 3 transcript instrument CSS", () => {
 
 describe("transcript row reflows to two rows below 1024px", () => {
   const section = css.slice(css.indexOf(heading));
-  const mobile = section.slice(section.indexOf("@media (max-width: 63.99rem)"));
+  const mobile = section.slice(section.indexOf("@media (max-width: 1023.98px)"));
 
-  it("has a max-width: 63.99rem block in the Slice 3 section", () => {
-    expect(section).toContain("@media (max-width: 63.99rem)");
+  it("has a max-width: 1023.98px block in the Slice 3 section", () => {
+    expect(section).toContain("@media (max-width: 1023.98px)");
   });
 
   it("drops the four-column grid for a two-row meta/utterance grid", () => {
@@ -56,12 +55,12 @@ describe("transcript row reflows to two rows below 1024px", () => {
     expect(mobile).toMatch(/\.samograph-line-date\s*\{[^}]*display\s*:\s*none/s);
   });
 
-  it("no longer shrinks the four-column grid at 40rem", () => {
+  it("no longer shrinks the four-column grid at --bp-md", () => {
     expect(section).not.toMatch(/42px\s+10ch\s+fit-content\(12ch\)/);
   });
 
   it("keeps the desktop four-column grid outside the mobile block", () => {
-    const desktop = section.slice(0, section.indexOf("@media (max-width: 63.99rem)"));
+    const desktop = section.slice(0, section.indexOf("@media (max-width: 1023.98px)"));
     expect(desktop).toMatch(
       /grid-template-columns\s*:\s*56px\s+19ch\s+fit-content\(22ch\)\s+minmax\(0\s*,\s*1fr\)/,
     );

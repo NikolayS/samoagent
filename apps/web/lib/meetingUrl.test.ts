@@ -113,6 +113,17 @@ describe("meetingTitle — join-link shapes that used to fall back to the host",
     expect(meetingTitle("https://meet.google.com/lookup/abcdefg")).toBe("meet.google.com");
   });
 
+  it("caps the vanity id so an arbitrarily long path cannot become a title (#288 NB)", () => {
+    // A Zoom vanity id is a personal-room name, not free text: 64 characters is
+    // already far past anything Zoom issues. Beyond the cap the link falls back
+    // to the bare host rather than painting an unbounded string into a row
+    // title, an aria-label and a `title` tooltip.
+    const longest = "a".repeat(64);
+    expect(meetingTitle(`https://zoom.us/my/${longest}`)).toBe(`Zoom · ${longest}`);
+    expect(meetingTitle(`https://zoom.us/my/${"a".repeat(65)}`)).toBe("zoom.us");
+    expect(meetingTitle(`https://zoom.us/my/${"a".repeat(400)}`)).toBe("zoom.us");
+  });
+
   it("still never echoes the password from any of these shapes", () => {
     for (const url of [
       "https://us02web.zoom.us/w/1234567890?pwd=GmbJ6pA9rUojNjPj7iNnLAvbpcF2uU.1",

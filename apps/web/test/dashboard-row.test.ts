@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Mobile audit M7 — the dashboard call row.
@@ -10,7 +9,7 @@ import { join } from "node:path";
  * target. This guard pins the new shape: a title line, a wrapping meta line, and
  * a row that is at least one `--control-h` (44px) tall at every width.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8")
+const css = readGlobalsCss()
   .replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 
@@ -19,9 +18,9 @@ function rule(selector: string, scope = css): string {
   return normalize(scope.match(new RegExp(`(?:^|[};])\\s*${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? "");
 }
 
-/** The body of the `@media (max-width: 40rem)` block that owns the dashboard. */
+/** The body of the `@media (max-width: 767.98px)` block that owns the dashboard. */
 const narrow = (() => {
-  const start = css.indexOf("@media (max-width: 40rem) {\n  .samograph-dash-hero-form");
+  const start = css.indexOf("@media (max-width: 767.98px) {\n  .samograph-dash-hero-form");
   if (start === -1) return "";
   return css.slice(start, css.indexOf("\n}", start));
 })();
@@ -64,7 +63,7 @@ describe("the dashboard call row (M7)", () => {
     expect(rule(".samograph-call-time")).toMatch(/white-space\s*:\s*nowrap/);
   });
 
-  it("stacks the row and keeps a 44px CTA below 40rem", () => {
+  it("stacks the row and keeps a 44px CTA below --bp-md", () => {
     expect(narrow).not.toBe("");
     expect(rule(".samograph-call-row, .samograph-meeting-item", narrow)).toMatch(
       /grid-template-columns\s*:\s*minmax\(0, 1fr\)/,
