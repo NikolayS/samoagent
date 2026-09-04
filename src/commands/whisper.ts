@@ -75,9 +75,12 @@ export async function cmdWhisper(
   const hud = sinkName === "fake-hud" ? createFakeHudSink(deps.hudGeometry ?? {}) : null;
   const sink = deps.sink ?? hud ?? createConsoleSink();
 
-  // A one-shot CLI invocation has nothing to queue, but it still goes through
-  // the queue so there is a single delivery policy: an embedded agent loop
-  // pushes on its own cadence and drains the same way.
+  // A one-shot CLI invocation builds a FRESH queue, so preemption, depth
+  // shedding and TTL expiry can never take effect here: with one whisper in
+  // an empty queue, push-then-drain always delivers it. Priority and ttl are
+  // still recorded on the whisper and handed to the sink. The queue policy
+  // only matters inside a long-lived sink process (an embedded agent loop or
+  // a device driver), which does not exist yet — README and --help say so.
   const queue = new WhisperQueue({ now: () => now().getTime() });
   queue.push(makeWhisper({ text, priority, ttlMs: args.whisper_ttl_ms ?? null }, now().getTime()));
 

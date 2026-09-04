@@ -164,7 +164,7 @@ Every delivered whisper, and every cue, is appended to the active transcript as 
 
 So an agent already running `samograph watch` receives whispers and the wearer's back-channel with no new contract. The `SAMOGRAPH-`/`SAMOGRAPH_` speaker namespace is reserved: a meeting participant who renames themselves `SAMOGRAPH-WHISPER` (or `-CUE`, `-WARNING`) is normalized to the unknown speaker `?`, so nobody in the call can forge a control line. Cues are **semantic** (`confirm`, `dismiss`, `next`, `more`), never physical (`tap`, `double-tap`), so a different input device is a driver swap and nothing above it moves. Both commands require an active session: without one they print `Error: no active session. Run 'samograph join' first.` and exit non-zero.
 
-Whispers carry a priority (`low|normal|high`) and an optional `--ttl SECONDS`. A `high` whisper preempts the one currently displayed and is never dropped; `low` is shed first when the queue is full.
+Whispers carry a priority (`low|normal|high`) and an optional `--ttl SECONDS`. Both are recorded on the whisper and delivered to the sink. The queue policy — a `high` whisper preempts the one currently displayed and is never dropped, `low` is shed first when the queue is full, a whisper with a ttl expires after it — is implemented in `WhisperQueue` and applies inside a long-lived sink process (an embedded agent loop or a device driver). That process does not exist yet: today's one-shot `samograph whisper` builds a fresh queue per invocation, so it always delivers immediately and nothing is ever preempted, shed or expired from the CLI.
 
 ## Google Doc Notes
 

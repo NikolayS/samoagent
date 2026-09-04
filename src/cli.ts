@@ -182,10 +182,14 @@ than silently dropped.
 
 options:
   --priority P   Delivery priority: low|normal|high (default: normal).
-                 A 'high' whisper preempts the one currently displayed and is
-                 never dropped; 'low' is shed first when the queue is full.
-  --ttl SECONDS  Auto-expire the whisper this many seconds after it was
-                 created (default: it never expires)
+                 Recorded on the whisper and delivered to the sink. The queue
+                 policy (a 'high' whisper preempts the one on screen and is
+                 never dropped; 'low' is shed first when the queue is full)
+                 applies inside a long-lived sink process, which does not
+                 exist yet: this one-shot command always delivers immediately.
+  --ttl SECONDS  Time-to-live recorded on the whisper and delivered to the
+                 sink (default: none). Expiry is applied by that same
+                 long-lived sink process, not by this one-shot command.
   --sink NAME    Output sink: console|fake-hud (default: console)
 
 examples:

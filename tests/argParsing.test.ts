@@ -616,6 +616,22 @@ describe("argParsing", () => {
     expect(stdout).toContain("examples:");
   });
 
+  it("whisper --help is truthful about what a one-shot CLI call can enforce", () => {
+    // A fresh queue is built per invocation, so preemption / depth shedding /
+    // TTL expiry cannot take effect from the CLI. The flags are still recorded
+    // on the whisper and handed to the sink; the help must not promise more.
+    const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "whisper", "--help"], { cwd: repoRoot });
+    const stdout = new TextDecoder().decode(proc.stdout);
+    expect(proc.exitCode).toBe(0);
+    expect(stdout).toContain("Recorded on the whisper and delivered to the sink.");
+    expect(stdout).toContain("applies inside a long-lived sink process, which does not");
+    expect(stdout).toContain("exist yet: this one-shot command always delivers immediately.");
+    expect(stdout).toContain("Time-to-live recorded on the whisper and delivered to the");
+    expect(stdout).toContain("not by this one-shot command.");
+    expect(stdout).not.toContain("A 'high' whisper preempts the one currently displayed and is");
+    expect(stdout).not.toContain("Auto-expire the whisper this many seconds after it was");
+  });
+
   it("cue --help shows command-specific help", () => {
     const proc = Bun.spawnSync([process.execPath, "src/cli.ts", "cue", "--help"], { cwd: repoRoot });
     const stdout = new TextDecoder().decode(proc.stdout);
