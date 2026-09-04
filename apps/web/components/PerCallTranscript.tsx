@@ -482,8 +482,14 @@ export function PerCallTranscript({
 function TranscriptTime({ ts }: { ts: string }) {
   const formatted = formatTranscriptTimestamp(ts);
   const parts = splitTranscriptTimestamp(formatted);
+  // `formatTranscriptTimestamp` is total: a ts it cannot parse comes back
+  // verbatim, and `splitTranscriptTimestamp` returns null for exactly those
+  // values. Publishing that raw string as `dateTime` would advertise a
+  // machine-readable value that is not one (#288 review), so the attribute is
+  // emitted ONLY for a canonical `YYYY-MM-DD HH:MM:SS` — i.e. only when the ts
+  // parsed. `title` keeps the human string either way.
   return (
-    <time className="samograph-line-time" aria-hidden="true" dateTime={formatted} title={formatted}>
+    <time className="samograph-line-time" aria-hidden="true" {...(parts ? { dateTime: formatted } : {})} title={formatted}>
       {parts ? (
         <>
           <span className="samograph-line-date">{parts.date}</span>

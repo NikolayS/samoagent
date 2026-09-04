@@ -31,7 +31,12 @@
   --ink-soft: #3a382f;
   --muted: #6b675c;
   --faint: #9c978a;
-  --line: #dfdbd1;
+  /* Lifted from the mockup's #dfdbd1 (1.24:1 on --ground, 1.31:1 on --surface —
+     a hairline nobody can see, the light-theme twin of the dark defect #293
+     fixed). #cbc7bd is the smallest lift clearing 1.5:1 on BOTH grounds
+     (1.51 / 1.60), keeps the mockup's warm r+4/g/b-10 cast, and stays lighter
+     than --line-strong (1.85:1) so the two-step hairline scale survives. */
+  --line: #cbc7bd;
   --line-strong: #b9b4a6;
 
   /* Theme-invariant transcript instrument */
@@ -230,7 +235,11 @@
 .samograph-landing-hero > p { color: var(--ink-soft); font-size: .85rem; }
 .samograph-hero-actions { display: flex; align-items: center; gap: 20px; }
 .samograph-hero-secondary { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted) !important; font-size: .75rem; }
-.samograph-instrument { min-width: min(780px, 100%); color: var(--panel-muted); background: var(--panel-ground); border: 1px solid var(--panel-line); font-size: var(--text-xs); }
+/* No `min-width` here: every `.samograph-instrument` in the app is also
+   `.samograph-percall`, whose (0,2,0) rule sets `min-width: 0`, so the
+   `min(780px, 100%)` this used to carry never applied to anything (#290
+   review). The real width contract lives on `.samograph-percall.samograph-instrument`. */
+.samograph-instrument { color: var(--panel-muted); background: var(--panel-ground); border: 1px solid var(--panel-line); font-size: var(--text-xs); }
 .samograph-instrument-head, .samograph-instrument-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 16px; background: var(--panel-surface); }.samograph-instrument-head { border-bottom: 1px solid var(--panel-line); }.samograph-instrument-head > div, .samograph-instrument-state, .samograph-instrument-foot > div { display: flex; align-items: center; gap: 14px; }.samograph-instrument i, .samograph-instrument-head i { color: var(--panel-line); font-style: normal; }.samograph-instrument strong { color: var(--panel-ink); font-weight: 500; }.samograph-instrument-state > span:last-child { font-variant-numeric: tabular-nums; }.samograph-instrument-state > span > b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-live); animation: samograph-refined-pulse 1.6s ease-in-out infinite; }
 .samograph-instrument-lines { list-style: none; margin: 0; padding: 18px 0 20px; }.samograph-instrument-lines li { display: grid; grid-template-columns: 56px 82px 66px minmax(480px, 1fr); gap: 14px; min-height: 33px; align-items: start; color: var(--panel-ink); font-size: .78rem; line-height: 1.5; }.samograph-line-number { height: 100%; padding-right: 14px; color: var(--panel-gutter); border-right: 1px solid var(--panel-line); text-align: right; font-variant-numeric: tabular-nums; }.samograph-instrument-lines time, .samograph-instrument-lines b { color: var(--panel-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
 .samograph-instrument-foot { border-top: 1px solid var(--panel-line); font-size: var(--text-xs); }.samograph-instrument-foot b { padding: 2px 8px; border: 1px solid var(--panel-line); }.samograph-instrument-foot i { margin: 0 3px; }
@@ -250,7 +259,11 @@
    56px gutter — audit finding 7, "two design languages in one product". */
 @media (min-width: 768px) { .samograph-site-nav { min-height: 64px; } }
 @media (max-width: 59.99rem) { .samograph-landing-hero { padding: 72px var(--gutter) 96px; } }
-/* Below 40rem, two decisions:
+/* Below 40rem, three decisions:
+   - The nav's 32px flex gap does not fit a 320px phone: the box is
+     320 - 2 x --gutter(20) = 280px and the wordmark (~153px) + CTA (~112px) +
+     32px gap is ~297px, so the CTA overhung the right edge (#290 review).
+     --space-3 (12px) lands the row at ~277px.
    - 350px of content buys two of these three: the wordmark (153px), the CTA
      (112px) and the 154px theme switcher. The name of the product and the way
      in win; theme follows the OS here and is still switchable inside the app.
@@ -258,7 +271,7 @@
      then dangle at the start of the wrapped row. Drop the glyphs and let a
      wider gap separate the links. Above 40rem all three fit on one line
      (400px of links in a >=576px content box), so the separators stay. */
-@media (max-width: 40rem) { .samograph-site-footer nav { column-gap: var(--space-4); }.samograph-site-footer nav i { display: none; }.samograph-brand { font-size: .82rem; }.samograph-nav-actions .samograph-theme-switcher { display: none; }.samograph-landing-hero { padding: 52px var(--gutter) 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px var(--gutter) 44px; } }
+@media (max-width: 40rem) { .samograph-site-nav { gap: var(--space-3); }.samograph-site-footer nav { column-gap: var(--space-4); }.samograph-site-footer nav i { display: none; }.samograph-brand { font-size: .82rem; }.samograph-nav-actions .samograph-theme-switcher { display: none; }.samograph-landing-hero { padding: 52px var(--gutter) 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px var(--gutter) 44px; } }
 @media (prefers-reduced-motion: reduce) { .samograph-instrument-state > span > b { animation: none; } }
 
 /* Dark by OS preference. The explicit `data-theme` blocks below have higher
@@ -294,7 +307,8 @@
   --ink-soft: #3a382f;
   --muted: #6b675c;
   --faint: #9c978a;
-  --line: #dfdbd1;
+  /* Lifted for contrast — see the base :root note above. */
+  --line: #cbc7bd;
   --line-strong: #b9b4a6;
   --warn: #8a5a00;
   --crit: #a63a3a;
@@ -942,6 +956,13 @@ button:hover {
   /* `.samograph-btn` is worn by <a> as often as by <button> (UpcomingMeetings
      renders four). A button is a box, not a link: no underline. */
   text-decoration: none;
+  /* The box above is pinned to ONE line (`height` + `line-height: 1`), so the
+     label must be pinned to one line too — otherwise a long `--sm` label in a
+     narrow row ("Undo skip auto-record", "Download (no chat)") wraps and the
+     second line paints outside the border (#279 review NB2). Where the box is
+     allowed to grow instead — the coarse/narrow block below — this is relaxed
+     back to `normal` so the label wraps into a taller button. */
+  white-space: nowrap;
   transition: color 140ms, background-color 140ms, border-color 140ms;
 }
 .samograph-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
@@ -1136,6 +1157,9 @@ textarea { resize: vertical; font-family: var(--font-mono); }
     height: auto;
     min-height: var(--tap-min);
     padding-block: var(--space-2);
+    /* The box grows here, so a long label wraps INTO it rather than being held
+       on one line that widens the row past the viewport (#279 review NB2). */
+    white-space: normal;
   }
 
   /* `.samograph-btn--sm { height: var(--control-h-sm) }` is declared later in
@@ -2390,8 +2414,12 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   position: absolute;
   z-index: 3;
   right: 16px;
-  /* Above the panel's foot rail, and above the home indicator with it (M6). */
-  bottom: calc(78px + var(--safe-bottom));
+  /* Above the panel's foot rail. NOT safe-area maths: the pill is absolutely
+     positioned inside `.samograph-percall`, so this offset is measured from the
+     panel's padding box, not the viewport — adding `var(--safe-bottom)` here
+     was inert at best and wrong at worst (#292 review NB4). The home-indicator
+     inset lives on the sticky savebar, which really is pulled to the edge. */
+  bottom: 78px;
   min-height: var(--control-h);
   color: var(--panel-ground);
   background: var(--accent-live);
