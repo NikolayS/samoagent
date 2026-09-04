@@ -1,4 +1,4 @@
-import { sanitizeTranscriptField } from "./transcript.ts";
+import { formatLocalTranscriptTs, sanitizeTranscriptField } from "./transcript.ts";
 
 /**
  * The private agent-to-wearer output channel.
@@ -489,28 +489,17 @@ export function normalizeCueSemantic(value: unknown): CueSemantic | null {
 }
 
 /**
- * Local-time transcript timestamp, byte-identical to the `SAMOGRAPH-WARNING`
- * watchdog lines in `src/server.ts` and the `SAMOGRAPH_CALL_ENDED` sentinel in
- * `src/commands/leave.ts`, so every control line shares one shape.
- */
-function fmtTranscriptTs(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-  );
-}
-
-/**
  * The exact transcript control line for a delivered whisper. It rides the
  * existing transcript stream on purpose: an agent already running
- * `samograph watch` sees whispers with no new contract to implement.
+ * `samograph watch` sees whispers with no new contract to implement. The
+ * timestamp is the shared local-time formatter, so every control line
+ * (watchdog warning, whisper, cue, sentinel) has one shape.
  */
 export function formatWhisperTranscriptLine(text: string, now: Date): string {
-  return `[${fmtTranscriptTs(now)}] ${WHISPER_LINE_MARKER} ${sanitizeTranscriptField(text)}`;
+  return `[${formatLocalTranscriptTs(now)}] ${WHISPER_LINE_MARKER} ${sanitizeTranscriptField(text)}`;
 }
 
 /** The exact transcript control line for a wearer cue. */
 export function formatCueTranscriptLine(cue: CueSemantic, now: Date): string {
-  return `[${fmtTranscriptTs(now)}] ${CUE_LINE_MARKER} ${cue}`;
+  return `[${formatLocalTranscriptTs(now)}] ${CUE_LINE_MARKER} ${cue}`;
 }

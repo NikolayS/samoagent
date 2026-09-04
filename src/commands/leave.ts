@@ -3,6 +3,7 @@ import { stateFile } from "../config.ts";
 import { loadState, botIdFromArgsOrState } from "../state.ts";
 import type { ParsedArgs } from "../args.ts";
 import { makeRecallClient, type RecallClient } from "../recall.ts";
+import { formatLocalTranscriptTs } from "../transcript.ts";
 
 export interface LeaveDeps {
   recall?: RecallClient;
@@ -15,11 +16,6 @@ function defaultKill(pid: number, signal: string): void {
   // process.kill throws ESRCH when the process does not exist; let it throw
   // so the caller can mirror Python's ProcessLookupError handling.
   process.kill(pid, signal as NodeJS.Signals);
-}
-
-function fmtSentinelTs(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 export async function cmdLeave(
@@ -44,7 +40,7 @@ export async function cmdLeave(
   const transcriptFile = state.transcript_file;
   if (typeof transcriptFile === "string" && transcriptFile) {
     if (existsSync(transcriptFile)) {
-      const ts = fmtSentinelTs(now());
+      const ts = formatLocalTranscriptTs(now());
       try {
         appendFileSync(transcriptFile, `[${ts}] SAMOGRAPH_CALL_ENDED\n`);
       } catch {

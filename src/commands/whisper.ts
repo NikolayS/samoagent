@@ -1,6 +1,6 @@
-import { appendFileSync } from "node:fs";
 import { ExitError } from "../config.ts";
 import { transcriptFileFromState } from "../state.ts";
+import { appendTranscriptLine } from "../transcript.ts";
 import type { ParsedArgs } from "../args.ts";
 import {
   G2_HEIGHT_PX,
@@ -28,10 +28,6 @@ export interface WhisperDeps {
   appendLine?: (path: string, line: string) => void;
 }
 
-function defaultAppendLine(path: string, line: string): void {
-  appendFileSync(path, `${line}\n`);
-}
-
 /**
  * Send a private message to the wearer.
  *
@@ -46,7 +42,7 @@ export async function cmdWhisper(
   deps: WhisperDeps = {},
 ): Promise<void> {
   const now = deps.now ?? (() => new Date());
-  const appendLine = deps.appendLine ?? defaultAppendLine;
+  const appendLine = deps.appendLine ?? appendTranscriptLine;
 
   const text = (args.message ?? "").trim();
   if (!text) {

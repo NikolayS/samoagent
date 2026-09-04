@@ -1,4 +1,5 @@
 import {
+  appendFileSync,
   existsSync,
   readFileSync,
   writeFileSync,
@@ -87,6 +88,31 @@ export {
   type NormalizedTranscriptLine,
   type TranscriptLineKind,
 } from "../packages/shared/transcript/index.ts";
+
+/**
+ * The ONE local-time timestamp formatter for every line samograph writes into
+ * the transcript itself — the `SAMOGRAPH-WARNING` watchdog lines
+ * (`src/server.ts`), the `SAMOGRAPH-WHISPER` / `SAMOGRAPH-CUE` control lines
+ * (`src/whisper.ts`) and the `SAMOGRAPH_CALL_ENDED` sentinel
+ * (`src/commands/leave.ts`) — so they all share one `YYYY-MM-DD HH:MM:SS`
+ * shape. Local time, unlike the UTC prefix used for transcript FILE names.
+ */
+export function formatLocalTranscriptTs(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  );
+}
+
+/**
+ * Append one already-framed line to a transcript file, terminated by "\n"
+ * exactly like the live writer does. The one appender behind the whisper and
+ * cue commands.
+ */
+export function appendTranscriptLine(path: string, line: string): void {
+  appendFileSync(path, `${line}\n`);
+}
 
 function transcriptPathFromState(): string {
   const state = loadState();

@@ -1,16 +1,12 @@
-import { appendFileSync } from "node:fs";
 import { ExitError } from "../config.ts";
 import { transcriptFileFromState } from "../state.ts";
+import { appendTranscriptLine } from "../transcript.ts";
 import type { ParsedArgs } from "../args.ts";
 import { CUE_SEMANTICS, formatCueTranscriptLine, normalizeCueSemantic } from "../whisper.ts";
 
 export interface CueDeps {
   now?: () => Date;
   appendLine?: (path: string, line: string) => void;
-}
-
-function defaultAppendLine(path: string, line: string): void {
-  appendFileSync(path, `${line}\n`);
 }
 
 /**
@@ -24,7 +20,7 @@ function defaultAppendLine(path: string, line: string): void {
  */
 export async function cmdCue(args: ParsedArgs, deps: CueDeps = {}): Promise<void> {
   const now = deps.now ?? (() => new Date());
-  const appendLine = deps.appendLine ?? defaultAppendLine;
+  const appendLine = deps.appendLine ?? appendTranscriptLine;
 
   const semantic = normalizeCueSemantic(args.cue);
   if (semantic === null) {
