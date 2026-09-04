@@ -2,7 +2,7 @@ import { appendFileSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { Buffer } from "node:buffer";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
-import { normalizeTranscriptEvent } from "./transcript.ts";
+import { formatLocalTranscriptTs, normalizeTranscriptEvent } from "./transcript.ts";
 import {
   decodeVideoSeparatePng,
   frameSourceAliases,
@@ -120,14 +120,6 @@ export interface TunnelWatchdogOptions {
   schedule?: (fn: () => void, ms: number) => { stop(): void };
 }
 
-function fmtTranscriptTs(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-  );
-}
-
 function defaultSchedule(fn: () => void, ms: number): { stop(): void } {
   const timer = setInterval(fn, ms);
   (timer as unknown as { unref?: () => void }).unref?.();
@@ -159,7 +151,7 @@ export function startTunnelWatchdog(
   let inOutage = false;
 
   const emit = (text: string): void => {
-    const line = `[${fmtTranscriptTs(now())}] ${text}`;
+    const line = `[${formatLocalTranscriptTs(now())}] ${text}`;
     try {
       appendFileSync(options.transcriptPath, line + "\n");
     } catch {
@@ -253,7 +245,7 @@ export function startTranscriptWatchdog(
   let inFailure = false;
 
   const emit = (text: string): void => {
-    const line = `[${fmtTranscriptTs(now())}] ${text}`;
+    const line = `[${formatLocalTranscriptTs(now())}] ${text}`;
     try {
       appendFileSync(options.transcriptPath, line + "\n");
     } catch {

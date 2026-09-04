@@ -38,3 +38,22 @@ export function botIdFromArgsOrState(argBotId?: string | null): string {
   }
   return bid;
 }
+
+/**
+ * Path of the ACTIVE session's transcript file, or a clean exit when there is
+ * none. Unlike the read-only transcript helpers this deliberately does not fall
+ * back to the default path: a surface that WRITES a control line (whisper, cue)
+ * must not append to a stale file from a finished call. Mirrors
+ * {@link botIdFromArgsOrState}: one stderr line, then ExitError(1).
+ */
+export function transcriptFileFromState(): string {
+  const state = loadState();
+  const tf = state.transcript_file;
+  if (!tf || typeof tf !== "string") {
+    process.stderr.write(
+      "Error: no active session. Run 'samograph join' first.\n",
+    );
+    throw new ExitError(1);
+  }
+  return tf;
+}

@@ -38,6 +38,8 @@ samograph gives an AI agent a small set of meeting tools:
 - `chat` - send a deliberate message into the meeting chat (plays a soft chime into the call audio so people notice it).
 - `intro` - post a short self-introduction into the meeting chat (also available as `join --intro`).
 - `presence` - update the bot camera state shown in the meeting.
+- `g2-whisper` - send a message only the wearer sees; never posted to the meeting.
+- `g2-cue` - record the wearer's semantic reply to a whisper (confirm/dismiss/next/more).
 - `frame` - export the current call view on demand.
 - `leave` - remove the bot and clean up local state.
 - `status` - show the current Recall bot state.
@@ -129,6 +131,41 @@ samograph presence idle
 
 Presence is in-memory runtime state. It is meant for lightweight meeting signaling, not persistence.
 
+## Private Whisper Channel
+
+`chat` and `presence` are both *visible to the meeting*: chat posts into the meeting with an audible chime, presence repaints the camera everyone can see. `g2-whisper` is the private counterpart — an agent-to-wearer channel the meeting never sees.
+
+```bash
+samograph g2-whisper "Ask about the index bloat on orders"
+samograph g2-whisper "Wrap up - 2 min left" --priority high --ttl 30
+samograph g2-whisper "A longer note for the wearer" --sink fake-hud
+samograph g2-cue confirm
+```
+
+It is fully useful with no hardware attached. `--sink console` (the default) prints the whisper to stderr; `--sink fake-hud` renders the Even Realities G2 screen — 576x288 px with a 27 px LVGL line height, so 10 lines — as a bounded box, so text that does not fit is *visible* rather than silently dropped:
+
+```text
+┌────────────────────────────────────────────────┐
+│Postgres 18 changed the default for io_method to│
+│worker which affects this benchmark comparison a│
+│lot                                             │
+│                                                │
+└────────────────────────────────────────────────┘
+```
+
+Glyph width is currently a documented approximation (`APPROX_GLYPH_WIDTH_PX`); `HudGeometry.measure` is the seam for pixel-accurate measurement on the real device.
+
+Every delivered whisper, and every cue, is appended to the active transcript as a control line — the same mechanism the tunnel watchdog uses for `SAMOGRAPH-WARNING`:
+
+```text
+[2026-08-26 14:05:09] SAMOGRAPH-WHISPER: Wrap up - 2 min left
+[2026-08-26 14:05:11] SAMOGRAPH-CUE: confirm
+```
+
+So an agent already running `samograph watch` receives whispers and the wearer's back-channel with no new contract. The `SAMOGRAPH-`/`SAMOGRAPH_` speaker namespace is reserved: a meeting participant who renames themselves `SAMOGRAPH-WHISPER` (or `-CUE`, `-WARNING`) is normalized to the unknown speaker `?`, so nobody in the call can forge a control line. Cues are **semantic** (`confirm`, `dismiss`, `next`, `more`), never physical (`tap`, `double-tap`), so a different input device is a driver swap and nothing above it moves. Both commands require an active session: without one they print `Error: no active session. Run 'samograph join' first.` and exit non-zero.
+
+Whispers carry a priority (`low|normal|high`) and an optional `--ttl SECONDS`. Both are recorded on the whisper and delivered to the sink. The queue policy — a `high` whisper preempts the one currently displayed and is never dropped, `low` is shed first when the queue is full, a whisper with a ttl expires after it — is implemented in `WhisperQueue` and applies inside a long-lived sink process (an embedded agent loop or a device driver). That process does not exist yet: today's one-shot `samograph g2-whisper` builds a fresh queue per invocation, so it always delivers immediately and nothing is ever preempted, shed or expired from the CLI.
+
 ## Google Doc Notes
 
 `notes` follows GitLab-style live doc meetings: the doc is an agenda and collaboration surface, not a transcript dump. The agent watches the transcript, decides what matters, then writes concise points into the right section.
@@ -149,6 +186,8 @@ If you really want raw transcript mirroring, make that explicit:
 ```bash
 samograph notes transcript --from-start
 ```
+
+Even in raw mirroring mode, samograph's own control lines (`SAMOGRAPH-WHISPER`, `SAMOGRAPH-CUE`, `SAMOGRAPH-WARNING`, the `SAMOGRAPH_CALL_ENDED` sentinel) are never written to the doc: a whisper is private to the wearer, a cue is the wearer's back-channel, and a warning is operator telemetry. They still appear on the command's stdout. Likewise `intro --context` never quotes a control line as "the first thing I heard".
 
 ## Frames
 
@@ -216,6 +255,8 @@ Archive filenames include call id, UTC timestamp, source type, and participant i
 - `intro [--intro-text TEXT] [--context] [--bot-id ID]` - post a short self-introduction (who the bot is and what it can do) into the meeting chat on demand. Reuses `chat` (same bot-id resolution, error handling, and chime). Default text is English and concise; override it with `--intro-text` (e.g. a localized or freshly generated intro the agent composes). `--context` appends the first spoken line the bot has heard so far ("The first thing I heard was — …"), skipped when the transcript is still empty. See also `join --intro`, which posts the default intro automatically once the bot is admitted (English, since no transcript exists yet to detect the call's language).
 - `chimes` - list the available chat chime sounds. The library default is marked `default`; a session default set via `join --chime` is marked `session`. The chimes are short (~0.2-0.4s), low-gain MP3s inlined as base64 (no binary asset files); regenerate them with `scripts/gen-chimes.sh` (needs `ffmpeg` + `libmp3lame`).
 - `presence <listening|thinking|speaking|acting|idle> [message]` - update the bot camera state; explicit messages are shown as live Comments activity on the camera page, bare state toggles only switch the state with its default message, and transcript webhooks add recent "heard" lines automatically without changing the agent-set state.
+- `whisper <text> [--priority low|normal|high] [--ttl SECONDS] [--sink console|fake-hud]` - send a private message to the wearer. Not visible to the meeting: it goes to the wearer's sink and is echoed into the active transcript as a `SAMOGRAPH-WHISPER` control line, so `watch` relays it. `--sink fake-hud` renders the Even Realities G2 screen (576x288 px, 27 px lines) as a bounded box with explicit overflow.
+- `cue <confirm|dismiss|next|more>` - record the wearer's back-channel reply as a `SAMOGRAPH-CUE` control line on the existing transcript stream. Semantic, never physical, so the input device stays a driver detail.
 - `frames` - list buffered WebSocket frame sources and metadata.
 - `frame [--source SOURCE] [--out FILE] [--archive]` - write an in-memory frame to disk on demand.
 - `status` - show bot id, name, Recall status code, transcript line count, transcript file path, and frame source metadata.

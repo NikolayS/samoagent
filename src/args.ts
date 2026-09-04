@@ -32,6 +32,10 @@ export interface ParsedArgs {
   presence_token?: string;
   presence_write_token?: string;
   presence_state?: string;
+  whisper_priority?: string | null;
+  whisper_ttl_ms?: number | null;
+  whisper_sink?: string | null;
+  cue?: string;
   doc_id?: string | null;
   credentials?: string | null;
   from_start?: boolean;

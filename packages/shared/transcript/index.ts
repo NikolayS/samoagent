@@ -40,11 +40,57 @@ export function sanitizeTranscriptField(value: string): string {
 }
 
 /**
+ * The reserved speaker namespace for samograph's OWN transcript lines: the
+ * tunnel watchdog's `SAMOGRAPH-WARNING:`, the private `SAMOGRAPH-WHISPER:`
+ * channel, the wearer's `SAMOGRAPH-CUE:` back-channel and the
+ * `SAMOGRAPH_CALL_ENDED` sentinel. Case-insensitive on purpose: a lookalike
+ * must not slip past a consumer that compares exact uppercase markers.
+ */
+const CONTROL_SPEAKER_RE = /^SAMOGRAPH[-_]/i;
+
+/**
+ * Whether `speaker` is in samograph's reserved control namespace. Meeting
+ * participants can never legitimately carry such a name: the normalizers
+ * replace it with the unknown-speaker default `?`, so this predicate is also
+ * the ONE test every consumer uses to tell a control line from speech.
+ */
+export function isControlSpeaker(speaker: string): boolean {
+  return CONTROL_SPEAKER_RE.test(speaker);
+}
+
+/** A framed transcript line whose speaker slot is a reserved control marker. */
+const CONTROL_LINE_RE = /^\[[^\]]*\]\s+SAMOGRAPH[-_]/i;
+
+/**
+ * Whether one on-disk / wire transcript line is a samograph control line
+ * (`[ts] SAMOGRAPH-…: …` or the `[ts] SAMOGRAPH_CALL_ENDED` sentinel) rather
+ * than speech or chat. Only the speaker slot counts: text that merely mentions
+ * a marker is still speech.
+ */
+export function isControlLine(line: string): boolean {
+  return CONTROL_LINE_RE.test(line);
+}
+
+/**
+ * The speaker slot for a meeting participant: sanitized, `"?"` when
+ * absent/blank, and `"?"` when the name is in the reserved control namespace.
+ * A participant who renames themselves `SAMOGRAPH-WHISPER` must not be able to
+ * forge a line byte-identical to a genuine control line — this is the ONE
+ * place that rule lives, shared by every CLI and hosted normalizer below.
+ */
+function participantSpeaker(name: string | undefined): string {
+  const speaker = sanitizeTranscriptField(name ?? "") || "?";
+  return isControlSpeaker(speaker) ? "?" : speaker;
+}
+
+/**
  * Normalize one Recall `transcript.data` payload to the canonical line, or
  * `null` when the payload is not a `transcript.data` event with words (e.g. a
  * different event, a partial with an empty `words[]`, or malformed input —
  * never throws). The timestamp comes solely from the first word; the speaker
- * defaults to `"?"` when absent/blank.
+ * defaults to `"?"` when absent/blank — and when it lies in samograph's
+ * reserved `SAMOGRAPH-`/`SAMOGRAPH_` control namespace, so a participant name
+ * can never forge a control line ({@link isControlSpeaker}).
  */
 export function normalizeTranscriptLine(payload: unknown): string | null {
   const p = (payload ?? {}) as TranscriptDataPayload;
@@ -57,7 +103,7 @@ export function normalizeTranscriptLine(payload: unknown): string | null {
     return null;
   }
   const text = sanitizeTranscriptField(words.map((w) => w?.text ?? "").join(" "));
-  const speaker = sanitizeTranscriptField(inner.participant?.name ?? "") || "?";
+  const speaker = participantSpeaker(inner.participant?.name);
   const absolute = words[0]?.start_timestamp?.absolute ?? "";
   const ts = absolute.slice(0, 19).replace("T", " ");
   return `[${ts}] ${speaker}: ${text}`;
@@ -124,7 +170,7 @@ export function normalizeChatMessageLine(payload: unknown): string | null {
   if (!text) {
     return null;
   }
-  const speaker = sanitizeTranscriptField(inner.participant?.name ?? "") || "?";
+  const speaker = participantSpeaker(inner.participant?.name);
   const absolute = inner.timestamp?.absolute ?? "";
   const ts = absolute.slice(0, 19).replace("T", " ");
   return `[${ts}] ${speaker}${CHAT_LINE_MARKER}: ${text}`;
@@ -186,7 +232,7 @@ export function normalizeTranscriptEventRow(payload: unknown): NormalizedTranscr
     const words = inner.words ?? [];
     if (!words.length) return null;
     const text = sanitizeTranscriptField(words.map((w) => w?.text ?? "").join(" "));
-    const speaker = sanitizeTranscriptField(inner.participant?.name ?? "") || "?";
+    const speaker = participantSpeaker(inner.participant?.name);
     const absolute = words[0]?.start_timestamp?.absolute ?? "";
     return { kind: "speech", ts: absolute.slice(0, 19).replace("T", " "), speaker, text };
   }
@@ -194,7 +240,7 @@ export function normalizeTranscriptEventRow(payload: unknown): NormalizedTranscr
     const inner = (payload as ChatMessagePayload).data?.data ?? {};
     const text = sanitizeTranscriptField(inner.data?.text ?? "");
     if (!text) return null;
-    const speaker = sanitizeTranscriptField(inner.participant?.name ?? "") || "?";
+    const speaker = participantSpeaker(inner.participant?.name);
     const absolute = inner.timestamp?.absolute ?? "";
     return { kind: "chat", ts: absolute.slice(0, 19).replace("T", " "), speaker, text };
   }

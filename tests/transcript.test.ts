@@ -1,5 +1,13 @@
 import { describe, it, expect } from "bun:test";
-import { formatTranscriptLine, SENTINEL_RE } from "../src/transcript.ts";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  appendTranscriptLine,
+  formatLocalTranscriptTs,
+  formatTranscriptLine,
+  SENTINEL_RE,
+} from "../src/transcript.ts";
 
 function event(
   speaker: string | null,
@@ -98,5 +106,34 @@ describe("SENTINEL_RE", () => {
 
   it("does not match bare phrase", () => {
     expect(SENTINEL_RE.test("SAMOGRAPH_CALL_ENDED")).toBe(false);
+  });
+});
+
+describe("formatLocalTranscriptTs", () => {
+  it("renders the local-time 'YYYY-MM-DD HH:MM:SS' shared by every control line", () => {
+    // Local-time components (not UTC): this is the ONE formatter behind the
+    // SAMOGRAPH-WARNING watchdog lines, the SAMOGRAPH-WHISPER / -CUE lines and
+    // the SAMOGRAPH_CALL_ENDED sentinel.
+    expect(formatLocalTranscriptTs(new Date(2026, 7, 26, 14, 5, 9))).toBe("2026-08-26 14:05:09");
+    expect(formatLocalTranscriptTs(new Date(2026, 0, 1, 0, 0, 0))).toBe("2026-01-01 00:00:00");
+  });
+});
+
+describe("appendTranscriptLine", () => {
+  it("appends exactly `line + \\n` to the file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "samograph-append-"));
+    const path = join(dir, "transcript.txt");
+    try {
+      writeFileSync(path, "[2026-08-26 14:05:08] Alice: hi\n");
+      appendTranscriptLine(path, "[2026-08-26 14:05:09] SAMOGRAPH-CUE: confirm");
+      appendTranscriptLine(path, "[2026-08-26 14:05:10] SAMOGRAPH-WHISPER: Wrap up");
+      expect(readFileSync(path, "utf-8")).toBe(
+        "[2026-08-26 14:05:08] Alice: hi\n" +
+          "[2026-08-26 14:05:09] SAMOGRAPH-CUE: confirm\n" +
+          "[2026-08-26 14:05:10] SAMOGRAPH-WHISPER: Wrap up\n",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
