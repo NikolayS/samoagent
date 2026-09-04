@@ -137,7 +137,10 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
     });
 
     it("defines a filled danger button modifier", () => {
-      expect(/\.samograph-btn--danger\.samograph-btn--solid\s*\{/.test(CSS_NO_COMMENTS)).toBe(true);
+      // Design PR 7 wrapped the `--solid` half in `:where()` so the modifier
+      // stays at single-class specificity and the `.samograph-btn[disabled]`
+      // recipe still outranks it. Same selector, same match, lower weight.
+      expect(/\.samograph-btn--danger:where\(\.samograph-btn--solid\)\s*\{/.test(CSS_NO_COMMENTS)).toBe(true);
     });
 
     it("styles every JSX role=alert as a samograph error alert", () => {
@@ -194,7 +197,7 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
     const DARK = {
       ground: "#111110", surface: "#191918", ink: "#edeae2",
       "ink-soft": "#c6c2b7", muted: "#918c80", faint: "#6a665d",
-      line: "#2a2926", "line-strong": "#45433d",
+      line: "#3a3934", "line-strong": "#45433d",
     };
     const INSTRUMENT = {
       "panel-ground": "#0c0c0b", "panel-surface": "#141413",
