@@ -301,6 +301,27 @@ describe("renderHudFrame", () => {
     expect(HUD_OVERFLOW_MARKER).toBe("…");
   });
 
+  it("trims the overflow head by code point, never leaving a lone surrogate", () => {
+    // "abc😀" is 4 glyphs (5 UTF-16 units). Trimming by code unit would cut the
+    // emoji in half and emit "abc\ud83d…" — an invalid string on the display.
+    const frame = renderHudFrame("abc😀 x y z w", { widthPx: 60, heightPx: 20, lineHeightPx: 20 });
+    expect(frame.lines).toEqual(["abc😀…"]);
+    expect(frame.lines[0]!.isWellFormed()).toBe(true);
+    expect(frame.overflow).toBe(true);
+    expect(frame.hiddenLines).toBe(2);
+    expect(frame.maxCols).toBe(5);
+    // The box is 5 glyphs wide and the row fills it exactly — no padding drift
+    // from counting UTF-16 units instead of glyphs.
+    expect(frame.frame).toBe(["┌─────┐", "│abc😀…│", "└─────┘"].join("\n"));
+  });
+
+  it("measures and pads by code point so an emoji occupies one column", () => {
+    const frame = renderHudFrame("😀 ok", { widthPx: 60, heightPx: 20, lineHeightPx: 20 });
+    expect(frame.overflow).toBe(false);
+    expect(frame.lines).toEqual(["😀 ok"]);
+    expect(frame.frame).toBe(["┌─────┐", "│😀 ok │", "└─────┘"].join("\n"));
+  });
+
   it("uses the real G2 geometry by default", () => {
     const frame = renderHudFrame("ok", {});
     expect(frame.maxLines).toBe(10);

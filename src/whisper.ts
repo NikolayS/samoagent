@@ -240,8 +240,13 @@ export const APPROX_GLYPH_WIDTH_PX = 12;
 /** Measures the rendered width of a string, in pixels. */
 export type MeasureFn = (text: string) => number;
 
-/** The monospace stand-in for real font measurement. */
-export const approxMeasure: MeasureFn = (text) => text.length * APPROX_GLYPH_WIDTH_PX;
+/** Glyph count of a string: code points, never UTF-16 units (an emoji is one). */
+function glyphCount(text: string): number {
+  return Array.from(text).length;
+}
+
+/** The monospace stand-in for real font measurement: one glyph per code point. */
+export const approxMeasure: MeasureFn = (text) => glyphCount(text) * APPROX_GLYPH_WIDTH_PX;
 
 /** Upper bound on probed columns, so a pathological `measure` cannot spin. */
 const HUD_MAX_COLUMNS = 512;
@@ -358,13 +363,22 @@ export interface HudFrame {
   hiddenLines: number;
 }
 
-/** Trim `line` until it plus the overflow marker fits the display width. */
+/**
+ * Trim `line` until it plus the overflow marker fits the display width. Trims
+ * whole code points, matching {@link hardBreak}: slicing a UTF-16 unit off a
+ * line that ends in an astral glyph (an emoji) would leave a lone surrogate.
+ */
 function withOverflowMarker(line: string, g: ResolvedGeometry): string {
-  let head = line;
-  while (head !== "" && g.measure(head + HUD_OVERFLOW_MARKER) > g.widthPx) {
-    head = head.slice(0, -1);
+  const head = Array.from(line);
+  while (head.length > 0 && g.measure(head.join("") + HUD_OVERFLOW_MARKER) > g.widthPx) {
+    head.pop();
   }
-  return head + HUD_OVERFLOW_MARKER;
+  return head.join("") + HUD_OVERFLOW_MARKER;
+}
+
+/** Right-pad `row` with spaces to `width` glyphs (code points, not UTF-16 units). */
+function padRow(row: string, width: number): string {
+  return row + " ".repeat(Math.max(0, width - glyphCount(row)));
 }
 
 /**
@@ -388,13 +402,13 @@ export function renderHudFrame(text: string, geometry: HudGeometry = {}): HudFra
     lines[lines.length - 1] = withOverflowMarker(lines[lines.length - 1]!, g);
   }
 
-  const inner = Math.max(maxCols, ...lines.map((l) => l.length), 0);
+  const inner = Math.max(maxCols, ...lines.map(glyphCount), 0);
   const rows = [...lines];
   while (rows.length < maxLines) rows.push("");
   const border = "─".repeat(inner);
   const frame = [
     `┌${border}┐`,
-    ...rows.map((row) => `│${row.padEnd(inner)}│`),
+    ...rows.map((row) => `│${padRow(row, inner)}│`),
     `└${border}┘`,
   ].join("\n");
 
