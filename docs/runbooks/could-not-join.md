@@ -1,5 +1,12 @@
 # Runbook: could not join (`COULD_NOT_JOIN` / `SAMO-CALL-JOIN`)
 
+## Active call conflict (`SAMO-CALL-ACTIVE`)
+
+`POST /calls` returns HTTP 409 with `SAMO-CALL-ACTIVE`, the existing call id,
+and its current status when the same tenant already has a non-terminal call for
+the normalized meeting URL created within the last four hours. This is an
+intentional cost-safety invariant: open the returned call instead of retrying.
+
 **Symptom.** A call reaches terminal status `COULD_NOT_JOIN`. The dashboard shows
 *"Couldn't join — &lt;Recall reason&gt;."* with a **Try again** action (Story 4).
 API/UI surface the code `SAMO-CALL-JOIN`.

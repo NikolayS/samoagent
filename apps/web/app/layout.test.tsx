@@ -5,6 +5,10 @@ mock.module("next/font/local", () => ({
   default: () => ({ variable: "mock-jetbrains-mono" }),
 }));
 
+mock.module("next/font/google", () => ({
+  Inter: () => ({ variable: "mock-inter-sans" }),
+}));
+
 const { default: RootLayout } = await import("./layout.tsx");
 
 /**
@@ -22,6 +26,7 @@ const { default: RootLayout } = await import("./layout.tsx");
  */
 describe("RootLayout (app shell) — issue #70 hydration mitigation", () => {
   const tree = RootLayout({ children: null }) as ReactElement<{
+    className?: string;
     suppressHydrationWarning?: boolean;
     children: ReactElement<{ suppressHydrationWarning?: boolean }>;
   }>;
@@ -42,5 +47,36 @@ describe("RootLayout (app shell) — issue #70 hydration mitigation", () => {
 
   it("suppresses on <html> because the no-flash theme script sets data-theme before hydration", () => {
     expect(tree.props.suppressHydrationWarning).toBe(true);
+  });
+});
+
+/**
+ * Prod rendering bug — the whole site fell back to the browser default serif.
+ *
+ * globals.css defines `--font-body`/`--font-display`/`--font-mono` on `:root`
+ * as `var(--font-jetbrains), ...`. The next/font variable class (which defines
+ * `--font-jetbrains`) was attached to <body> — a DESCENDANT of `:root` — so at
+ * `:root` the var() substituted an undefined custom property. Per CSS spec that
+ * makes the declaration invalid at computed-value time: the token computes to
+ * `guaranteed-invalid`, `font-family: var(--font-body)` collapses, and the site
+ * renders in Times New Roman. The variable class MUST live on <html>.
+ */
+describe("RootLayout — next/font variable class placement", () => {
+  const tree = RootLayout({ children: null }) as ReactElement<{
+    className?: string;
+    children: ReactElement<{ className?: string }>;
+  }>;
+  const children = Children.toArray(tree.props.children) as ReactElement<{
+    className?: string;
+  }>[];
+  const body = children.find((child) => child.type === "body")!;
+
+  it("attaches the font variable class to <html> so :root font tokens resolve", () => {
+    expect(tree.props.className ?? "").toContain("mock-jetbrains-mono");
+    expect(tree.props.className ?? "").toContain("mock-inter-sans");
+  });
+
+  it("does not rely on <body> for the variable class", () => {
+    expect(body.props.className ?? "").not.toContain("mock-jetbrains-mono");
   });
 });

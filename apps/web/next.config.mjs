@@ -82,6 +82,11 @@ const nextConfig = {
                 destination: `${apiOrigin}/calendar/meetings`,
               },
               {
+                source: "/calendar/meetings/:id",
+                has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
+                destination: `${apiOrigin}/calendar/meetings/:id`,
+              },
+              {
                 source: "/calendar/connection",
                 has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
                 destination: `${apiOrigin}/calendar/connection`,
@@ -110,6 +115,17 @@ const nextConfig = {
                 source: "/calls/:id",
                 has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
                 destination: `${apiOrigin}/calls/:id`,
+              },
+              {
+                // Only the client's settings fetch (not the /settings page navigation).
+                source: "/settings",
+                has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
+                destination: `${apiOrigin}/settings`,
+              },
+              {
+                // Account deletion is a client fetch; there is no /account page.
+                source: "/account",
+                destination: `${apiOrigin}/account`,
               },
               { source: "/__dev/:path*", destination: `${apiOrigin}/__dev/:path*` },
             ],

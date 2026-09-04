@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, mock } from "bun:test";
 import { render, fireEvent, act } from "@testing-library/react";
 import { ShareModal } from "./ShareModal.tsx";
 import { createFakeShareApiClient } from "../lib/fakeShareApiClient.ts";
@@ -21,6 +21,12 @@ function stubClipboard(): string[] {
   return writes;
 }
 
+function createPendingShareClient() {
+  const client = createFakeShareApiClient();
+  client.getShare = () => new Promise(() => {});
+  return client;
+}
+
 describe("ShareModal — owner share-link control (SPEC §4.1, §5.7, Story 2)", () => {
   beforeEach(() => {
     stubClipboard();
@@ -32,6 +38,7 @@ describe("ShareModal — owner share-link control (SPEC §4.1, §5.7, Story 2)",
       <ShareModal shareClient={client} callId="call_1" onClose={() => {}} />,
     );
     const create = await findByText("Create share link");
+    expect(create.className).toContain("samograph-btn samograph-btn--primary");
     await act(async () => {
       fireEvent.click(create);
     });
@@ -46,6 +53,17 @@ describe("ShareModal — owner share-link control (SPEC §4.1, §5.7, Story 2)",
       <ShareModal shareClient={client} callId="call_1" onClose={() => {}} />,
     );
     expect(await findByText("/c/shr_1")).toBeDefined();
+  });
+
+  it("styles all active-link actions as secondary", async () => {
+    const client = createFakeShareApiClient();
+    await client.mintShare("call_1");
+    const view = render(<ShareModal shareClient={client} callId="call_1" onClose={() => {}} />);
+    await view.findByText("/c/shr_1");
+    for (const name of ["Copy link", "Rotate", "Revoke"]) {
+      expect(view.getByRole("button", { name }).className).toContain("samograph-btn--secondary");
+    }
+    expect(view.getByRole("button", { name: "Close" }).className).toContain("samograph-btn--ghost");
   });
 
   it("copies the link to the clipboard and confirms 'Copied'", async () => {
@@ -100,6 +118,17 @@ describe("ShareModal — owner share-link control (SPEC §4.1, §5.7, Story 2)",
     );
     fireEvent.click(await findByText("Create share link"));
     expect(await findByRole("alert")).toBeDefined();
+    expect((await findByRole("alert")).className).toContain("samograph-alert samograph-alert--error");
+  });
+
+  it("marks Create share link busy and disabled while minting", async () => {
+    const client = createFakeShareApiClient();
+    client.mintShare = () => new Promise(() => {});
+    const view = render(<ShareModal shareClient={client} callId="call_1" onClose={() => {}} />);
+    const create = await view.findByRole("button", { name: "Create share link" }) as HTMLButtonElement;
+    fireEvent.click(create);
+    expect(create.disabled).toBe(true);
+    expect(create.getAttribute("aria-busy")).toBe("true");
   });
 
   it("closes via the close affordance", async () => {
@@ -111,5 +140,54 @@ describe("ShareModal — owner share-link control (SPEC §4.1, §5.7, Story 2)",
     const close = await findByRole("button", { name: /close/i });
     fireEvent.click(close);
     expect(closed).toEqual([true]);
+  });
+
+  it("is a labelled modal dialog", () => {
+    const view = render(<ShareModal shareClient={createPendingShareClient()} callId="call_1" onClose={() => {}} />);
+    const dialog = view.getByRole("dialog");
+    const title = view.getByRole("heading", { name: "Share read-only link" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("aria-labelledby")).toBe(title.id);
+  });
+
+  it("moves focus inside on open and restores it to the trigger on unmount", () => {
+    const trigger = document.createElement("button");
+    document.body.append(trigger);
+    trigger.focus();
+    const view = render(<ShareModal shareClient={createPendingShareClient()} callId="call_1" onClose={() => {}} />);
+    const dialog = view.getByRole("dialog");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    view.unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it("closes exactly once on Escape", () => {
+    const onClose = mock(() => {});
+    render(<ShareModal shareClient={createPendingShareClient()} callId="call_1" onClose={onClose} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("wraps Tab focus in both directions", async () => {
+    const view = render(<ShareModal shareClient={createFakeShareApiClient()} callId="call_1" onClose={() => {}} />);
+    const dialog = view.getByRole("dialog");
+    const first = view.getByRole("button", { name: "Close" });
+    const last = await view.findByRole("button", { name: "Create share link" });
+    last.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+    first.focus();
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it("closes from the backdrop but not from inside the panel", () => {
+    const onClose = mock(() => {});
+    const view = render(<ShareModal shareClient={createPendingShareClient()} callId="call_1" onClose={onClose} />);
+    fireEvent.click(view.getByTestId("modal-panel"));
+    expect(onClose).toHaveBeenCalledTimes(0);
+    fireEvent.click(view.getByTestId("modal-backdrop"));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

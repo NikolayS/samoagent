@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -108,6 +108,59 @@ const STATE_TOKENS = [
 ];
 
 describe("Refined design tokens — globals.css contract (issue #241)", () => {
+  describe("Slice 2 controls and feedback primitives", () => {
+    it("does not give every bare button or label a margin-top", () => {
+      expect(/(?:^|\})\s*button\s*\{[^}]*margin-top\s*:/m.test(CSS_NO_COMMENTS)).toBe(false);
+      expect(/(?:^|\})\s*label\s*\{[^}]*margin-top\s*:/m.test(CSS_NO_COMMENTS)).toBe(false);
+    });
+
+    for (const selector of [
+      ".samograph-btn", ".samograph-btn--primary", ".samograph-btn--secondary",
+      ".samograph-btn--danger", ".samograph-btn[disabled]",
+      '.samograph-btn[aria-busy="true"]', ".samograph-alert",
+      ".samograph-alert--error", ".samograph-alert--warn",
+      ".samograph-alert--success", ".samograph-alert--info", ".samograph-field",
+      ".samograph-field-hint", ".samograph-actions",
+    ]) {
+      it(`defines ${selector}`, () => {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        expect(new RegExp(`${escaped}\\s*\\{`).test(CSS_NO_COMMENTS)).toBe(true);
+      });
+    }
+
+    it("uses the mono font for textarea controls", () => {
+      expect(/textarea\s*\{[^}]*font-family\s*:\s*var\(--font-mono\)/m.test(CSS_NO_COMMENTS)).toBe(true);
+    });
+
+    it("has no bare role=alert selector", () => {
+      expect(/\[role=["']?alert["']?\]\s*\{/.test(CSS_NO_COMMENTS)).toBe(false);
+    });
+
+    it("defines a filled danger button modifier", () => {
+      expect(/\.samograph-btn--danger\.samograph-btn--solid\s*\{/.test(CSS_NO_COMMENTS)).toBe(true);
+    });
+
+    it("styles every JSX role=alert as a samograph error alert", () => {
+      const roots = [join(import.meta.dir, "..", "components"), join(import.meta.dir, "..", "app")];
+      const files: string[] = [];
+      const visit = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const path = join(dir, entry.name);
+          if (entry.isDirectory()) visit(path);
+          else if (entry.name.endsWith(".tsx") && !entry.name.endsWith(".test.tsx")) files.push(path);
+        }
+      };
+      roots.forEach(visit);
+      const offenders = files.flatMap((file) => {
+        const source = readFileSync(file, "utf8");
+        return [...source.matchAll(/<[^>]*role=["']alert["'][^>]*>/gs)]
+          .filter(([tag]) => !/className=["'][^"']*samograph-alert--error[^"']*["']/.test(tag))
+          .map(() => file);
+      });
+      expect(offenders).toEqual([]);
+    });
+  });
+
   describe("(a) :root defines the full Refined token set", () => {
     const root = baseRootBody();
 
@@ -172,15 +225,19 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
       for (const [token, value] of Object.entries(INSTRUMENT)) {
         expect(valueOf(baseRootBody(), token)).toBe(value);
       }
-      // One compatibility alias declaration plus one actual use: the streaming caret.
+      // One compatibility alias declaration plus the streaming caret, now drawn
+      // once — only the real transcript (Slice 3); the landing no longer fakes
+      // an instrument. The signal magenta stays a ONE-ELEMENT accent.
       expect(CSS_NO_COMMENTS.match(/var\(--signal\)/g)?.length ?? 0).toBe(2);
+      expect(CSS_NO_COMMENTS.match(/background: var\(--signal\)/g)?.length ?? 0).toBe(1);
     });
 
-    it("uses JetBrains Mono for every font role", () => {
+    it("uses the Slice 1 dual sans/mono font roles", () => {
       const root = baseRootBody();
-      for (const token of ["font-body", "font-display", "font-mono"]) {
-        expect(valueOf(root, token)).toContain('"JetBrains Mono"');
-      }
+      expect(valueOf(root, "font-sans")).toContain('"Inter"');
+      expect(valueOf(root, "font-mono")).toContain('"JetBrains Mono"');
+      expect(valueOf(root, "font-body")).toBe("var(--font-sans)");
+      expect(valueOf(root, "font-display")).toBe("var(--font-sans)");
     });
   });
 
@@ -227,7 +284,6 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
 
   describe("landing link touch targets", () => {
     for (const selector of [
-      "\\.samograph-nav-links a",
       "\\.samograph-site-footer nav a",
       "\\.samograph-brand",
     ]) {
@@ -300,5 +356,36 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
       expect(rule).toContain("var(--google-btn-border)");
       expect(rule).toContain("var(--google-btn-ink)");
     });
+  });
+});
+
+/**
+ * Slice 5 — Auth + Settings. `--border-strong` is a *width* token (2px); using it
+ * where a colour belongs makes the whole `border-top` declaration invalid at
+ * parse time, so the Settings section rules and the sticky save bar draw nothing.
+ */
+describe("Slice 5 — Settings section rules and save bar", () => {
+  for (const selector of ["\\.samograph-settings-section", "\\.samograph-savebar"]) {
+    it(`${selector.replace(/\\/g, "")} draws its rule with the width token and a line colour`, () => {
+      const rule = flatBlockBody(selector);
+      expect(rule.length).toBeGreaterThan(0);
+      expect(rule).toContain("border-top: var(--border-strong) solid var(--line-strong);");
+      // A width token can never be a colour — `1px solid 2px` is an invalid declaration.
+      expect(/solid\s+var\(--border-strong\)/.test(rule)).toBe(false);
+    });
+  }
+
+  it("gives the settings route a --width-prose page so the section blocks can breathe", () => {
+    const rule = flatBlockBody("\\.samograph-page--prose");
+    expect(rule).toContain("max-width: var(--width-prose);");
+    const route = readFileSync(join(import.meta.dir, "..", "app", "settings", "page.tsx"), "utf8");
+    expect(route).toContain('pageClassName="samograph-page--prose"');
+    expect(route).not.toContain('pageClassName="samograph-page--form"');
+  });
+
+  it("varies the three visible skeleton bars, not the visually-hidden label", () => {
+    // `.samograph-visually-hidden` is span nth-of-type(1); the bars are 2..4.
+    expect(CSS).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }');
+    expect(CSS).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }');
   });
 });

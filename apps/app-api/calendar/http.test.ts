@@ -15,6 +15,8 @@ class Store implements CalendarConnectionStore {
   async get() { return this.row; }
   async save(row: CalendarConnection) { this.row = row; }
   async delete() { this.row = null; }
+  excludedMeetingIds: string[] = [];
+  async excludeMeeting(_userId: string, _tenantId: string, eventId: string) { this.excludedMeetingIds.push(eventId); return true; }
 }
 function handler() {
   const store = new Store();
@@ -26,6 +28,19 @@ function handler() {
 const session = () => `samo_session=${signSession({ userId: "user", tenantId: "tenant", iat: now }, secret)}`;
 
 describe("calendar HTTP adapter", () => {
+  it("rejects a malformed meeting UUID before calling the service", async () => {
+    const store = new Store();
+    const service = new CalendarService({ provider: undefined, store,
+      rateLimiter: new InMemoryRateLimiter(), sessionSecret: secret, clock: () => now,
+      activeKey: Buffer.alloc(32), activeKeyVersion: 1, decryptionKeys: new Map([[1, Buffer.alloc(32)]]) });
+    const response = await createCalendarHandler(service, secret, () => now)(new Request("http://api.test/calendar/meetings/not-a-uuid", {
+      method: "PATCH", headers: { cookie: session(), "content-type": "application/json" }, body: JSON.stringify({ excluded: true }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(store.excludedMeetingIds).toEqual([]);
+  });
+
   it("uses the dead-session convention when owner resolution marks the tenant erased", async () => {
     const store = new Store();
     store.active = false;

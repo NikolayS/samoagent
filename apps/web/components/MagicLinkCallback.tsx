@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AppApiError, type AppApiClient } from "../lib/appApiClient.ts";
 import { authErrorMessage, AUTH_INFRA_MESSAGE } from "../lib/authErrors.ts";
+import { PageSkeleton } from "./PageSkeleton.tsx";
 
 export interface MagicLinkCallbackProps {
   token: string | undefined;
@@ -58,16 +59,17 @@ export function MagicLinkCallback({ token, client }: MagicLinkCallbackProps) {
 
   if (state.phase === "verifying") {
     return (
-      <section aria-live="polite">
+      <section aria-live="polite" className="samograph-auth">
         <h1>Signing you in</h1>
         <p>Verifying your sign-in link…</p>
+        <PageSkeleton variant="form" />
       </section>
     );
   }
 
   if (state.phase === "success") {
     return (
-      <section>
+      <section className="samograph-auth">
         <h1>You're signed in.</h1>
         <a href="/dashboard">Go to dashboard</a>
       </section>
@@ -75,9 +77,9 @@ export function MagicLinkCallback({ token, client }: MagicLinkCallbackProps) {
   }
 
   return (
-    <section>
+    <section className="samograph-auth">
       <h1>Sign-in failed</h1>
-      <p role="alert">{state.message}</p>
+      <p role="alert" className="samograph-alert samograph-alert--error">{state.message}</p>
       <a href="/auth">Request a new link</a>
     </section>
   );

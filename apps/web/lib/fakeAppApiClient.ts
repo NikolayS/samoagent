@@ -26,7 +26,7 @@ import { validateMeetingUrl } from "./validateMeetingUrl.ts";
 
 export interface RecordedRequest {
   path: string;
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body: Record<string, unknown>;
 }
 
@@ -90,6 +90,8 @@ export interface FakeAppApiClientOptions {
   failGetCalendarStatusWith?: FailSpec & { status?: number };
   failStartCalendarConnectWith?: FailSpec & { status?: number };
   failDisconnectCalendarWith?: FailSpec & { status?: number };
+  failUpdateCalendarAutoJoinWith?: FailSpec & { status?: number };
+  failSetCalendarMeetingExcludedWith?: FailSpec & { status?: number };
   failListCalendarMeetingsWith?: FailSpec & { status?: number };
   /** Seed `listCalls` with pre-existing tenant calls (e.g. to test reload). */
   seedCalls?: Call[];
@@ -196,11 +198,26 @@ export class FakeAppApiClient implements AppApiClient {
     this.calendarMeetings = [];
   }
 
+  async updateCalendarAutoJoin(autoJoin: boolean): Promise<CalendarStatus> {
+    this.requests.push({ path: "/calendar/connection", method: "PATCH", body: { auto_join: autoJoin } });
+    this.fail(this.options.failUpdateCalendarAutoJoinWith);
+    this.calendarStatus = { ...this.calendarStatus, autoJoin };
+    return { ...this.calendarStatus };
+  }
+
+  async setCalendarMeetingExcluded(eventId: string, excluded: boolean): Promise<{ id: string; excluded: boolean }> {
+    this.requests.push({ path: `/calendar/meetings/${encodeURIComponent(eventId)}`, method: "PATCH", body: { excluded } });
+    this.fail(this.options.failSetCalendarMeetingExcludedWith);
+    const meeting = this.calendarMeetings.find((row) => row.id === eventId);
+    if (meeting) meeting.autoJoinExcluded = excluded;
+    return { id: eventId, excluded };
+  }
+
   async listCalendarMeetings(limit?: number): Promise<CalendarMeetingsSnapshot> {
     this.requests.push({ path: limit === undefined ? "/calendar/meetings" : `/calendar/meetings?limit=${limit}`, method: "GET", body: {} });
     this.fail(this.options.failListCalendarMeetingsWith);
     const seeded = this.options.seedCalendarMeetings;
-    return { connectionState: seeded?.connectionState ?? this.calendarStatus.state, meetings: limit === undefined ? this.calendarMeetings.map((m) => ({ ...m })) : this.calendarMeetings.slice(0, limit).map((m) => ({ ...m })), lastSyncAt: seeded?.lastSyncAt ?? this.calendarStatus.lastSyncAt, ...(seeded?.errorCode ? { errorCode: seeded.errorCode } : {}) };
+    return { connectionState: seeded?.connectionState ?? this.calendarStatus.state, meetings: limit === undefined ? this.calendarMeetings.map((m) => ({ ...m })) : this.calendarMeetings.slice(0, limit).map((m) => ({ ...m })), lastSyncAt: seeded?.lastSyncAt ?? this.calendarStatus.lastSyncAt, autoJoin: seeded?.autoJoin ?? this.calendarStatus.autoJoin, ...(seeded?.errorCode ? { errorCode: seeded.errorCode } : {}) };
   }
 
   private fail(spec?: FailSpec & { status?: number }): void {

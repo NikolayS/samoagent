@@ -127,18 +127,21 @@ export interface CalendarStatus {
   lastSyncAt: string | null;
   lastSyncErrorAt: string | null;
   errorCode?: "SAMO-CALENDAR-005";
+  autoJoin?: boolean;
 }
 export interface CalendarMeeting {
   id: string; title: string; startsAt: string; endsAt: string; allDay: boolean;
   meetingUrl: string | null; meetingProvider: MeetingProvider | null;
   organizerEmail: string | null;
   attendeeResponse: "needsAction" | "declined" | "tentative" | "accepted" | null;
+  autoJoinExcluded?: boolean;
 }
 export interface CalendarMeetingsSnapshot {
   connectionState: CalendarConnectionState;
   meetings: CalendarMeeting[];
   lastSyncAt: string | null;
   errorCode?: "SAMO-CALENDAR-005";
+  autoJoin?: boolean;
 }
 
 export interface AppApiClient {
@@ -157,6 +160,8 @@ export interface AppApiClient {
   getCalendarStatus(): Promise<CalendarStatus>;
   startCalendarConnect(): Promise<{ authorizationUrl: string }>;
   disconnectCalendar(): Promise<void>;
+  updateCalendarAutoJoin(autoJoin: boolean): Promise<CalendarStatus>;
+  setCalendarMeetingExcluded(eventId: string, excluded: boolean): Promise<{ id: string; excluded: boolean }>;
   listCalendarMeetings(limit?: number): Promise<CalendarMeetingsSnapshot>;
   /** `GET /auth/callback?token=…` — verifies the link; throws `AppApiError` on failure. */
   verifyMagicLink(token: string): Promise<void>;
@@ -337,6 +342,7 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
         connectedAt: typeof d.connected_at === "string" ? d.connected_at : null,
         lastSyncAt: typeof d.last_sync_at === "string" ? d.last_sync_at : null,
         lastSyncErrorAt: typeof d.last_sync_error_at === "string" ? d.last_sync_error_at : null,
+        ...(typeof d.auto_join === "boolean" ? { autoJoin: d.auto_join } : {}),
         ...(error?.code === "SAMO-CALENDAR-005" ? { errorCode: error.code } : {}),
       };
     },
@@ -351,6 +357,19 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
       const res = await fetch(`${baseUrl}/calendar/connection`, { method: "DELETE", credentials: "same-origin" });
       if (!res.ok) await throwTyped(res, "SAMO-CALENDAR-500");
     },
+    async updateCalendarAutoJoin(autoJoin) {
+      const res = await fetch(`${baseUrl}/calendar/connection`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ auto_join: autoJoin }), credentials: "same-origin" });
+      if (!res.ok) await throwTyped(res, "SAMO-CALENDAR-500");
+      const d = (await res.json()) as Record<string, unknown>;
+      return { provider: "google", state: d.state === "connected" || d.state === "broken" ? d.state : "not_connected", connectedAt: typeof d.connected_at === "string" ? d.connected_at : null, lastSyncAt: typeof d.last_sync_at === "string" ? d.last_sync_at : null, lastSyncErrorAt: typeof d.last_sync_error_at === "string" ? d.last_sync_error_at : null, autoJoin: d.auto_join === true };
+    },
+    async setCalendarMeetingExcluded(eventId, excluded) {
+      const res = await fetch(`${baseUrl}/calendar/meetings/${encodeURIComponent(eventId)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ excluded }), credentials: "same-origin" });
+      if (!res.ok) await throwTyped(res, "SAMO-CALENDAR-006");
+      const d = (await res.json()) as Record<string, unknown>;
+      if (typeof d.id !== "string" || typeof d.excluded !== "boolean") throw new Error("Invalid calendar meeting exclusion response");
+      return { id: d.id, excluded: d.excluded };
+    },
     async listCalendarMeetings(limit) {
       const query = limit === undefined ? "" : `?limit=${encodeURIComponent(String(limit))}`;
       const res = await fetch(`${baseUrl}/calendar/meetings${query}`, { credentials: "same-origin" });
@@ -363,8 +382,8 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
       const meetings = rows.filter((raw): raw is Record<string, unknown> => {
         const r = raw as Record<string, unknown>;
         return typeof r?.id === "string" && typeof r.title === "string" && typeof r.starts_at === "string" && typeof r.ends_at === "string" && typeof r.all_day === "boolean" && (r.meeting_url === null || typeof r.meeting_url === "string") && (r.meeting_provider === null || r.meeting_provider === "google_meet" || r.meeting_provider === "zoom") && (r.organizer_email === null || typeof r.organizer_email === "string") && (r.attendee_response === null || responses.includes(String(r.attendee_response)));
-      }).map((r) => ({ id: r.id as string, title: r.title as string, startsAt: r.starts_at as string, endsAt: r.ends_at as string, allDay: r.all_day as boolean, meetingUrl: r.meeting_url as string | null, meetingProvider: r.meeting_provider as MeetingProvider | null, organizerEmail: r.organizer_email as string | null, attendeeResponse: r.attendee_response as CalendarMeeting["attendeeResponse"] }));
-      return { connectionState: state, meetings, lastSyncAt: typeof d.last_sync_at === "string" ? d.last_sync_at : null, ...(error?.code === "SAMO-CALENDAR-005" ? { errorCode: error.code } : {}) };
+      }).map((r) => ({ id: r.id as string, title: r.title as string, startsAt: r.starts_at as string, endsAt: r.ends_at as string, allDay: r.all_day as boolean, meetingUrl: r.meeting_url as string | null, meetingProvider: r.meeting_provider as MeetingProvider | null, organizerEmail: r.organizer_email as string | null, attendeeResponse: r.attendee_response as CalendarMeeting["attendeeResponse"], ...(typeof r.auto_join_excluded === "boolean" ? { autoJoinExcluded: r.auto_join_excluded } : {}) }));
+      return { connectionState: state, meetings, lastSyncAt: typeof d.last_sync_at === "string" ? d.last_sync_at : null, ...(typeof d.auto_join === "boolean" ? { autoJoin: d.auto_join } : {}), ...(error?.code === "SAMO-CALENDAR-005" ? { errorCode: error.code } : {}) };
     },
     async verifyMagicLink(token) {
       const res = await fetch(

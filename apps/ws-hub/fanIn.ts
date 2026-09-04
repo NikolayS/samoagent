@@ -26,6 +26,7 @@
  * future split, consumed by this exact `deliver`.
  */
 import type { SQL } from "bun";
+import { canonicalTs } from "./timestamp.ts";
 import { setTenant } from "../../packages/shared/db/client.ts";
 import type {
   TranscriptControlFrame,
@@ -52,16 +53,6 @@ export interface FanIn {
    * published line frame (or `null` for a no-op / control frame), for tests.
    */
   deliver(signal: TranscriptSignal): Promise<TranscriptLineFrame | null>;
-}
-
-/** Canonical `YYYY-MM-DD HH:MM:SS` (UTC) — matches the live pipeline line frame (§5.4). */
-function canonicalTs(value: Date | string): string {
-  const d = value instanceof Date ? value : new Date(value);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ` +
-    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
-  );
 }
 
 interface TranscriptRow {

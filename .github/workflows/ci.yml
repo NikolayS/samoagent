@@ -48,6 +48,7 @@ jobs:
   postgres-smoke:
     name: Postgres integration tests (migrations + RLS + tokens + orchestrator + magic-link + auth gate + calls)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:

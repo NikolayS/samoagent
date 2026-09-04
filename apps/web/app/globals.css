@@ -56,6 +56,9 @@
   --good: var(--accent-live);
   --warn: #8a5a00;
   --crit: #a63a3a;
+  /* Success COPY ink. `--accent-live` mint is an instrument colour and fails
+     WCAG AA as body text on the light surface, so alert text uses this. */
+  --success-ink: #1d6b47;
 
   /* Foregrounds for filled accents */
   --on-green: var(--panel-ground);
@@ -83,43 +86,90 @@
   --google-btn-ink: #1f1f1f;
 
   /* Type */
-  --font-body: var(--font-jetbrains), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-display: var(--font-jetbrains), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-mono: var(--font-jetbrains), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-body: var(--font-sans);
+  --font-display: var(--font-sans);
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+  --leading-tight: 1.2;
+  --leading-normal: 1.55;
+  --leading-prose: 1.7;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 56px;
+  --space-16: 80px;
+
+  /* Shape and layout */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-strong: 2px;
+  --width-app: 1120px;
+  --width-prose: 720px;
+  --width-form: 480px;
+  --gutter: var(--space-8);
+
+  /* Control geometry — the single answer to "how tall is a control?".
+     `--radius-control` is the one radius for every interactive box, and
+     `--field-max` caps short fields (selects, enums) so a four-character value
+     stops spanning the whole column. */
+  --control-h: 44px;
+  --radius-control: var(--radius-md);
+  --field-max: 22rem;
+
+  /* Interaction */
+  --focus-ring: var(--ink);
+  --hover-surface: color-mix(in srgb, var(--ink) 5%, var(--surface));
+  --control-border: var(--line-strong);
+  --field-bg-disabled: color-mix(in srgb, var(--muted) 8%, var(--surface));
 }
 
-/* Refined public landing (issue #241). */
-body:has(.samograph-landing) { padding: 0; }
-.samograph-landing { max-width: none; width: 100%; overflow: hidden; }
+/* Public landing (simplified, issue #241) plus the transcript-panel primitives
+   the per-call view composes on top of. */
+.samograph-landing { max-width: none; width: 100%; overflow: hidden; font-family: var(--font-mono); line-height: 1.5; }
 .samograph-landing *, .samograph-landing *::before, .samograph-landing *::after { box-sizing: border-box; }
 .samograph-landing a { color: inherit; text-decoration: none; }
 .samograph-landing a:hover { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .samograph-site-nav { min-height: 68px; padding: 0 56px; display: flex; align-items: center; justify-content: space-between; gap: 32px; background: var(--surface); border-bottom: 1px solid var(--line); }
-.samograph-nav-left, .samograph-nav-actions, .samograph-brand, .samograph-nav-links { display: flex; align-items: center; }
-.samograph-nav-left { gap: 30px; }.samograph-nav-actions { gap: 16px; }.samograph-nav-links { gap: 22px; font-size: .75rem; color: var(--muted); }
-.samograph-nav-links a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; }
+.samograph-nav-actions { display: flex; align-items: center; gap: 16px; }
 .samograph-brand { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; gap: 10px; font-size: .95rem; font-weight: 700; letter-spacing: -.02em; }.samograph-brand img { border: 1px solid var(--line); border-radius: 4px; }.samograph-brand span span { color: var(--faint); }
 .samograph-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border: 1px solid var(--ink); border-radius: 6px; color: var(--ground) !important; background: var(--ink); font-size: .74rem; font-weight: 500; }
 .samograph-button--compact { padding: 0 15px; }.samograph-button:hover { opacity: .82; text-decoration: none !important; }
-.samograph-landing-hero, .samograph-section { max-width: none; margin: 0; padding: 56px; }.samograph-landing-hero { padding-top: 68px; padding-bottom: 60px; }
-.samograph-hero-copy { display: flex; flex-direction: column; gap: 26px; margin-bottom: 38px; }.samograph-hero-copy > * { margin: 0; }.samograph-eyebrow { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: .7rem; letter-spacing: .09em; }.samograph-eyebrow i { width: 44px; height: 2px; background: var(--ink); }
-.samograph-hero-copy h1 { max-width: 880px; font-size: 2.65rem; line-height: 1.14; font-weight: 700; letter-spacing: -.02em; }.samograph-hero-copy > p:not(.samograph-eyebrow) { max-width: 790px; color: var(--ink-soft); font-size: .85rem; line-height: 1.7; }.samograph-hero-actions { display: flex; align-items: center; gap: 18px; color: var(--faint); font-size: .75rem; }
-.samograph-instrument { min-width: 780px; color: var(--panel-muted); background: var(--panel-ground); border: 1px solid var(--panel-line); font-size: .7rem; }.samograph-landing-hero { overflow-x: auto; }
-.samograph-instrument-head, .samograph-instrument-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 16px; background: var(--panel-surface); }.samograph-instrument-head { border-bottom: 1px solid var(--panel-line); }.samograph-instrument-head > div, .samograph-instrument-state, .samograph-instrument-foot > div { display: flex; align-items: center; gap: 14px; }.samograph-instrument i, .samograph-instrument-head i { color: var(--panel-line); font-style: normal; }.samograph-instrument strong { color: var(--panel-ink); font-weight: 500; }.samograph-listening { padding: 3px 10px; color: var(--accent-live); border: 1px solid var(--panel-line); border-radius: 999px; letter-spacing: .04em; }.samograph-instrument-state > span:last-child { font-variant-numeric: tabular-nums; }.samograph-instrument-state > span > b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-live); animation: samograph-refined-pulse 1.6s ease-in-out infinite; }
-.samograph-degraded { padding: 8px 16px; display: flex; gap: 10px; background: var(--panel-strip); border-bottom: 1px solid var(--panel-line); }
-.samograph-instrument-lines { list-style: none; margin: 0; padding: 18px 0 20px; }.samograph-instrument-lines li { display: grid; grid-template-columns: 56px 82px 66px minmax(480px, 1fr); gap: 14px; min-height: 33px; align-items: start; color: var(--panel-ink); font-size: .78rem; line-height: 1.5; }.samograph-line-number { height: 100%; padding-right: 14px; color: var(--panel-gutter); border-right: 1px solid var(--panel-line); text-align: right; font-variant-numeric: tabular-nums; }.samograph-instrument-lines time, .samograph-instrument-lines b { color: var(--panel-muted); font-weight: 400; font-variant-numeric: tabular-nums; }.samograph-partial > span:last-child { color: var(--panel-muted); }.samograph-caret { display: inline-block; width: 8px; height: .95em; vertical-align: -.15em; background: var(--signal); animation: samograph-refined-caret 1s steps(1,end) infinite; }
+.samograph-landing-hero { max-width: none; margin: 0; padding: 104px 56px 128px; display: flex; flex-direction: column; align-items: flex-start; gap: 22px; }
+.samograph-landing-hero > * { margin: 0; }
+.samograph-landing-hero h1 { max-width: 900px; font-size: 2.65rem; line-height: 1.14; font-weight: 700; letter-spacing: -.02em; }
+.samograph-landing-hero > p { color: var(--ink-soft); font-size: .85rem; }
+.samograph-hero-actions { display: flex; align-items: center; gap: 20px; }
+.samograph-hero-secondary { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted) !important; font-size: .75rem; }
+.samograph-instrument { min-width: 780px; color: var(--panel-muted); background: var(--panel-ground); border: 1px solid var(--panel-line); font-size: .7rem; }
+.samograph-instrument-head, .samograph-instrument-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 16px; background: var(--panel-surface); }.samograph-instrument-head { border-bottom: 1px solid var(--panel-line); }.samograph-instrument-head > div, .samograph-instrument-state, .samograph-instrument-foot > div { display: flex; align-items: center; gap: 14px; }.samograph-instrument i, .samograph-instrument-head i { color: var(--panel-line); font-style: normal; }.samograph-instrument strong { color: var(--panel-ink); font-weight: 500; }.samograph-instrument-state > span:last-child { font-variant-numeric: tabular-nums; }.samograph-instrument-state > span > b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-live); animation: samograph-refined-pulse 1.6s ease-in-out infinite; }
+.samograph-instrument-lines { list-style: none; margin: 0; padding: 18px 0 20px; }.samograph-instrument-lines li { display: grid; grid-template-columns: 56px 82px 66px minmax(480px, 1fr); gap: 14px; min-height: 33px; align-items: start; color: var(--panel-ink); font-size: .78rem; line-height: 1.5; }.samograph-line-number { height: 100%; padding-right: 14px; color: var(--panel-gutter); border-right: 1px solid var(--panel-line); text-align: right; font-variant-numeric: tabular-nums; }.samograph-instrument-lines time, .samograph-instrument-lines b { color: var(--panel-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
 .samograph-instrument-foot { border-top: 1px solid var(--panel-line); font-size: .66rem; }.samograph-instrument-foot b { padding: 2px 8px; border: 1px solid var(--panel-line); }.samograph-instrument-foot i { margin: 0 3px; }
-.samograph-rule { height: 1px; background: var(--line); }.samograph-section { display: flex; flex-direction: column; gap: 36px; }.samograph-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }.samograph-section-head h2 { margin: 0; font-size: 1.05rem; letter-spacing: -.02em; }.samograph-section-head > span, .samograph-section > small { color: var(--faint); font-size: .7rem; letter-spacing: .06em; }
-.samograph-differentiators { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 34px; }.samograph-differentiators article { display: flex; flex-direction: column; gap: 12px; }.samograph-differentiators span { color: var(--faint); font-size: .7rem; }.samograph-differentiators i { height: 1px; background: var(--line-strong); }.samograph-differentiators h3, .samograph-differentiators p { margin: 0; }.samograph-differentiators h3 { font-size: .85rem; letter-spacing: -.02em; }.samograph-differentiators p, .samograph-steps p, .samograph-heritage p { color: var(--muted); font-size: .775rem; line-height: 1.68; }
-.samograph-steps { list-style: none; margin: 0; padding: 0; }.samograph-steps li { display: grid; grid-template-columns: 64px 300px minmax(0,1fr); gap: 24px; align-items: baseline; padding: 13px 0; border-top: 1px solid var(--line); }.samograph-steps li:last-child { border-bottom: 1px solid var(--line); }.samograph-steps span { color: var(--faint); font-size: .72rem; }.samograph-steps h3, .samograph-steps p { margin: 0; }.samograph-steps h3 { font-size: .85rem; }
-.samograph-pricing-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }.samograph-tier { display: flex; flex-direction: column; gap: 20px; padding: 24px; border: 1px solid var(--line); }.samograph-tier header { display: flex; justify-content: space-between; gap: 16px; }.samograph-tier h3 { margin: 0; font-size: .9rem; }.samograph-tier header span { color: var(--faint); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; }.samograph-price { font-size: 1.8rem; letter-spacing: -.02em; }.samograph-tier ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: .72rem; line-height: 1.5; }.samograph-tier button { min-height: 44px; margin: 0; border-radius: 6px; color: var(--ink-soft); background: transparent; border-color: var(--line-strong); font-size: .74rem; opacity: 1; }
-.samograph-heritage { max-width: none; margin: 0; padding: 56px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 64px; background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }.samograph-heritage > div { display: flex; flex-direction: column; gap: 20px; }.samograph-label { color: var(--muted); font-size: .7rem; letter-spacing: .09em; }.samograph-heritage h2, .samograph-heritage p { margin: 0; }.samograph-heritage h2 { font-size: 1.35rem; line-height: 1.25; }.samograph-repo { display: flex; gap: 14px; align-items: center; }.samograph-repo a { color: var(--ink-soft) !important; border-bottom: 1px solid var(--line-strong); }.samograph-cli { display: flex; flex-direction: column; gap: 9px; padding: 20px 22px; border: 1px solid var(--line-strong); background: var(--ground); }.samograph-cli code { display: flex; gap: 10px; color: var(--ink-soft); font-size: .755rem; white-space: pre-wrap; }.samograph-cli b { color: var(--accent-live); }.samograph-heritage aside { padding: 18px 22px; border: 1px dashed var(--line-strong); }.samograph-heritage aside span { color: var(--faint); font-size: .65rem; letter-spacing: .08em; }
-.samograph-closing { max-width: none; margin: 0; padding: 32px 56px; display: flex; align-items: center; justify-content: space-between; gap: 32px; border-bottom: 1px solid var(--line); font-size: .88rem; }.samograph-site-footer { padding: 40px 56px 48px; display: flex; flex-direction: column; align-items: center; gap: 18px; color: var(--muted); font-size: .73rem; text-align: center; }.samograph-site-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }.samograph-site-footer nav span { display: flex; gap: 12px; }.samograph-site-footer i, .samograph-site-footer small { color: var(--faint); font-style: normal; }
+.samograph-site-footer { font-family: var(--font-mono); padding: 40px 56px 48px; display: flex; flex-direction: column; align-items: center; gap: 18px; color: var(--muted); font-size: .73rem; text-align: center; border-top: 1px solid var(--line); }.samograph-site-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }.samograph-site-footer nav span { display: flex; gap: 12px; }.samograph-site-footer i, .samograph-site-footer small { color: var(--faint); font-style: normal; }
+.samograph-site-footer a { color: inherit; text-decoration: none; }.samograph-site-footer a:hover { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .samograph-site-footer nav a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; }
-@keyframes samograph-refined-caret { 0%,100% { opacity: 1; } 50% { opacity: 0; } } @keyframes samograph-refined-pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
-@media (max-width: 59.99rem) { .samograph-site-nav { padding: 12px 32px; }.samograph-nav-links { display: none; }.samograph-landing-hero,.samograph-section,.samograph-heritage { padding: 48px 32px; }.samograph-differentiators,.samograph-pricing-grid,.samograph-heritage { grid-template-columns: 1fr; }.samograph-steps li { grid-template-columns: 48px minmax(180px,.65fr) 1fr; }.samograph-instrument-foot { align-items: flex-start; flex-direction: column; } }
-@media (max-width: 40rem) { .samograph-site-nav { padding: 10px 20px; }.samograph-brand > span,.samograph-button--compact { display: none; }.samograph-landing-hero,.samograph-section,.samograph-heritage { padding: 40px 20px; }.samograph-hero-copy h1 { font-size: 2rem; }.samograph-hero-actions,.samograph-section-head,.samograph-closing { align-items: flex-start; flex-direction: column; }.samograph-steps li { grid-template-columns: 36px 1fr; }.samograph-steps p { grid-column: 2; }.samograph-closing { padding: 28px 20px; }.samograph-site-footer { padding: 36px 20px 44px; } }
-@media (prefers-reduced-motion: reduce) { .samograph-caret,.samograph-instrument-state > span > b { animation: none; } }
+@keyframes samograph-refined-pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+@media (max-width: 59.99rem) { .samograph-site-nav { padding: 12px 32px; }.samograph-landing-hero { padding: 72px 32px 96px; } }
+@media (max-width: 40rem) { .samograph-site-nav { padding: 10px 20px; }.samograph-brand > span,.samograph-button--compact { display: none; }.samograph-landing-hero { padding: 52px 20px 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px 20px 44px; } }
+@media (prefers-reduced-motion: reduce) { .samograph-instrument-state > span > b { animation: none; } }
 
 /* Dark by OS preference. The explicit `data-theme` blocks below have higher
    specificity and therefore override this in both directions. Only the base hue
@@ -137,6 +187,7 @@ body:has(.samograph-landing) { padding: 0; }
     --line-strong: #45433d;
     --warn: #e2b45a;
     --crit: #ff7a7a;
+    --success-ink: var(--accent-live);
     /* Google's approved DARK button set (#209) — not our palette to tune. */
     --google-btn-bg: #131314;
     --google-btn-border: #8e918f;
@@ -157,6 +208,7 @@ body:has(.samograph-landing) { padding: 0; }
   --line-strong: #b9b4a6;
   --warn: #8a5a00;
   --crit: #a63a3a;
+  --success-ink: #1d6b47;
   /* Google's approved LIGHT button set (#209). */
   --google-btn-bg: #ffffff;
   --google-btn-border: #747775;
@@ -175,6 +227,7 @@ body:has(.samograph-landing) { padding: 0; }
   --line-strong: #45433d;
   --warn: #e2b45a;
   --crit: #ff7a7a;
+  --success-ink: var(--accent-live);
   /* Google's approved DARK button set (#209). */
   --google-btn-bg: #131314;
   --google-btn-border: #8e918f;
@@ -185,10 +238,17 @@ body:has(.samograph-landing) { padding: 0; }
  * Base elements
  * ========================================================================== */
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  padding: 2rem;
-  line-height: 1.5;
+  padding: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   font-family: var(--font-body);
   background: var(--ground);
   color: var(--ink);
@@ -196,20 +256,39 @@ body {
 
 main,
 section {
-  max-width: 32rem;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
-h1,
-h2,
-h3 {
+h1, h2, h3 {
   font-family: var(--font-display);
   color: var(--ink);
-  line-height: 1.2;
 }
 
 h1 {
-  letter-spacing: -0.02em;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: var(--leading-tight);
+}
+
+h2 {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+:where(.samograph-landing) h1,
+:where(.samograph-landing) h2,
+:where(.samograph-landing) h3 {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 a {
@@ -222,19 +301,22 @@ a:hover {
 
 a:focus-visible,
 button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--green);
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 label {
   display: block;
-  margin-top: 1rem;
   font-weight: 600;
   color: var(--ink);
 }
 
-input {
+input,
+select,
+textarea {
   display: block;
   width: 100%;
   margin-top: 0.25rem;
@@ -246,12 +328,17 @@ input {
   border-radius: 8px;
 }
 
-input:focus-visible {
-  border-color: var(--green);
+.samograph-keyterms {
+  font-family: var(--font-mono);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--ink);
 }
 
 button {
-  margin-top: 1rem;
   padding: 0.5rem 1rem;
   font: inherit;
   font-weight: 600;
@@ -266,8 +353,76 @@ button {
 }
 
 button:hover {
-  background: var(--green-soft);
-  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+  background: var(--hover-surface);
+  border-color: var(--line-strong);
+}
+
+.samograph-page {
+  max-width: var(--width-app);
+  margin: 0 auto;
+  padding: var(--space-8) var(--gutter) var(--space-16);
+}
+
+.samograph-page--form {
+  max-width: var(--width-form);
+}
+
+.samograph-page--prose {
+  max-width: var(--width-prose);
+}
+
+.samograph-app-nav {
+  border-bottom: var(--border) solid var(--line);
+  background: var(--surface);
+}
+
+.samograph-app-nav-inner {
+  max-width: var(--width-app);
+  min-height: 64px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.samograph-app-nav-links,
+.samograph-app-nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.samograph-app-nav-right {
+  margin-left: auto;
+}
+
+.samograph-app-brand {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.samograph-skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ground);
+  background: var(--ink);
+  transform: translateY(-200%);
+}
+
+.samograph-skip-link:focus {
+  color: var(--ground);
+  transform: translateY(0);
+}
+
+@media (max-width: 40rem) {
+  :root { --gutter: var(--space-5); }
+  .samograph-app-nav-inner { flex-wrap: wrap; }
+  .samograph-app-nav-right { width: 100%; margin-left: 0; }
 }
 
 /* Compact segmented theme control; each hit target remains 44px tall. */
@@ -310,9 +465,275 @@ button:hover {
   font-weight: 500;
 }
 
-[role="alert"] {
-  color: var(--crit);
+/* ===== Slice 2 — Controls: buttons, fields, alerts, inline confirm ===== */
+.samograph-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: color 140ms, background-color 140ms, border-color 140ms;
 }
+.samograph-btn--primary { color: var(--ground); background: var(--ink); border-color: var(--ink); }
+.samograph-btn--primary:hover { background: color-mix(in srgb, var(--ink) 88%, var(--surface)); }
+.samograph-btn--secondary { color: var(--muted); background: transparent; border: 1px solid var(--control-border); }
+.samograph-btn--secondary:hover { color: var(--ink); border-color: var(--ink); }
+.samograph-btn--danger { color: var(--crit); background: transparent; border: 1px solid var(--crit); }
+.samograph-btn--danger:hover { color: white; background: var(--crit); border-color: var(--crit); }
+.samograph-btn--danger.samograph-btn--solid { color: white; background: var(--crit); border-color: var(--crit); }
+.samograph-btn--danger.samograph-btn--solid:hover { background: color-mix(in srgb, var(--crit) 88%, black); border-color: color-mix(in srgb, var(--crit) 88%, black); }
+.samograph-btn--ghost { border: 0; background: transparent; }
+.samograph-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.samograph-btn--primary[disabled]:hover { color: var(--ground); background: var(--ink); border-color: var(--ink); }
+.samograph-btn--secondary[disabled]:hover { color: var(--muted); background: transparent; border-color: var(--control-border); }
+.samograph-btn--danger[disabled]:hover { color: var(--crit); background: transparent; border-color: var(--crit); }
+.samograph-btn[aria-busy="true"] { cursor: progress; }
+.samograph-field { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
+.samograph-field > label, .samograph-field > input, .samograph-field > select, .samograph-field > textarea { margin-top: 0; }
+.samograph-field-hint { margin: 0; color: var(--muted); font-size: var(--text-xs); }
+/* Select — a native <select> with `appearance: none` and our own affordance:
+   a full-height bordered end-cap (::before) with a masked chevron (::after)
+   painted in --muted, so it is correct in both themes. Both pseudo-elements are
+   pointer-events: none — the whole control stays one hit target. The mask must
+   stay on its own element: masking the cap would erase its hairline and fill. */
+.samograph-select { position: relative; display: block; width: 100%; max-width: var(--field-max); }
+.samograph-select > select {
+  appearance: none; -webkit-appearance: none;
+  display: block; width: 100%; height: var(--control-h); margin: 0;
+  padding: 0 calc(var(--control-h) + var(--space-2)) 0 var(--space-3);
+  font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--control-border); border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.samograph-select::before {
+  content: ""; position: absolute; inset-block: 1px; inset-inline-end: 1px;
+  width: calc(var(--control-h) - 2px); pointer-events: none;
+  border-inline-start: 1px solid var(--line);
+  border-start-end-radius: calc(var(--radius-control) - 1px);
+  border-end-end-radius: calc(var(--radius-control) - 1px);
+  background: color-mix(in srgb, var(--ink) 3%, var(--surface));
+}
+.samograph-select::after {
+  content: ""; position: absolute; pointer-events: none;
+  top: 50%; margin-top: -3px; inset-inline-end: calc((var(--control-h) - 10px) / 2);
+  width: 10px; height: 6px; background: var(--muted);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-size: 10px 6px; mask-size: 10px 6px;
+  -webkit-mask-position: center; mask-position: center;
+}
+.samograph-select:hover > select { border-color: var(--ink); }
+.samograph-select:hover::before { background: var(--hover-surface); }
+.samograph-select:hover::after { background: var(--ink); }
+/* `border-color` is restated here because `.samograph-select > select` above
+   sets `border` and outranks the shared `select:focus-visible` rule on source
+   order (both are 0,1,1) — without it a focused select keeps its resting
+   border while every input darkens to --ink. */
+.samograph-select > select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-color: var(--ink); }
+.samograph-select > select:disabled { color: var(--muted); background: var(--field-bg-disabled); cursor: not-allowed; }
+.samograph-select:has(> select:disabled)::before { background: var(--field-bg-disabled); }
+.samograph-select:has(> select:disabled)::after { background: var(--faint); }
+.samograph-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-5); }
+input, select, textarea { background: var(--surface); border-color: var(--control-border); }
+textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
+.samograph-alert { border: 1px solid currentColor; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
+.samograph-alert--error { color: var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
+.samograph-alert--warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.samograph-alert--success { color: var(--success-ink); background: color-mix(in srgb, var(--success-ink) 8%, var(--surface)); }
+.samograph-alert--info { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
+.samograph-toggle { display: flex; align-items: flex-start; gap: var(--space-3); margin-block: var(--space-4); cursor: pointer; }
+.samograph-toggle input { margin-top: 0.2rem; }
+.samograph-toggle span { display: grid; gap: var(--space-1); }
+.samograph-toggle .samograph-field-hint { display: block; }
+.samograph-chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0.15rem 0.45rem; font-size: var(--text-xs); font-weight: 700; }
+.samograph-danger-zone { border-top: var(--border-strong) solid var(--crit); padding-top: var(--space-5); }
+.samograph-danger-zone-title { color: var(--crit); }
+.samograph-danger-confirm { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
+.samograph-danger-delete { margin-top: var(--space-5); }
+.samograph-danger-error, .samograph-delete-error { color: var(--crit); }
+.samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
+/* ===== end Slice 2 ===== */
+
+/* ===== Slice 4 — Dashboard ===== */
+.samograph-dash-hero {
+  margin-block: var(--space-5);
+}
+
+.samograph-dash-hero-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.samograph-dash-hero-form label {
+  grid-column: 1 / -1;
+}
+
+.samograph-field-input--mono {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+.samograph-call-list,
+.samograph-meeting-list {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.samograph-call-item,
+.samograph-meeting-item {
+  border-top: 1px solid var(--line);
+}
+
+.samograph-call-item:last-child,
+.samograph-meeting-item:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.samograph-call-row,
+.samograph-meeting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-2);
+}
+
+.samograph-call-row {
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 120ms ease;
+}
+
+.samograph-call-row:hover,
+.samograph-call-row:focus-visible,
+.samograph-meeting-item:hover {
+  background: var(--hover-surface);
+}
+
+.samograph-call-row:focus-visible {
+  outline: var(--border-strong) solid var(--ink);
+  outline-offset: -2px;
+}
+
+.samograph-call-body,
+.samograph-meeting-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.samograph-call-url {
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.samograph-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  color: var(--state-pending);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+}
+
+.samograph-status-chip[data-kind="joining"] { color: var(--state-joining); }
+/* The mint `--state-live` is instrument-only and fails AA as text on the page
+   ground; the live DOT keeps the mint, the label takes the readable green. */
+.samograph-status-chip[data-kind="live"] { color: var(--success-ink); }
+.samograph-status-chip[data-kind="ended"] { color: var(--state-ended); }
+.samograph-status-chip[data-kind="error"] { color: var(--state-error); }
+
+.samograph-call-error,
+.samograph-call-hint,
+.samograph-meeting-meta {
+  font-size: var(--text-sm);
+}
+
+.samograph-call-error { color: var(--crit); }
+.samograph-call-hint,
+.samograph-meeting-meta { color: var(--muted); }
+
+.samograph-call-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.samograph-call-cta-live { color: var(--state-live); }
+.samograph-call-cta-retry { color: var(--state-error); }
+.samograph-call-cta-open { color: var(--muted); }
+.samograph-call-cta-text { white-space: nowrap; }
+.samograph-call-cta-arrow { transition: transform 120ms ease; }
+.samograph-call-row:hover .samograph-call-cta-arrow,
+.samograph-call-row:focus-visible .samograph-call-cta-arrow { transform: translateX(2px); }
+
+.samograph-call-live-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--state-live);
+  animation: samograph-live-pulse 1.6s ease-out infinite;
+}
+
+.samograph-empty-state {
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.samograph-empty-title {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.samograph-empty-hint {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.samograph-upcoming-meetings { margin-block: var(--space-6); }
+.samograph-meeting-title {
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.samograph-meeting-item[data-declined="true"] { opacity: 0.65; }
+.samograph-btn--sm { height: 28px; padding-inline: var(--space-3); font-size: var(--text-xs); }
+
+@media (max-width: 40rem) {
+  .samograph-dash-hero-form { grid-template-columns: 1fr; }
+  .samograph-dash-hero-form .samograph-btn { width: 100%; }
+  .samograph-call-row,
+  .samograph-meeting-item { grid-template-columns: minmax(0, 1fr); }
+  .samograph-call-cta,
+  .samograph-meeting-item > .samograph-btn { justify-self: start; }
+}
+/* ===== end Slice 4 ===== */
 
 /* =============================================================================
  * Sign-in page — "Continue with Google" + the divider above the magic-link form
@@ -403,331 +824,113 @@ button:hover {
   }
 }
 
-/* =============================================================================
- * Landing — the "Greenroom" hero (SPEC §3 Story 1, issue #182)
- *
- * A two-column hero: honest value prop + the four-step v1 flow + the single
- * primary CTA on the left, an illustrative product-preview panel on the right.
- * Wider than the default `main` (32rem) so the two columns breathe; collapses
- * to one column on narrow viewports. All color via Greenroom tokens.
- * ========================================================================== */
-
-.samograph-landing {
-  max-width: none;
+/* ===== Slice 5 — Auth + Settings ===== */
+.samograph-auth {
+  display: flex;
+  flex-direction: column;
+  max-width: var(--width-form);
+  margin-inline: auto;
+  gap: var(--space-4);
 }
 
-.samograph-hero {
+.samograph-auth-sent {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 2rem;
-  align-items: center;
-  margin-top: 0.5rem;
+  gap: var(--space-3);
 }
 
-@media (min-width: 60rem) {
-  .samograph-hero {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    gap: 3rem;
-  }
-}
-
-/* --- Left column: copy, steps, CTA --- */
-
-.samograph-wordmark {
-  margin: 0 0 0.75rem;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
-  color: var(--green-deep);
-}
-
-.samograph-hero-headline {
-  margin: 0 0 1rem;
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 3rem);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.samograph-hero-subhead {
-  margin: 0 0 1.5rem;
-  max-width: 44ch;
-  font-size: 1.05rem;
-  color: var(--muted);
-}
-
-/* Four-step flow as a styled sequence: green numbered pills instead of raw
-   list markers. Ordered (`<ol>`) so the sequence is meaningful to AT. */
-.samograph-hero-steps {
-  list-style: none;
-  counter-reset: samograph-hero-step;
-  margin: 0 0 1.75rem;
-  padding: 0;
+.samograph-auth-sent-message {
   display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+  align-items: flex-start;
+  gap: var(--space-3);
 }
 
-.samograph-hero-steps > li {
-  counter-increment: samograph-hero-step;
-  position: relative;
-  padding-left: 2.4rem;
-  line-height: 1.5;
-  color: var(--ink);
-}
-
-.samograph-hero-steps > li::before {
-  content: counter(samograph-hero-step);
-  position: absolute;
-  left: 0;
-  top: 0.05em;
-  width: 1.6rem;
-  height: 1.6rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--green-deep);
-  background: var(--green-soft);
-  border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));
-  border-radius: 999px;
-}
-
-/* The single primary call-to-action into the magic-link sign-in: one filled,
-   green control (not a plain link). Focus/hover states are visible. */
-.samograph-hero-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.7rem 1.5rem;
-  font-weight: 700;
-  font-size: 1.02rem;
-  color: var(--on-green);
-  background: var(--green-deep);
-  border: 1px solid transparent;
-  border-radius: 12px;
-  text-decoration: none;
-  transition:
-    background-color 120ms ease,
-    transform 120ms ease;
-}
-
-.samograph-hero-cta:hover {
-  color: var(--on-green);
-  background: var(--green);
-  transform: translateY(-1px);
-}
-
-.samograph-hero-cta:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 2px;
-}
-
-/* --- Right column: illustrative product-preview panel ---
-   Echoes the live-transcript look (mono lines, live dot, presence pill,
-   streaming partial caret) with clearly-labeled SAMPLE data. */
-.samograph-hero-preview {
-  margin: 0;
-  padding: 1rem 1.1rem 1.25rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--ink) 10%, transparent);
-}
-
-.samograph-hero-preview-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding-bottom: 0.75rem;
-  margin-bottom: 0.75rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.samograph-hero-preview-bar .samograph-presence {
-  margin: 0;
-}
-
-.samograph-hero-preview-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--green-deep);
-}
-
-.samograph-hero-live-dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: var(--green);
-  animation: samograph-live-pulse 1.6s ease-out infinite;
-}
-
-.samograph-hero-transcript {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.samograph-hero-transcript > li {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.5;
-  color: var(--ink);
-  word-break: break-word;
-}
-
-/* Streaming partial line: muted text + the rationed pink caret at the live
-   edge — the same "bot speaks / live edge" pink used in the real transcript. */
-.samograph-hero-line-partial {
-  color: var(--muted);
-}
-
-.samograph-hero-line-partial::after {
-  content: "";
-  display: inline-block;
-  width: 0.5ch;
-  height: 1.05em;
-  margin-left: 0.15em;
-  vertical-align: text-bottom;
-  background: var(--pink);
-  border-radius: 1px;
-  animation: samograph-caret 1s steps(1, end) infinite;
-}
-
-.samograph-hero-preview-note {
-  margin-top: 0.85rem;
-  font-size: 0.78rem;
-  font-style: italic;
-  color: var(--muted);
-}
-
-/* =============================================================================
- * Dashboard — call list (SPEC §3 Story 1). Each row is a whole-row link into
- * its per-call transcript page; it must *read* as tappable.
- * ========================================================================== */
-
-.samograph-call-list {
-  list-style: none;
-  padding: 0;
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.samograph-call-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  text-decoration: none;
-  color: var(--ink);
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
-}
-
-.samograph-call-row:hover,
-.samograph-call-row:focus-visible {
-  background: var(--green-soft);
-  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
-}
-
-.samograph-call-row:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 2px;
-}
-
-.samograph-call-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.samograph-call-url {
-  font-weight: 600;
-  word-break: break-all;
-}
-
-.samograph-call-status {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.samograph-call-hint {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.samograph-call-error {
-  font-size: 0.85rem;
-  color: var(--crit);
-}
-
-/* Explicit call-to-action: "View transcript →", "Try again →", or the live cue.
-   The arrow slides on hover to reinforce that the whole row is a link. */
-.samograph-call-cta {
+.samograph-auth-sent-message > svg {
   flex: none;
-  display: inline-flex;
+  width: var(--space-6);
+  fill: var(--muted);
+}
+
+.samograph-auth-email {
+  font-family: var(--font-mono);
+}
+
+.samograph-settings-section {
+  max-width: var(--width-prose);
+  padding-block: var(--space-5);
+  border-top: var(--border-strong) solid var(--line-strong);
+}
+
+.samograph-savebar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.9rem;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  background: var(--surface);
+  border-top: var(--border-strong) solid var(--line-strong);
+}
+
+.samograph-savebar-status {
+  color: var(--muted);
+}
+
+.samograph-signin {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.samograph-signin-methods {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.samograph-signin-method {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-4);
+}
+
+.samograph-signin-method-name {
   font-weight: 600;
-  white-space: nowrap;
-  color: color-mix(in srgb, var(--ink) 72%, transparent);
 }
 
-.samograph-call-row:hover .samograph-call-cta,
-.samograph-call-row:focus-visible .samograph-call-cta {
-  color: var(--ink);
+.samograph-signin-method-state {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
-.samograph-call-cta-arrow {
-  transition: transform 120ms ease;
+.samograph-skeleton {
+  display: grid;
+  gap: var(--space-3);
+  width: 100%;
 }
 
-.samograph-call-row:hover .samograph-call-cta-arrow,
-.samograph-call-row:focus-visible .samograph-call-cta-arrow {
-  transform: translateX(2px);
+.samograph-skeleton > span[aria-hidden="true"] {
+  height: var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--muted) 15%, transparent);
+  animation: samograph-skeleton-shimmer 1.4s ease-in-out infinite alternate;
 }
 
-.samograph-call-cta-retry {
-  color: var(--crit);
+.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }
+.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }
+.samograph-skeleton--form { max-width: var(--width-form); }
+.samograph-skeleton--page { max-width: var(--width-prose); }
+
+@keyframes samograph-skeleton-shimmer {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
 }
 
-/* Live cue: a pulsing "●" + "Live — watch transcript", green so it's clearly an
-   active invitation (distinct from the red error/retry treatment). */
-.samograph-call-cta-live {
-  color: var(--green-deep);
+@media (prefers-reduced-motion: reduce) {
+  .samograph-skeleton > span[aria-hidden="true"] { animation: none; }
 }
-
-.samograph-call-live-dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: var(--green);
-  animation: samograph-live-pulse 1.6s ease-out infinite;
-}
-
+/* ===== end Slice 5 ===== */
 @keyframes samograph-live-pulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 60%, transparent);
@@ -738,25 +941,6 @@ button:hover {
   100% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 0%, transparent);
   }
-}
-
-/* Empty state */
-.samograph-empty-state {
-  margin-top: 1.5rem;
-  padding: 1.25rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
-.samograph-empty-title {
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.samograph-empty-hint {
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 /* =============================================================================
@@ -991,6 +1175,7 @@ button:hover {
 
 .samograph-account-email {
   color: var(--muted);
+  font-family: var(--font-mono);
   font-size: 0.9rem;
   /* An address is data, not prose — never let it be re-flowed or re-wrapped
      mid-token into something that reads as a different address. */
@@ -1006,72 +1191,8 @@ button:hover {
   margin-bottom: 1rem;
 }
 
-.samograph-calendar-card,
-.samograph-upcoming-meetings {
+.samograph-calendar-card {
   margin-block: 1.5rem;
-}
-
-.samograph-meeting-list {
-  display: grid;
-  gap: 0.65rem;
-  padding: 0;
-  list-style: none;
-}
-
-.samograph-meeting-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.25rem 1rem;
-  align-items: center;
-  padding: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-
-.samograph-meeting-title {
-  font-weight: 650;
-}
-
-.samograph-meeting-item > span:not(.samograph-meeting-title) {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.samograph-meeting-item[data-declined="true"] {
-  opacity: 0.65;
-}
-
-/* =============================================================================
- * Presence pills — forward-looking hook for a per-participant / bot presence
- * indicator. Not yet mounted in apps/web (the bot-camera presence page is
- * `src/presence.ts`, out of scope for #178); tokenized here so it lands styled.
- * ========================================================================== */
-
-.samograph-presence {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.5rem 0;
-}
-
-.samograph-presence-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--green-deep);
-  background: var(--green-soft);
-  border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));
-  border-radius: 999px;
-}
-
-/* Pink is rationed to the speaking state, matching the transcript caret. */
-.samograph-presence-pill[data-state="speaking"] {
-  color: var(--pink);
-  background: var(--pink-soft);
-  border-color: color-mix(in srgb, var(--pink) 35%, var(--line));
 }
 
 /* =============================================================================
@@ -1080,15 +1201,390 @@ button:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .samograph-call-row,
-  .samograph-call-cta-arrow,
-  .samograph-hero-cta {
+  .samograph-call-cta-arrow {
     transition: none;
   }
   .samograph-call-live-dot,
   .samograph-status[data-status-kind="live"] .samograph-status-label::before,
-  .samograph-transcript > li.samograph-line-partial::after,
-  .samograph-hero-live-dot,
-  .samograph-hero-line-partial::after {
+  .samograph-transcript > li.samograph-line-partial::after {
+    animation: none;
+  }
+}
+
+/* ===== Slice 6 — Modal + shortcuts ===== */
+.samograph-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+.samograph-modal-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--panel-ground) 60%, transparent); }
+.samograph-modal-panel {
+  position: relative; z-index: 1; width: min(100%, 480px);
+  max-height: calc(100vh - (2 * var(--space-4))); overflow: auto;
+  padding: var(--space-5); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--control-border); border-radius: var(--radius-md);
+}
+.samograph-share-modal, .samograph-share-active { display: grid; gap: var(--space-4); }
+.samograph-modal-header, .samograph-share-header, .samograph-share-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.samograph-modal-header h2, .samograph-share-header h2, .samograph-share-blurb, .samograph-share-rotated { margin: 0; }
+.samograph-share-blurb, .samograph-share-rotated { color: var(--muted); font-size: var(--text-sm); }
+.samograph-share-url { overflow-wrap: anywhere; font-family: var(--font-mono); }
+.samograph-shortcut-list { display: grid; gap: var(--space-2); margin: var(--space-4) 0 0; }
+.samograph-shortcut-list > div { display: grid; grid-template-columns: 7rem 1fr; gap: var(--space-2); align-items: center; }
+.samograph-shortcut-list dt, .samograph-shortcut-list dd { margin: 0; }
+.samograph-shortcut-list kbd {
+  padding: var(--space-1) var(--space-2); font-family: var(--font-mono); font-size: var(--text-xs);
+  background: var(--ground); border: 1px solid var(--control-border); border-radius: var(--radius-md);
+}
+/* ===== end Slice 6 ===== */
+
+/* ===== Slice 3 — Transcript instrument (calls/[id], c/[token]) ===== */
+.samograph-call-view {
+  width: 100%;
+  max-width: var(--width-app);
+  margin-inline: auto;
+  font-family: var(--font-body);
+}
+
+.samograph-call-view-heading {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.samograph-call-view-heading h1,
+.samograph-share-page-header h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-body);
+  font-size: var(--text-xl);
+  line-height: var(--leading-tight);
+}
+
+.samograph-call-back {
+  width: fit-content;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.samograph-percall.samograph-instrument {
+  --speaker-0: #8ecdf3;
+  --speaker-1: #f0ae7b;
+  --speaker-2: #b9d982;
+  --speaker-3: #d4a5ef;
+  --speaker-4: #f2a5bd;
+  --speaker-5: #82d7ce;
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--panel-muted);
+  background: var(--panel-ground);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+}
+
+.samograph-percall .samograph-status.samograph-instrument-head {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-6);
+  align-items: center;
+  margin: 0;
+  padding: 10px 16px;
+  color: var(--panel-muted);
+  background: var(--panel-surface);
+  border: 0;
+  border-bottom: 1px solid var(--panel-line);
+  border-radius: 0;
+}
+
+.samograph-instrument-meta,
+.samograph-percall .samograph-instrument-state,
+.samograph-share-state,
+.samograph-owner-controls,
+.samograph-transcript-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.samograph-instrument-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.samograph-percall .samograph-status-label {
+  padding: 3px 10px;
+  color: var(--accent-live);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+}
+
+.samograph-percall .samograph-status[data-status-kind="error"] .samograph-status-label {
+  color: color-mix(in srgb, var(--crit) 78%, white);
+}
+
+.samograph-percall .samograph-status-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: var(--text-xs);
+}
+
+.samograph-percall .samograph-status-code {
+  color: color-mix(in srgb, var(--crit) 78%, white);
+}
+
+.samograph-status-elapsed,
+.samograph-line-time,
+.samograph-line-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.samograph-percall .samograph-degraded-banner {
+  margin: 0;
+  padding: 8px 16px;
+  color: var(--panel-ink);
+  background: var(--panel-strip);
+  border: 0;
+  border-bottom: 1px solid var(--panel-line);
+  border-radius: 0;
+}
+
+.samograph-percall .samograph-transcript {
+  max-height: min(62vh, 680px);
+  min-height: 260px;
+  margin: 0;
+  padding: 18px 0 20px;
+  overflow-y: auto;
+  background: none;
+  scrollbar-color: var(--panel-gutter) var(--panel-ground);
+}
+
+.samograph-instrument-lines > li.samograph-transcript-row {
+  display: grid;
+  grid-template-columns: 56px 19ch fit-content(22ch) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-height: 34px;
+  padding: 5px 16px 5px 0;
+  color: var(--panel-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.samograph-transcript-row > * {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.samograph-percall .samograph-transcript-row::before,
+.samograph-percall .samograph-transcript-row::after {
+  content: none;
+}
+
+.samograph-percall .samograph-line-number {
+  align-self: stretch;
+  padding-right: 14px;
+  color: var(--panel-gutter);
+  border-right: 1px solid var(--panel-line);
+  text-align: right;
+}
+
+.samograph-line-time {
+  color: var(--panel-muted);
+  white-space: nowrap;
+}
+
+.samograph-line-speaker {
+  display: inline-flex;
+  min-width: 8ch;
+  overflow: hidden;
+  color: var(--speaker-0);
+  font-weight: 500;
+}
+
+.samograph-line-speaker-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.samograph-line-speaker-marker {
+  flex: 0 0 auto;
+  white-space: pre;
+}
+
+.samograph-line-speaker[data-speaker-index="1"] { color: var(--speaker-1); }
+.samograph-line-speaker[data-speaker-index="2"] { color: var(--speaker-2); }
+.samograph-line-speaker[data-speaker-index="3"] { color: var(--speaker-3); }
+.samograph-line-speaker[data-speaker-index="4"] { color: var(--speaker-4); }
+.samograph-line-speaker[data-speaker-index="5"] { color: var(--speaker-5); }
+
+.samograph-line-utterance {
+  min-width: 0;
+  color: var(--panel-ink);
+}
+
+.samograph-line-partial .samograph-line-utterance {
+  color: var(--panel-muted);
+}
+
+.samograph-line-partial .samograph-line-utterance::after {
+  content: "";
+  display: inline-block;
+  width: 0.5ch;
+  height: 1.05em;
+  margin-left: 0.15em;
+  vertical-align: text-bottom;
+  background: var(--signal);
+  animation: samograph-caret 1s steps(1, end) infinite;
+}
+
+.samograph-transcript-empty {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  padding: var(--space-8);
+  color: var(--panel-muted);
+  text-align: center;
+  line-height: var(--leading-prose);
+}
+
+.samograph-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.samograph-percall .samograph-stream-error {
+  min-height: 260px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--crit) 55%, white);
+  background: var(--panel-ground);
+  border: 0;
+  border-radius: 0;
+}
+
+.samograph-percall .samograph-controls.samograph-instrument-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 10px 16px;
+  background: var(--panel-surface);
+  border-top: 1px solid var(--panel-line);
+  font-family: var(--font-body);
+}
+
+.samograph-percall .samograph-transcript-actions {
+  margin: 0;
+}
+
+.samograph-percall .samograph-download-transcript,
+.samograph-percall .samograph-download-transcript-speech,
+.samograph-percall .samograph-toggle-chat {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.samograph-percall .samograph-download-transcript {
+  color: var(--panel-ground);
+  background: var(--panel-ink);
+  border: 1px solid var(--panel-ink);
+}
+
+.samograph-percall .samograph-download-transcript-speech,
+.samograph-percall .samograph-toggle-chat {
+  color: var(--panel-ink);
+  background: transparent;
+  border: 1px solid var(--panel-gutter);
+}
+
+.samograph-percall .samograph-toggle-chat[aria-pressed="true"] {
+  color: var(--panel-ground);
+  background: var(--panel-muted);
+}
+
+.samograph-share-state {
+  justify-content: flex-end;
+}
+
+.samograph-percall .samograph-owner-controls {
+  margin: 0;
+}
+
+.samograph-jump-live {
+  position: absolute;
+  z-index: 3;
+  right: 16px;
+  bottom: 78px;
+  min-height: 44px;
+  color: var(--panel-ground);
+  background: var(--accent-live);
+  border-color: var(--accent-live);
+  border-radius: var(--radius-pill);
+}
+
+@media (max-width: 48rem) {
+  .samograph-percall .samograph-status.samograph-instrument-head,
+  .samograph-percall .samograph-controls.samograph-instrument-foot {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .samograph-share-state {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 40rem) {
+  .samograph-instrument-lines > li.samograph-transcript-row {
+    grid-template-columns: 42px 10ch fit-content(12ch) minmax(0, 1fr);
+    gap: 8px;
+    font-size: 0.72rem;
+  }
+
+  .samograph-line-time {
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samograph-line-partial .samograph-line-utterance::after {
     animation: none;
   }
 }

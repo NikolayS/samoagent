@@ -13,17 +13,22 @@
 // globals (document, window, fetch, …) from leaking into the CLI/Bun test files
 // that run later in the same process.
 import { afterAll, afterEach, beforeAll } from "bun:test";
-import { cleanup } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 export function installDom(): void {
   beforeAll(() => {
-    GlobalRegistrator.register();
+    GlobalRegistrator.register({ url: "http://localhost/" });
   });
   afterEach(() => {
     cleanup();
   });
   afterAll(async () => {
+    await act(async () => {
+      cleanup();
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     await GlobalRegistrator.unregister();
   });
 }

@@ -12,6 +12,7 @@ export interface CalendarConnection {
   id: string; userId: string; tenantId: string;
   encryptedRefreshToken: Buffer; refreshTokenIv: Buffer; refreshTokenTag: Buffer;
   encryptionKeyVersion: number; grantedScopes: string[]; status: "connected" | "broken";
+  autoJoin: boolean;
   connectedAt: Date; lastSyncAt: Date | null; lastSyncErrorAt: Date | null;
 }
 export interface CalendarConnectionStore {
@@ -19,10 +20,12 @@ export interface CalendarConnectionStore {
   get(userId: string, tenantId: string): Promise<CalendarConnection | null>;
   save(row: CalendarConnection): Promise<void>;
   delete(userId: string, tenantId: string): Promise<void>;
+  updateAutoJoin?(userId: string, tenantId: string, autoJoin: boolean): Promise<CalendarConnection | null>;
+  excludeMeeting?(userId: string, tenantId: string, eventId: string, excluded: boolean): Promise<boolean>;
   meetings?(userId: string, tenantId: string, limit: number, now: Date): Promise<CalendarMeetingsSnapshot>;
 }
-export interface CalendarMeeting { id: string; title: string; startsAt: Date; endsAt: Date; allDay: boolean; meetingUrl: string | null; meetingProvider: "google_meet" | "zoom" | null; organizerEmail: string | null; attendeeResponse: "needsAction" | "declined" | "tentative" | "accepted" | null; }
-export interface CalendarMeetingsSnapshot { connection: Pick<CalendarConnection, "status" | "lastSyncAt"> | null; meetings: CalendarMeeting[]; }
+export interface CalendarMeeting { id: string; title: string; startsAt: Date; endsAt: Date; allDay: boolean; meetingUrl: string | null; meetingProvider: "google_meet" | "zoom" | null; organizerEmail: string | null; attendeeResponse: "needsAction" | "declined" | "tentative" | "accepted" | null; autoJoinExcluded?: boolean; }
+export interface CalendarMeetingsSnapshot { connection: (Pick<CalendarConnection, "status" | "lastSyncAt"> & Partial<Pick<CalendarConnection, "autoJoin">>) | null; meetings: CalendarMeeting[]; }
 export interface CalendarServiceDeps {
   provider?: GoogleCalendarOAuthPort; store: CalendarConnectionStore; rateLimiter: RateLimiter;
   sessionSecret: string; clock: () => number; randomValue?: () => string;
@@ -67,15 +70,32 @@ export class CalendarService {
       const existing = await this.#deps.store.get(input.userId, input.tenantId);
       const rowBase = { id: existing?.id ?? randomUUID(), userId: input.userId, tenantId: input.tenantId };
       const encrypted = encryptSecret(exchanged.refreshToken, this.#deps.activeKey, this.#deps.activeKeyVersion, aad(rowBase));
-      const row: CalendarConnection = { ...rowBase, encryptedRefreshToken: encrypted.ciphertext, refreshTokenIv: encrypted.iv, refreshTokenTag: encrypted.tag, encryptionKeyVersion: encrypted.keyVersion, grantedScopes: exchanged.scopes, status: "connected", connectedAt: new Date(this.#deps.clock()), lastSyncAt: null, lastSyncErrorAt: null };
+      const row: CalendarConnection = { ...rowBase, encryptedRefreshToken: encrypted.ciphertext, refreshTokenIv: encrypted.iv, refreshTokenTag: encrypted.tag, encryptionKeyVersion: encrypted.keyVersion, grantedScopes: exchanged.scopes, status: "connected", autoJoin: existing?.autoJoin ?? false, connectedAt: new Date(this.#deps.clock()), lastSyncAt: null, lastSyncErrorAt: null };
       await this.#deps.store.save(row);
       // Slice 2 seam: Slices 3/4 inject the shared immediate synchronization service.
       await this.#deps.immediateSync?.(row.id).catch(() => {});
       return { ok: true as const };
-    } catch { return { ok: false as const, code: "SAMO-CALENDAR-500" as const }; }
+    } catch (error) {
+      let sqlstate: string | null = null;
+      try {
+        if (error && typeof error === "object") {
+          for (const key of ["code", "errno"]) {
+            const candidate = Reflect.get(error, key);
+            if (typeof candidate === "string" && /^[0-9A-Z]{5}$/.test(candidate)) {
+              sqlstate = candidate;
+              break;
+            }
+          }
+        }
+      } catch {}
+      console.error('SAMO-CALENDAR-500 calendar callback failed', { sqlstate });
+      return { ok: false as const, code: "SAMO-CALENDAR-500" as const };
+    }
   }
   async status(userId: string, tenantId: string) { return this.#deps.store.get(userId, tenantId); }
   async meetings(userId: string, tenantId: string, limit: number) { return this.#deps.store.meetings?.(userId, tenantId, limit, new Date(this.#deps.clock())) ?? { connection: null, meetings: [] }; }
+  async updateAutoJoin(userId: string, tenantId: string, autoJoin: boolean) { return this.#deps.store.updateAutoJoin?.(userId, tenantId, autoJoin) ?? null; }
+  async excludeMeeting(userId: string, tenantId: string, eventId: string, excluded: boolean) { return this.#deps.store.excludeMeeting?.(userId, tenantId, eventId, excluded) ?? false; }
   async disconnect(userId: string, tenantId: string): Promise<"ok" | "failed" | "not_configured" | "not_connected"> {
     const row = await this.#deps.store.get(userId, tenantId);
     if (!row) return "not_connected";

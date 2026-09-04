@@ -22,6 +22,19 @@ describe("MagicLinkRequestForm", () => {
     expect(input.tagName).toBe("INPUT");
     expect(input.type).toBe("email");
     expect(getByRole("button", { name: "Send magic link" })).toBeDefined();
+    expect(getByRole("button", { name: "Send magic link" }).className).toContain("samograph-btn");
+    expect(getByRole("button", { name: "Send magic link" }).className).toContain("samograph-btn--primary");
+  });
+
+  it("marks Send magic link busy and disabled while sending", () => {
+    const client = createFakeAppApiClient();
+    client.requestMagicLink = () => new Promise(() => {});
+    const { container, getByLabelText, getByRole } = render(<MagicLinkRequestForm client={client} />);
+    fireEvent.change(getByLabelText("Email"), { target: { value: "dev@samograph.dev" } });
+    submit(container);
+    const button = getByRole("button", { name: "Send magic link" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
   });
 
   it("rejects an empty submit without calling the client", () => {
@@ -32,11 +45,14 @@ describe("MagicLinkRequestForm", () => {
     submit(container);
     expect(client.requests).toEqual([]);
     expect(getByText("Enter your email address.")).toBeDefined();
+    const alert = getByText("Enter your email address.");
+    expect(alert.getAttribute("role")).toBe("alert");
+    expect(alert.className).toContain("samograph-alert samograph-alert--error");
   });
 
   it("POSTs the email to /auth/magic-link and shows the check-your-email state", async () => {
     const client = createFakeAppApiClient();
-    const { container, getByLabelText, findByText } = render(
+    const { container, getByLabelText, findByText, findByRole, getByRole } = render(
       <MagicLinkRequestForm client={client} />,
     );
     fireEvent.change(getByLabelText("Email"), {
@@ -55,14 +71,40 @@ describe("MagicLinkRequestForm", () => {
         body: { email: "dev@samograph.dev" },
       },
     ]);
-    expect(
-      await findByText("We sent a sign-in link to dev@samograph.dev."),
-    ).toBeDefined();
+    const info = await findByRole("status");
+    expect(info.textContent).toBe("We sent a sign-in link to dev@samograph.dev.");
+    expect(info.getAttribute("role")).toBe("status");
+    expect(info.className).toContain("samograph-alert--info");
+    expect(getByRole("button", { name: "Resend link" }).className).toContain("samograph-btn--secondary");
+    expect(getByRole("button", { name: "Use a different email" }).className).toContain("samograph-btn--secondary");
+  });
+
+  it("groups the exact sent state, mono email, and secondary actions", async () => {
+    const client = createFakeAppApiClient();
+    const { container, getByLabelText, findByRole, getByRole } = render(
+      <MagicLinkRequestForm client={client} />,
+    );
+    fireEvent.change(getByLabelText("Email"), { target: { value: "user@example.com" } });
+    submit(container);
+
+    const status = await findByRole("status");
+    expect(status.textContent).toBe("We sent a sign-in link to user@example.com.");
+    const email = status.querySelector("span.samograph-auth-email");
+    expect(email?.textContent).toBe("user@example.com");
+    expect(status.closest(".samograph-auth-sent")).not.toBeNull();
+    const actions = container.querySelector(".samograph-actions");
+    expect(actions).not.toBeNull();
+    const resend = getByRole("button", { name: "Resend link" });
+    const alternate = getByRole("button", { name: "Use a different email" });
+    expect(resend.parentElement).toBe(actions);
+    expect(alternate.parentElement).toBe(actions);
+    expect(resend.className).toBe("samograph-btn samograph-btn--secondary");
+    expect(alternate.className).toBe("samograph-btn samograph-btn--secondary");
   });
 
   it("offers a resend affordance that re-POSTs the same email (SPEC §10 #7)", async () => {
     const client = createFakeAppApiClient();
-    const { container, getByLabelText, findByText, getByText } = render(
+    const { container, getByLabelText, findByText, findByRole, getByText } = render(
       <MagicLinkRequestForm client={client} />,
     );
     fireEvent.change(getByLabelText("Email"), {
@@ -71,7 +113,7 @@ describe("MagicLinkRequestForm", () => {
     submit(container);
     await findByText("Check your email");
     fireEvent.click(getByText("Resend link"));
-    await findByText("We sent a sign-in link to dev@samograph.dev.");
+    expect((await findByRole("status")).textContent).toBe("We sent a sign-in link to dev@samograph.dev.");
     const sends = client.requests.filter((r) => r.path === "/auth/magic-link");
     expect(sends).toHaveLength(2);
     expect(sends.every((r) => r.body.email === "dev@samograph.dev")).toBe(true);

@@ -205,7 +205,7 @@ export function codeChallengeS256(verifier: string): string {
 const RETURN_TO_ALLOWLIST: ReadonlySet<string> = new Set([DEFAULT_RETURN_TO, "/settings"]);
 
 /** The one parameterised member: `/calls/<uuid>`. Fully anchored, hex only. */
-const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+export const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /** Upper bound before any inspection — nothing legitimate is near this long. */
 const RETURN_TO_MAX_LEN = 128;

@@ -53,6 +53,7 @@ export const COUNTER_SPECS = {
   calendar_connect_callback_total: { label: "result", help: "Calendar OAuth callbacks by result." },
   calendar_disconnect_total: { label: "revocation_result", help: "Calendar disconnects by revocation result." },
   calendar_sync_total: { label: "result", help: "Calendar connection syncs by result." },
+  calendar_autojoin_total: { label: "result", help: "Calendar auto-join outcomes by result." },
 } as const;
 
 export type CounterName = keyof typeof COUNTER_SPECS;
@@ -203,6 +204,7 @@ export class MetricsRegistry {
   incCalendarConnectCallback(result: string): void { this.bump("calendar_connect_callback_total", result, 1); }
   incCalendarDisconnect(result: string): void { this.bump("calendar_disconnect_total", result, 1); }
   incCalendarSync(result: string): void { this.bump("calendar_sync_total", result, 1); }
+  incCalendarAutoJoin(result: string): void { this.bump("calendar_autojoin_total", result, 1); }
   incCalendarSyncEvents(by: number): void { this.bumpScalarBy("calendar_sync_events_total", by); }
   setCalendarConnections(state: string, count: number): void { this.setGauge("calendar_connections", state, count); }
   setCalendarSyncAgeSeconds(seconds: number): void { this.scalarGauges.set("calendar_sync_age_seconds", seconds); }

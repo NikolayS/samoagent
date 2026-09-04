@@ -66,16 +66,17 @@ export function AuthLanding({ client, redirect, errorCode }: AuthLandingProps) {
   }, [client]);
 
   return (
-    <>
+    <div className="samograph-auth">
+      <p className="samograph-app-brand" data-wordmark>samograph</p>
       <h1>Sign in to samograph</h1>
       {errorCode !== undefined ? (
         isAuthInfoCode(errorCode) ? (
           // "You cancelled" is a normal outcome, not a failure (§5.16 S5-1).
-          <p role="status" className="samograph-auth-note">
+          <p role="status" className="samograph-auth-note samograph-alert samograph-alert--info">
             {authErrorMessage(errorCode)}
           </p>
         ) : (
-          <p role="alert">{authErrorMessage(errorCode)}</p>
+          <p role="alert" className="samograph-alert samograph-alert--error">{authErrorMessage(errorCode)}</p>
         )
       ) : null}
       {google === true ? (
@@ -89,6 +90,6 @@ export function AuthLanding({ client, redirect, errorCode }: AuthLandingProps) {
         </>
       ) : null}
       <MagicLinkRequestForm client={client} />
-    </>
+    </div>
   );
 }

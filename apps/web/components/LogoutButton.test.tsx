@@ -12,7 +12,9 @@ describe("LogoutButton — calls logout() then redirects to sign-in", () => {
     const { getByRole } = render(
       <LogoutButton client={client} redirect={() => {}} />,
     );
-    expect(getByRole("button", { name: /log out/i })).toBeDefined();
+    const button = getByRole("button", { name: /log out/i });
+    expect(button.className).toContain("samograph-btn");
+    expect(button.className).toContain("samograph-btn--secondary");
   });
 
   it("POSTs /auth/logout then redirects to /auth", async () => {

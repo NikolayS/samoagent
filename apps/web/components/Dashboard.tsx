@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AccountEmail } from "./AccountEmail.tsx";
 import { AddToCallForm } from "./AddToCallForm.tsx";
-import { LogoutButton } from "./LogoutButton.tsx";
 import { AccountDangerZone } from "./AccountDangerZone.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { AppApiError, type AppApiClient, type Call } from "../lib/appApiClient.ts";
@@ -66,7 +64,13 @@ function CallRow({ call }: { call: Call }) {
         aria-label={rowAriaLabel(call.meetingUrl, view, cta)}
       >
         <span className="samograph-call-body">
-          <span className="samograph-call-url">{call.meetingUrl}</span>
+          <span className="samograph-call-url" title={call.meetingUrl}>{call.meetingUrl}</span>
+          <span className="samograph-status-chip" data-kind={view.kind}>
+            {view.kind === "live" ? (
+              <span className="samograph-call-live-dot" aria-hidden="true" />
+            ) : null}
+            {view.label}
+          </span>
           {view.kind === "error" ? (
             <>
               <span className="samograph-call-error">{view.message}</span>
@@ -74,15 +78,10 @@ function CallRow({ call }: { call: Call }) {
                 <span className="samograph-call-hint">{view.hint}</span>
               ) : null}
             </>
-          ) : view.kind === "live" ? null : (
-            <span className="samograph-call-status">{view.label}</span>
-          )}
+          ) : null}
         </span>
         {cta ? (
           <span className={`samograph-call-cta samograph-call-cta-${cta.kind}`}>
-            {cta.kind === "live" ? (
-              <span className="samograph-call-live-dot" aria-hidden="true" />
-            ) : null}
             <span className="samograph-call-cta-text">{cta.text}</span>
             {cta.kind === "live" ? null : (
               <span className="samograph-call-cta-arrow" aria-hidden="true">
@@ -108,9 +107,6 @@ function CallRow({ call }: { call: Call }) {
 export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
   const [status, setStatus] = useState<Status>("loading");
   const [calls, setCalls] = useState<Call[]>([]);
-  // `null` = not known yet (or never answered). The header renders regardless —
-  // see AccountEmail for why the unknown state still occupies its line.
-  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const calendarAuthFailure = useCallback(() => {
     setStatus("redirecting");
     redirect("/auth");
@@ -137,27 +133,6 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
     void load();
   }, [load]);
 
-  // Which account is this? (#238). `GET /settings` already serves the
-  // authoritative `signin.email`, so this reuses it rather than adding a `/me`.
-  // It is deliberately SEPARATE from `load`: the dashboard's reason to exist is
-  // the call list, and a settings read that 401s, 404s or breaks must cost the
-  // user nothing more than an unfilled chip — never a redirect (`load` owns the
-  // auth gate) and never an empty dashboard.
-  useEffect(() => {
-    let active = true;
-    client
-      .getSettings()
-      .then((snap) => {
-        if (active) setAccountEmail(snap.signin.email || null);
-      })
-      .catch(() => {
-        if (active) setAccountEmail(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [client]);
-
   if (status === "loading") {
     return (
       <section aria-live="polite" aria-busy="true">
@@ -182,15 +157,11 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
 
   return (
     <>
-      <header className="samograph-app-header">
-        <AccountEmail email={accountEmail} />
-        <LogoutButton client={client} redirect={redirect} />
-      </header>
-      <AddToCallForm client={client} initialUrl={initialUrl} onCreated={() => void load()} />
-      <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} />
+      <h1>Your calls</h1>
+      <AddToCallForm client={client} initialUrl={initialUrl} autoFocus={calls.length === 0} onCreated={() => void load()} />
+      <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} onCreated={() => void load()} />
       {calls.length === 0 ? (
         <section aria-label="Your calls" className="samograph-empty-state">
-          <h2>Your calls</h2>
           <p className="samograph-empty-title">No calls yet.</p>
           <p>Paste a Zoom or Google Meet link above to add samograph to your first call.</p>
           <p className="samograph-empty-hint">

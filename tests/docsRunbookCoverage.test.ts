@@ -29,6 +29,7 @@ const OPERATOR_CODES = [
   "SAMO-RATE-001",
   "SAMO-INGEST-DEGRADED",
   "SAMO-WORKER-503",
+  "SAMO-CALL-ACTIVE",
 ];
 
 function readAllRunbooks(): string {

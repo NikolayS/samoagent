@@ -41,7 +41,8 @@ function withFailingProbe(client: FakeAppApiClient): AppApiClient {
 /** The rendered sign-in block, once the settings load AND the probe have landed. */
 async function renderSettings(client: AppApiClient) {
   const utils = render(<SettingsPage client={client} redirect={() => {}} />);
-  const block = await utils.findByRole("region", { name: /sign-in/i });
+  const account = await utils.findByRole("region", { name: "Account" });
+  const block = account.querySelector(".samograph-signin") as HTMLElement;
   return { ...utils, block };
 }
 
@@ -135,13 +136,14 @@ describe("SettingsPage — read-only Sign-in block (S5-1 item 8, #223)", () => {
     // …and it is not inside the settings form, so it can never be submitted.
     expect(block.closest("form")).toBeNull();
 
+    fireEvent.change(getByRole("combobox", { name: /language/i }), { target: { value: "de" } });
     fireEvent.click(getByRole("button", { name: /save/i }));
     await findByText(/saved/i);
     const put = client.requests.find((r) => r.method === "PUT" && r.path === "/settings");
     expect(put!.body).toEqual({
       dictionary_preset: "none",
       keyterms: [],
-      language: "multi",
+      language: "de",
       chime: "blip",
     });
   });

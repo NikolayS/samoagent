@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 const jetBrainsMono = localFont({
@@ -13,24 +14,30 @@ const jetBrainsMono = localFont({
   display: "swap",
 });
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
 const themeBootScript = `(function(){try{var t=localStorage.getItem("samograph-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;else document.documentElement.removeAttribute("data-theme")}catch(e){}})()`;
 
 export const metadata: Metadata = {
   title: "samograph — live transcripts for your calls",
   description:
-    "Zero-setup live transcripts for your Zoom and Google Meet calls. Sign in, add a meeting link, watch it stream live, then share read-only or download.",
+    "An agent that joins your Zoom or Google Meet call and transcribes it live.",
   icons: { icon: "/robot-mark.png" },
   openGraph: {
     title: "samograph — live transcripts for your calls",
     description:
-      "Zero-setup live transcripts for your Zoom and Google Meet calls. Sign in, add a meeting link, watch it stream live, then share read-only or download.",
+      "An agent that joins your Zoom or Google Meet call and transcribes it live.",
     type: "website",
   },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${jetBrainsMono.variable} ${inter.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
@@ -42,7 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         the no-flash theme script intentionally sets its data-theme before React
         hydrates. Real mismatches inside the app still surface.
       */}
-      <body className={jetBrainsMono.variable} suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

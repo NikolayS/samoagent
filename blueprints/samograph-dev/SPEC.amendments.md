@@ -1345,3 +1345,73 @@ The stable Calendar errors added to §5.16 are:
 | `SAMO-CALENDAR-500` | 500 JSON or 302 query | Unexpected internal Calendar failure | “Something went wrong connecting Google Calendar.” |
 
 **Why:** Upcoming meetings are useful before auto-join is enabled and provide a smaller, reviewable first slice of the §5.12 Calendar feature. Keeping consent incremental preserves the S5-1 security and verification boundary around ordinary sign-in; choosing the narrower event-only scope and minimizing the cache reduces retained personal data. Auto-join remains separate because it introduces independent scheduling, cost, eligibility, idempotency, and per-event-control requirements.
+
+---
+
+### S5-4. Typography — dual sans/mono stack — *Deviation (post-v1)*
+
+**Amends:** `DESIGN.md` §Typography, which specifies JetBrains Mono as the only typeface.
+
+**What differs:** App chrome and prose use Inter through `--font-sans`; body and display roles resolve to that stack. JetBrains Mono remains the `--font-mono` data face for transcripts, timestamps, identifiers, URLs, commands, and keyterms.
+
+**Why:** A sans face makes dense app chrome and prose easier to scan while preserving mono where its data-oriented character and alignment are useful.
+
+### S5-5. Layout — wider app, prose, and form columns — *Deviation (post-v1)*
+
+**Amends:** The legacy blanket 32rem application column.
+
+**What differs:** Application pages use `--width-app: 1120px`, prose uses `--width-prose: 720px`, and narrow forms use `--width-form: 480px`.
+
+**Why:** Calls and transcripts need horizontal room, while prose and forms retain purpose-specific readable measures instead of sharing one restrictive width.
+
+### S5-6. Interaction color — instrument-only live accent — *Deviation (post-v1)*
+
+**Amends:** `DESIGN.md` §Color tokens and §Interaction and accessibility where `accent-live` had also supplied general focus and hover color.
+
+**What differs:** `accent-live` is restricted to the transcript instrument. General focus and hover treatments are achromatic through `--focus-ring` and `--hover-surface`. These tokens land in Slice 1; adoption across controls follows in Slices 2–6.
+
+**Why:** Reserving green for live state protects its meaning, while ink-based interaction states provide stronger contrast in both themes.
+
+### S5-7. §5.2 / §5.10 / §5.12 — Calendar meetings and opt-in auto-join — *Extension*
+
+**Amends:** §5.2 (call creation and bot join path), §5.10 (data model), and
+§5.12 (Calendar settings). PRs **#242, #243, #244, #245, #246, #249**, **#264**, **#265**, **#269**, and
+**#271**; follow-ups **#266** and **#270**.
+
+**What differs:** The S5-3 incremental Google Calendar connection now backs a
+meetings-only upcoming list with an explicit **“Add samograph”** action (#264),
+and an owner-controlled `auto_join` switch plus durable per-event exclusions
+(#271). The poller auto-joins eligible, non-declined, non-all-day events with a
+validated Meet or Zoom URL from 10 minutes behind the current time through 6
+minutes ahead (#269). Calendar creation uses the shared `createCallForTenant`
+path (#265), so it retains normal URL validation, tenant settings, audit and
+enqueue behavior, but has a separate 10/hour/tenant limiter. Its idempotency key
+is connection-scoped (`<connection_id>:<provider_event_id>`).
+
+For both manual and Calendar creation, an advisory transaction lock enforces one
+active bot per tenant and normalized meeting URL. A conflicting `POST /calls`
+returns HTTP 409 `SAMO-CALL-ACTIVE` with the existing call id; Calendar poller
+conflicts are skipped. `calls.source` (`manual | calendar`) and
+`calls.source_event_id` record provenance, with a unique non-null
+tenant/source/event identity.
+
+**Schema additions:** migration `0016_calls_source.sql` adds `calls.source` and
+`calls.source_event_id`; `0017_calendar_autojoin.sql` adds
+`calendar_connections.auto_join`; and
+`0018_calendar_event_autojoin_exclusion.sql` adds the RLS-protected
+`calendar_event_exclusions` table keyed by connection + provider event. These
+extend S5-3's `calendar_connections` / `calendar_events` schema.
+
+**Why:** This deliberately ships the §5.12 Calendar auto-join capability after
+v1 while preserving incremental consent and routing every join through the same
+cost, tenancy, validation, and lifecycle boundary as pasted-URL calls.
+
+### S6-1. Landing page — radical simplification — *Deviation (post-v1)*
+
+**Amends:** `SPEC.md` §5 landing description and the Refined landing composition in `DESIGN.md` / `design-ref/RefinedLight.dc.html` + `RefinedDark.dc.html`, which specify a hero with a simulated live "instrument" panel, a four-card differentiators grid, a four-step "From link to live page" list, a heritage/CLI section, and a closing band.
+
+**What differs:** The landing is one screen: nav (brand, theme switcher, sign-in button), a single `h1` — "An agent that joins your call and transcribes it live." — one supporting line, one primary CTA to `/auth` plus a `github` secondary link, and a minimal footer. The simulated instrument, differentiators, step list (including the "Sign in" step), heritage/CLI section, and closing band are removed, along with their CSS. Rendered visible text above the footer drops from 428 words to 26. A skip link is added; the transcript-panel CSS primitives the per-call view composes are retained.
+
+**Why:** Owner feedback on the shipped page: it was too complicated and too wordy, and a "Sign in" step is not information a developer needs. A developer should be able to tell what samograph is, and start, in about five seconds.
+
+**Follow-up (2026-08-26).** The first pass of this simplification kept a compact four-line transcript glimpse (`[00:12:04] Dana: ...`) under the CTAs as a format sample. Owner feedback — *"i don't like the stupid example with dana, morgan, etc."* — and it was removed outright with nothing in its place, along with the `.samograph-glimpse` CSS. Invented speakers and invented utterances are a fake product demo, not evidence; the page now shows only claims it can stand behind. This is why the word count above reads 26 rather than the 55 the glimpse version shipped with.
