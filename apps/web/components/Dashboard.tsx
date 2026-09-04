@@ -6,6 +6,8 @@ import { AccountDangerZone } from "./AccountDangerZone.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { AppApiError, type AppApiClient, type Call } from "../lib/appApiClient.ts";
 import { statusView, type StatusView } from "../lib/callStatusView.ts";
+import { displayMeetingUrl, meetingTitle } from "../lib/meetingUrl.ts";
+import { relativeTime } from "../lib/relativeTime.ts";
 
 export interface DashboardProps {
   client: AppApiClient;
@@ -38,45 +40,75 @@ function rowCta(view: StatusView): RowCta | null {
   return null; // COULD_NOT_RECORD, BOT_REMOVED — reason only.
 }
 
-/** Accessible name for the whole-row link (screen readers get the intent). */
-function rowAriaLabel(url: string, view: StatusView, cta: RowCta | null): string {
-  if (cta?.kind === "live") return `Live call ${url} — open to watch the live transcript`;
-  if (cta?.kind === "open") return `${view.label} call ${url} — view transcript`;
-  if (cta?.kind === "retry") return `${view.message} ${url} — open to try again`;
-  return `${view.message} ${url} — open call`;
+/**
+ * Accessible name for the whole-row link (screen readers get the intent).
+ * `title` is the display-safe {@link meetingTitle}, never the raw URL: a Zoom
+ * link carries its password in the query string and an `aria-label` is DOM text
+ * like any other (mobile audit M7 / `d02`).
+ */
+function rowAriaLabel(title: string, view: StatusView, cta: RowCta | null): string {
+  if (cta?.kind === "live") return `Live call ${title} — open to watch the live transcript`;
+  if (cta?.kind === "open") return `${view.label} call ${title} — view transcript`;
+  if (cta?.kind === "retry") return `${view.message} ${title} — open to try again`;
+  return `${view.message} ${title} — open call`;
 }
 
-/** Render one call as a whole-row transcript link with its status/error copy. */
-function CallRow({ call }: { call: Call }) {
+/**
+ * Render one call as a whole-row transcript link: a readable TITLE, one META
+ * line (status chip · relative time · display-safe URL) and the CTA.
+ *
+ * The row used to be the raw `meetingUrl` — which meant the Zoom `?pwd=` join
+ * secret was printed in the list (mobile audit M7 / `d02`). Everything shown
+ * here goes through `meetingTitle` / `displayMeetingUrl`, which drop the query
+ * string and the fragment, so no meeting password can reach the DOM.
+ */
+function CallRow({ call, now }: { call: Call; now: number }) {
   // §5.16 view: for a terminal failure the message carries the persisted
   // status_reason ("Couldn't join — <reason>.") plus a bespoke, actionable hint.
   const view = statusView(call.status, { recallReason: call.statusReason });
   const cta = rowCta(view);
+  const title = meetingTitle(call.meetingUrl);
+  const safeUrl = displayMeetingUrl(call.meetingUrl);
+  const createdAt = call.createdAt;
+  const when = createdAt ? relativeTime(createdAt, now) : "";
   return (
     <li className="samograph-call-item">
-      {/* Whole-row link into the per-call transcript page; ?url= lets that page's
-          Story-4 "Try again" (COULD_NOT_JOIN) pre-fill the paste input. The
-          explicit CTA below makes the row read as an obvious, tappable way in. */}
+      {/* Whole-row link into the per-call transcript page; `?url=` carries the
+          DISPLAY-SAFE url so that page's Story-4 "Try again" (COULD_NOT_JOIN)
+          can pre-fill the paste input without the address bar, the browser
+          history or a copied link carrying the meeting password. */}
       <a
         className="samograph-call-row"
         data-status-kind={view.kind}
-        href={`/calls/${encodeURIComponent(call.id)}?url=${encodeURIComponent(call.meetingUrl)}`}
-        aria-label={rowAriaLabel(call.meetingUrl, view, cta)}
+        href={`/calls/${encodeURIComponent(call.id)}?url=${encodeURIComponent(safeUrl)}`}
+        aria-label={rowAriaLabel(title, view, cta)}
       >
         <span className="samograph-call-body">
-          <span className="samograph-call-url" title={call.meetingUrl}>{call.meetingUrl}</span>
-          <span className="samograph-status-chip" data-kind={view.kind}>
-            {view.kind === "live" ? (
-              <span className="samograph-call-live-dot" aria-hidden="true" />
+          <span className="samograph-call-title">{title}</span>
+          <span className="samograph-call-meta">
+            <span className="samograph-status-chip" data-kind={view.kind}>
+              {view.kind === "live" ? (
+                <span className="samograph-call-live-dot" aria-hidden="true" />
+              ) : null}
+              {view.label}
+            </span>
+            {when && createdAt ? (
+              <time
+                className="samograph-call-time"
+                dateTime={createdAt}
+                title={new Date(createdAt).toLocaleString()}
+              >
+                {when}
+              </time>
             ) : null}
-            {view.label}
+            {safeUrl ? (
+              <span className="samograph-call-url" title={safeUrl}>{safeUrl}</span>
+            ) : null}
           </span>
           {view.kind === "error" ? (
             <>
               <span className="samograph-call-error">{view.message}</span>
-              {view.hint ? (
-                <span className="samograph-call-hint">{view.hint}</span>
-              ) : null}
+              {view.hint ? <span className="samograph-call-hint">{view.hint}</span> : null}
             </>
           ) : null}
         </span>
@@ -152,6 +184,9 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
   // Split into two clearly-labelled groups: still-running calls the user might
   // want to open live vs. finished/failed ones. Terminal = ENDED plus every
   // COULD_NOT_* / BOT_REMOVED failure (`isTerminalStatus`, SPEC §5.2).
+  // One clock read per render, injected into every row, so the list's relative
+  // times are consistent with each other and the helper stays pure.
+  const now = Date.now();
   const active = calls.filter((c) => !statusView(c.status).isTerminal);
   const past = calls.filter((c) => statusView(c.status).isTerminal);
 
@@ -176,7 +211,7 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
               <h2>Active calls</h2>
               <ul className="samograph-call-list">
                 {active.map((c) => (
-                  <CallRow key={c.id} call={c} />
+                  <CallRow key={c.id} call={c} now={now} />
                 ))}
               </ul>
             </section>
@@ -186,7 +221,7 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
               <h2>Past calls</h2>
               <ul className="samograph-call-list">
                 {past.map((c) => (
-                  <CallRow key={c.id} call={c} />
+                  <CallRow key={c.id} call={c} now={now} />
                 ))}
               </ul>
             </section>

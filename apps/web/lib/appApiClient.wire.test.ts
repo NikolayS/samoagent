@@ -27,6 +27,7 @@ const rows: Array<{
   meeting_url: string;
   status: string;
   status_reason?: string | null;
+  created_at?: string;
 }> = [];
 let counter = 0;
 
@@ -126,6 +127,25 @@ describe("createHttpAppApiClient — over-the-wire contract with app-api", () =>
     expect(calls.every((c) => c.status === "PENDING")).toBe(true);
     expect(calls.map((c) => c.provider)).toEqual(["zoom", "google_meet"]);
     expect(calls.map((c) => c.id)).toEqual(["call_2", "call_1"]);
+  });
+
+  it("listCalls maps `created_at` to `createdAt` so a row can show when it happened", async () => {
+    rows.unshift({
+      id: "call_dated",
+      meeting_url: MEET_URL,
+      status: "ENDED",
+      created_at: "2026-09-01T09:30:00.000Z",
+    });
+    try {
+      const calls = await client.listCalls();
+      expect(calls.find((c) => c.id === "call_dated")?.createdAt).toBe(
+        "2026-09-01T09:30:00.000Z",
+      );
+      // A row without the field on the wire has no createdAt (never `null`).
+      expect(calls.find((c) => c.id === "call_1")?.createdAt).toBeUndefined();
+    } finally {
+      rows.shift();
+    }
   });
 
   it("listCalls maps a failed row's `status_reason` to `statusReason` (§5.16 error details)", async () => {

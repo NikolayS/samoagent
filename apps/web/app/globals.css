@@ -762,6 +762,8 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 }
 
 .samograph-call-row {
+  /* One row = one tap target (mobile audit M3/M7): never below --control-h. */
+  min-height: var(--control-h);
   color: var(--ink);
   text-decoration: none;
   transition: background-color 120ms ease;
@@ -785,11 +787,39 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   gap: var(--space-1);
 }
 
+/* The row's headline: a readable meeting title (provider + room id), never the
+   raw URL — which carried the Zoom `?pwd=` join secret (mobile audit M7/d02). */
+.samograph-call-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status chip · relative time · display-safe URL, one line that wraps on a
+   phone rather than three stacked lines of nothing useful. */
+.samograph-call-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.samograph-call-time {
+  white-space: nowrap;
+}
+
+/* Demoted from headline to meta text: mono, muted, truncating. */
 .samograph-call-url {
   overflow: hidden;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  color: var(--muted);
   font-family: var(--font-mono);
-  font-weight: 600;
+  font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -886,6 +916,13 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   .samograph-meeting-item { grid-template-columns: minmax(0, 1fr); }
   .samograph-call-cta,
   .samograph-meeting-item > .samograph-btn { justify-self: start; }
+  /* Stacked, the CTA is its own tap target under the row's content; the 44px
+     box supplies the breathing room, so the grid gap tightens. */
+  .samograph-call-row { row-gap: var(--space-1); }
+  .samograph-call-cta { min-height: var(--control-h); }
+  /* On a phone the title names the call; the raw URL is noise that pushes the
+     row past 150px. Keep the meta line to chip + time (mobile audit M7). */
+  .samograph-call-url { display: none; }
 }
 /* ===== end Slice 4 ===== */
 
