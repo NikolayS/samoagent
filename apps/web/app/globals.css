@@ -130,8 +130,17 @@
   /* Control geometry — the single answer to "how tall is a control?".
      `--radius-control` is the one radius for every interactive box, and
      `--field-max` caps short fields (selects, enums) so a four-character value
-     stops spanning the whole column. */
+     stops spanning the whole column.
+
+     The scale has three steps and nothing else: 44 is the default (forms,
+     primary actions, the theme switcher, in-panel buttons), 36 is the dense
+     step for actions inside a list row, 28 is reserved for inline actions
+     inside a line of text. A control is sized by ONE recipe — border-box, an
+     explicit height, zero block padding and a capped line-height — so its
+     height is exact rather than the accidental sum of font metrics. */
   --control-h: 44px;
+  --control-h-sm: 36px;
+  --control-h-xs: 28px;
   --radius-control: var(--radius-md);
   --field-max: 22rem;
 
@@ -314,18 +323,38 @@ label {
   color: var(--ink);
 }
 
-input,
+/* The one control recipe. Checkboxes and radios are excluded on purpose: they
+   are not control BOXES, and the old blanket `input` selector stretched them to
+   the full column width. */
+input:where(:not([type="checkbox"], [type="radio"])),
 select,
 textarea {
   display: block;
+  box-sizing: border-box;
   width: 100%;
   margin-top: 0.25rem;
-  padding: 0.5rem 0.6rem;
   font: inherit;
+  line-height: var(--leading-tight);
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
+}
+
+/* Height comes from `height` + zero block padding, never from padding + font
+   metrics, so every field is exactly var(--control-h) tall. */
+input:where(:not([type="checkbox"], [type="radio"])),
+select {
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+}
+
+textarea {
+  min-height: calc(var(--control-h) * 2);
+  padding: var(--space-3);
+  /* --leading-tight pins a ONE-line control to an exact height; a textarea
+     wraps, so its lines stay on the body rhythm. */
+  line-height: var(--leading-normal);
 }
 
 .samograph-keyterms {
@@ -437,8 +466,8 @@ button:hover {
 }
 
 .samograph-theme-switcher__option {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--control-h);
+  min-height: var(--control-h);
   margin: 0;
   padding: 0 11px;
   color: var(--muted);
@@ -470,9 +499,11 @@ button:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
+  box-sizing: border-box;
+  height: var(--control-h);
   padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
+  line-height: 1;
+  border-radius: var(--radius-control);
   font-size: var(--text-sm);
   font-weight: 500;
   transition: color 140ms, background-color 140ms, border-color 140ms;
@@ -538,8 +569,8 @@ button:hover {
 .samograph-select:has(> select:disabled)::before { background: var(--field-bg-disabled); }
 .samograph-select:has(> select:disabled)::after { background: var(--faint); }
 .samograph-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-5); }
-input, select, textarea { background: var(--surface); border-color: var(--control-border); }
-textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
+input:where(:not([type="checkbox"], [type="radio"])), select, textarea { background: var(--surface); border-color: var(--control-border); }
+textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-alert { border: 1px solid currentColor; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
 .samograph-alert--error { color: var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
 .samograph-alert--warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
@@ -566,8 +597,14 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 .samograph-dash-hero-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
+  align-items: center;
   gap: var(--space-3);
+}
+
+/* The label owns the row above, so the input drops the top margin the shared
+   field recipe gives it and the two 44px boxes line up exactly. */
+.samograph-dash-hero-form input {
+  margin-top: 0;
 }
 
 .samograph-dash-hero-form label {
@@ -723,7 +760,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   white-space: nowrap;
 }
 .samograph-meeting-item[data-declined="true"] { opacity: 0.65; }
-.samograph-btn--sm { height: 28px; padding-inline: var(--space-3); font-size: var(--text-xs); }
+.samograph-btn--sm { height: var(--control-h-sm); padding-inline: var(--space-3); font-size: var(--text-xs); }
 
 @media (max-width: 40rem) {
   .samograph-dash-hero-form { grid-template-columns: 1fr; }
@@ -757,7 +794,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   gap: 0.75rem; /* 12px — inside Google's 8–12px mark-to-label range */
   box-sizing: border-box;
   width: 100%;
-  min-height: 40px; /* Google's stated minimum — do not shrink */
+  min-height: var(--control-h); /* 44px — clears Google's stated 40px minimum */
   margin-top: 1rem;
   padding: 0 0.75rem;
   font-family: var(--font-body);
@@ -1510,9 +1547,10 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 .samograph-percall .samograph-toggle-chat {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  box-sizing: border-box;
+  min-height: var(--control-h);
   padding: 0 14px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   font-size: var(--text-xs);
   font-weight: 600;
   text-decoration: none;
@@ -1549,7 +1587,7 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   z-index: 3;
   right: 16px;
   bottom: 78px;
-  min-height: 44px;
+  min-height: var(--control-h);
   color: var(--panel-ground);
   background: var(--accent-live);
   border-color: var(--accent-live);
