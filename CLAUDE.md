@@ -1,5 +1,7 @@
 # samograph Agent Notes
 
+> NOTE (not part of the synced block): principle 2 (bugfix red/green TDD) originates here and should be upstreamed to the canonical PRINCIPLES.md.
+
 <!-- SAMO-DEV-PRINCIPLES:START (synced block — update the canonical source then re-sync; do not edit in place) -->
 ## Development principles
 
@@ -9,6 +11,15 @@ Accumulated, non-negotiable working principles for SAMO projects. Canonical sour
 Once a reviewer (samorev) approves an MR/PR, **any** later commit invalidates that approval — **including a commit that fixes the review's own findings**. Re-review the change (at minimum the new delta) **before** merge. Never merge a post-review commit on the strength of the prior PASS plus a green pipeline: a passing pipeline proves it builds and tests pass, not that it was reviewed.
 
 Order: review → fix-commit → **re-review the delta** → merge.  (NOT: review → fix-commit → merge.)
+
+### 2. Bugfixes are red/green TDD — no exceptions
+Every bugfix PR MUST **first** add a test that reproduces the bug and **fails** on current `main` (RED), then the fix that turns it green (GREEN), then any refactor. The test comes first so we know it actually pins the bug: a test written after the fix proves nothing except that the code still does what it now does.
+
+The PR description **pastes both** — the RED failure (the assertion/output on unfixed code) and the GREEN pass on the same test. **A bugfix PR without a reproducing test is rejected at review**, however small the diff.
+
+"Confirmed in prod", "verified in the logs", or a manual repro is **not** a substitute for a test: it fixes today's incident and leaves nothing behind to stop the regression. If a bug genuinely cannot be expressed as an automated test, say so explicitly in the PR and get that exception agreed by the reviewer *before* merge.
+
+Order: red test → fix → **paste RED + GREEN** → review → merge.
 <!-- SAMO-DEV-PRINCIPLES:END -->
 
 Use samograph to join a meeting, watch the live transcript, speak in meeting chat when asked, and capture the call view on demand.
@@ -193,6 +204,7 @@ surfaces authenticate through `gh`/`glab`; see the repo's `docs/bot-operation.md
 - The PR description **must show both the RED failure and the GREEN pass** as evidence (paste the failing assertion/output, then the passing run). *(pg_ash PR #108 documents RED error string + GREEN "PASSED".)*
 - **Assert exact values, not mere existence** — "a test that only checks a row exists can't distinguish correct aggregation from garbage." *(pg_ash.)* Property/idempotence tests where the SPEC calls for them (e.g. normalizer §6.2 #1).
 - For the §6.2 TDD list, the SPEC item number is the contract: each acceptance criterion traces to a `§6.2 #n` red case.
+- **Bugfixes are covered by this too — see Development principle 2 above.** A bugfix starts with a test that reproduces the bug and fails on current `main`; no reproducing test, no merge.
 
 ### Branches & commits
 - **Branch naming:** type-prefixed kebab, embedding the issue number — `feat/<area>-<slug>`, `fix/<n>-<slug>`, `chore/...`, `docs/...`, `test/...`, `ci/...`. Agent branches use `claude/<slug>-<hash>`. *(pgque + rpg + pg_ash all converge on `type/slug`; pgque uses `claude/<slug>-<hash>` for agent branches.)*
