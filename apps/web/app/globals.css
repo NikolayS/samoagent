@@ -127,10 +127,19 @@
   --width-form: 480px;
   --gutter: var(--space-8);
 
+  /* Control geometry — the single answer to "how tall is a control?".
+     `--radius-control` is the one radius for every interactive box, and
+     `--field-max` caps short fields (selects, enums) so a four-character value
+     stops spanning the whole column. */
+  --control-h: 44px;
+  --radius-control: var(--radius-md);
+  --field-max: 22rem;
+
   /* Interaction */
   --focus-ring: var(--ink);
   --hover-surface: color-mix(in srgb, var(--ink) 5%, var(--surface));
   --control-border: var(--line-strong);
+  --field-bg-disabled: color-mix(in srgb, var(--muted) 8%, var(--surface));
 }
 
 /* Public landing (simplified, issue #241) plus the transcript-panel primitives
@@ -485,6 +494,49 @@ button:hover {
 .samograph-field { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
 .samograph-field > label, .samograph-field > input, .samograph-field > select, .samograph-field > textarea { margin-top: 0; }
 .samograph-field-hint { margin: 0; color: var(--muted); font-size: var(--text-xs); }
+/* Select — a native <select> with `appearance: none` and our own affordance:
+   a full-height bordered end-cap (::before) with a masked chevron (::after)
+   painted in --muted, so it is correct in both themes. Both pseudo-elements are
+   pointer-events: none — the whole control stays one hit target. The mask must
+   stay on its own element: masking the cap would erase its hairline and fill. */
+.samograph-select { position: relative; display: block; width: 100%; max-width: var(--field-max); }
+.samograph-select > select {
+  appearance: none; -webkit-appearance: none;
+  display: block; width: 100%; height: var(--control-h); margin: 0;
+  padding: 0 calc(var(--control-h) + var(--space-2)) 0 var(--space-3);
+  font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--control-border); border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.samograph-select::before {
+  content: ""; position: absolute; inset-block: 1px; inset-inline-end: 1px;
+  width: calc(var(--control-h) - 2px); pointer-events: none;
+  border-inline-start: 1px solid var(--line);
+  border-start-end-radius: calc(var(--radius-control) - 1px);
+  border-end-end-radius: calc(var(--radius-control) - 1px);
+  background: color-mix(in srgb, var(--ink) 3%, var(--surface));
+}
+.samograph-select::after {
+  content: ""; position: absolute; pointer-events: none;
+  top: 50%; margin-top: -3px; inset-inline-end: calc((var(--control-h) - 10px) / 2);
+  width: 10px; height: 6px; background: var(--muted);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-size: 10px 6px; mask-size: 10px 6px;
+  -webkit-mask-position: center; mask-position: center;
+}
+.samograph-select:hover > select { border-color: var(--ink); }
+.samograph-select:hover::before { background: var(--hover-surface); }
+.samograph-select:hover::after { background: var(--ink); }
+/* `border-color` is restated here because `.samograph-select > select` above
+   sets `border` and outranks the shared `select:focus-visible` rule on source
+   order (both are 0,1,1) — without it a focused select keeps its resting
+   border while every input darkens to --ink. */
+.samograph-select > select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-color: var(--ink); }
+.samograph-select > select:disabled { color: var(--muted); background: var(--field-bg-disabled); cursor: not-allowed; }
+.samograph-select:has(> select:disabled)::before { background: var(--field-bg-disabled); }
+.samograph-select:has(> select:disabled)::after { background: var(--faint); }
 .samograph-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-5); }
 input, select, textarea { background: var(--surface); border-color: var(--control-border); }
 textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
