@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { render, fireEvent } from "@testing-library/react";
+import { render, fireEvent, waitFor } from "@testing-library/react";
 import { Dashboard } from "./Dashboard.tsx";
 import { createFakeAppApiClient } from "../lib/fakeAppApiClient.ts";
 import type { Call } from "../lib/appApiClient.ts";
@@ -143,11 +143,19 @@ describe("Dashboard — Slice 4 information hierarchy", () => {
 
   it("autofocuses the paste input when the dashboard has no calls", async () => {
     const client = createFakeAppApiClient();
-    const { findByPlaceholderText } = render(
+    const { findByPlaceholderText, findByText } = render(
       <Dashboard client={client} redirect={noopRedirect} />,
     );
+    // The focus is not applied by the render that puts the input in the DOM: the
+    // dashboard renders a loading state until `load()` resolves, and only then
+    // mounts AddToCallForm, whose `useEffect` (keyed on `autoFocus={calls.length
+    // === 0}`) moves focus AFTER commit. `findBy*` resolves on the mutation, so
+    // a single synchronous `document.activeElement` read races that effect.
+    await findByText("No calls yet.");
     const input = await findByPlaceholderText("Paste a Zoom or Google Meet link");
-    expect(document.activeElement === input).toBe(true);
+    // Identity compared as a boolean on purpose: `expect(activeElement).toBe(input)`
+    // serialises two whole Happy-DOM nodes when it fails, which takes minutes.
+    await waitFor(() => expect(document.activeElement === input).toBe(true));
   });
 });
 

@@ -405,7 +405,7 @@ export function PerCallTranscript({
           {!hasLines && emptyCopy && view.kind !== "error" ? <li className="samograph-transcript-empty">{emptyCopy}</li> : null}
           {state.lines.filter((l) => !isChatHidden || l.kind !== "chat").map((l) =>
             l.speaker === SAMOGRAPH_WARNING_SPEAKER ? (
-              <li key={l.seq}>
+              <li key={l.seq} className="samograph-warning-row">
                 <WarningLine line={l} />
               </li>
             ) : (
@@ -482,7 +482,7 @@ function TranscriptTime({ ts }: { ts: string }) {
   const formatted = formatTranscriptTimestamp(ts);
   const parts = splitTranscriptTimestamp(formatted);
   return (
-    <time className="samograph-line-time" aria-hidden="true" title={formatted}>
+    <time className="samograph-line-time" aria-hidden="true" dateTime={formatted} title={formatted}>
       {parts ? (
         <>
           <span className="samograph-line-date">{parts.date}</span>
