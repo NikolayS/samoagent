@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Mobile audit M6 — "savebar + safe area"
@@ -33,7 +34,7 @@ import { join } from "node:path";
  * on browsers that do not know the keyword, which drops the whole declaration —
  * the #255 failure mode `css-tokens-defined.test.ts` guards).
  */
-const cssRaw = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const cssRaw = readGlobalsCss();
 const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, "");
 const root = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";
 const layout = readFileSync(join(import.meta.dir, "../app/layout.tsx"), "utf8");

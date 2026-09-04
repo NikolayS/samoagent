@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render } from "@testing-library/react";
 import { Landing } from "./Landing.tsx";
 import { installDom } from "../test/setup.tsx";
+import { readGlobalsCss } from "../test/helpers/stylesheet";
 
 installDom();
 
@@ -133,7 +133,7 @@ describe("Landing CTAs are legible against their own fill", () => {
   let style: HTMLStyleElement;
   beforeEach(() => {
     style = document.createElement("style");
-    style.textContent = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+    style.textContent = readGlobalsCss();
     document.head.append(style);
   });
   afterEach(() => style.remove());

@@ -1,0 +1,315 @@
+/* ===== Slice 5 — Auth + Settings ===== */
+.samograph-auth {
+  display: flex;
+  flex-direction: column;
+  max-width: var(--width-form);
+  margin-inline: auto;
+  gap: var(--space-4);
+}
+
+/* ONE field geometry on /auth (mobile audit M8 §6).
+   The page used to stack three different controls in a 480px column: a 40px
+   input, a 36px submit and a 40px Google button. All three are now the 44px
+   control recipe at full column width — `--control-h` for height (which also
+   clears Google's stated 40px minimum, so branding is honored, not bent) and
+   `width: 100%` so the stack has one left and one right edge. The radii still
+   differ by 2px because Google's 4px is mandated; that is the one deviation.
+   `display: block` is deliberate — the label/input pair carries its own
+   rhythm through `margin-top`, and a grid gap would double it. */
+.samograph-auth-form {
+  display: block;
+}
+
+.samograph-auth-form > .samograph-btn {
+  width: 100%;
+  margin-top: var(--space-3);
+}
+
+.samograph-auth-sent {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.samograph-auth-sent-message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.samograph-auth-sent-message > svg {
+  flex: none;
+  width: var(--space-6);
+  fill: var(--muted);
+}
+
+.samograph-auth-email {
+  font-family: var(--font-mono);
+}
+
+/* The reading measure lives on the page's CONTENT column since #287
+   (`.samograph-page--prose > * { max-width: var(--content-max) }`), so the
+   per-section cap here was a second, silently redundant 720px box. What is left
+   is settings' own heavier divider; the padding comes from `.samograph-section`. */
+.samograph-settings-section {
+  border-top: var(--border-strong) solid var(--line-strong);
+}
+
+/* Mobile audit M6. A sticky bottom bar is pulled UP to the viewport edge while
+   its resting place is still below the fold, so it floats over whatever content
+   happens to be at the bottom of the screen — at 1024 that was the bottom
+   border of the "Chat chime" select (`d01-settings-1024.jpg`). Two things make
+   that safe: nothing may be TRAPPED under the bar (the bar is the last child
+   here, and `.samograph-page` reserves at least the bar's own height of ground
+   beneath it, so scrolling to the end always clears every control), and the bar
+   must read as ABOVE the page rather than as another rule inside the form —
+   hence the upward shadow, the stacking context below, and the edge-to-edge
+   bleed on the widths where the column is the page (see the --bp-md block).
+
+   Deliberately NOT `padding-bottom` on this wrapper: the wrapper is the bar's
+   containing block, and a sticky box is never pushed DOWN past its flow
+   position, so padding here only raises where the bar comes to rest. Measured
+   at 1024x900: the bar ended 174px above the viewport bottom instead of 80px. */
+.samograph-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  /* Explicit box + explicit height: the page can only reserve the bar's
+     footprint if that footprint is a stated number (--savebar-h) rather than
+     the accidental sum of font metrics. */
+  box-sizing: border-box;
+  min-height: calc(var(--savebar-h) + var(--safe-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  padding-bottom: calc(var(--space-3) + var(--safe-bottom));
+  background: var(--surface);
+  border-top: var(--border-strong) solid var(--line-strong);
+  box-shadow: var(--elev-savebar);
+}
+
+/* Any programmatic scroll — an anchor, `scrollIntoView`, the browser bringing a
+   focused control into view — must land the control ABOVE the bar, not under
+   it. */
+.samograph-settings .samograph-field {
+  scroll-margin-bottom: calc(var(--savebar-h) + var(--safe-bottom) + var(--space-3));
+}
+
+/* Where the bar may bleed, and where it may not (M6 review NB3). Since #241/#287
+   `<main>` is the full --page-max box and `.samograph-settings` is a --width-prose
+   column LEFT-aligned inside it, so cancelling the page gutter with negative
+   margins up there would push the bar 32px past the column's left edge and still
+   leave it hundreds of px short of the page's right edge — a slab aligned to
+   nothing. Above --bp-md the bar therefore spans its own column, exactly.
+
+   Below --bp-md the content box (<= 704px at 768) is narrower than the 720px cap,
+   so the column IS the page's content box and cancelling the page's inline
+   padding lands the bar precisely on the two screen edges. The expression mirrors
+   the page's own `max(--gutter, --safe-*)` term by term, so it cancels exactly in
+   landscape too and never adds a scrollable pixel. */
+@media (max-width: 767.98px) {
+  .samograph-savebar {
+    margin-inline: calc(-1 * max(var(--gutter), var(--safe-left))) calc(-1 * max(var(--gutter), var(--safe-right)));
+    padding-inline: max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right));
+  }
+}
+
+.samograph-savebar-status {
+  color: var(--muted);
+}
+
+.samograph-signin {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.samograph-signin-methods {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.samograph-signin-method {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-4);
+}
+
+.samograph-signin-method-name {
+  font-weight: 600;
+}
+
+.samograph-signin-method-state {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+/* ----- Skeletons (design PR 10) ---------------------------------------------
+   "Loading is a skeleton of the thing that is coming" (DESIGN-MODEL §1.4). The
+   audit found the opposite (finding #8): one wired fallback and three bare
+   `<p role="status">Loading …</p>` sentences — a ~20px paragraph standing in
+   for ~1090px of settings form, so the whole page jumped the moment the fetch
+   resolved.
+
+   A placeholder can only avoid that jump if it is the SHAPE of the page that is
+   arriving, so the two shaped variants are page-shaped on purpose: `--panel` is
+   the settings page (title / sections of label+control+hint fields / savebar)
+   and `--row` is the dashboard (title / add-to-call hero / upcoming block /
+   call rows / danger zone). Their spacing is not hand-tuned pixels — a group is
+   built from the same `--space-5` padding and `--border-strong` rule as
+   `.samograph-settings-section`, and a field from the same `--space-3` rhythm
+   as `.samograph-field`, so the two move together when the page rhythm moves.
+   `apps/web/test/skeleton-layout.test.ts` pins the heights; the ≤8px no-jump
+   measurement is in the PR body. */
+.samograph-skeleton {
+  display: grid;
+  gap: var(--skeleton-gap);
+  width: 100%;
+}
+
+/* A descendant selector, not a child one: the shaped variants nest their bars
+   inside groups and fields. */
+.samograph-skeleton span[aria-hidden="true"] {
+  height: var(--skeleton-bar-h);
+  border-radius: var(--skeleton-radius);
+  background: var(--skeleton-bg);
+  animation: samograph-skeleton-shimmer var(--skeleton-dur) ease-in-out infinite alternate;
+}
+
+/* `--form` and `--page` are three anonymous lines; the 70%/85% taper is what
+   keeps them from reading as a table. Scoped to those two variants ON PURPOSE:
+   the selector is (0,3,1) — two classes, the attribute, `:nth-of-type` AND the
+   `span` type — so written against the base class it out-specifies every
+   three-class modifier below and lands on whatever the shaped variants happen
+   to have in span slots 3 and 4. In `--row` that was the 245px upcoming slab
+   (rendered at 70%) and the first 30% section heading (rendered at 85%).
+   `apps/web/test/skeleton-width.test.tsx` replays the cascade and fails if this
+   ever loses its scope again. */
+.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(3), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }
+.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(4), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }
+
+/* The named bars. Three classes deep (0,3,0) on purpose: both the base bar rule
+   and the `:nth-of-type` widths above out-specify a lone modifier class, so a
+   single-class rule here would silently lose and every bar would render 16px
+   tall — which is exactly what the first cut of this PR did. */
+.samograph-skeleton .samograph-skeleton-bar { width: 100%; }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--title { height: var(--skeleton-title-h); width: 45%; }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--head { height: var(--skeleton-head-h); width: 30%; }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--label { height: var(--skeleton-bar-h); width: 35%; }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--control { height: var(--skeleton-control-h); max-width: var(--field-max); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--area { height: var(--skeleton-area-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--para { height: var(--skeleton-para-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--row { height: var(--skeleton-row-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--hero { height: var(--skeleton-hero-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--block { height: var(--skeleton-block-h); }
+.samograph-skeleton .samograph-skeleton-bar.samograph-skeleton-bar--savebar { height: var(--savebar-h); }
+
+/* A section of the page: the geometry of `.samograph-settings-section`, so the
+   placeholder's rules land where the loaded page's rules land. The rule is
+   `--line` rather than `--line-strong` because a shimmering placeholder should
+   not draw a heavier line than the content it stands in for. */
+.samograph-skeleton-group {
+  display: grid;
+  gap: var(--space-5);
+  padding-block: var(--space-5);
+  border-top: var(--border-strong) solid var(--line);
+}
+
+/* One field inside a section: label → control → hint, on `.samograph-field`'s
+   own `--space-3` rhythm. */
+.samograph-skeleton-field {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* An `<h1>` carries margins the grid gap does not; `<h2>` likewise. Matching
+   them here is what keeps the section rules in the skeleton at the same
+   y-offsets as the section rules in the loaded page. */
+/* The page header: title over a description line, then the header's own
+   `--space-8` rail before the first section — `.samograph-page-header`'s
+   geometry, so the first rule of the skeleton lands where the first rule of the
+   page lands. */
+.samograph-skeleton-header {
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-5) var(--space-8);
+}
+.samograph-skeleton .samograph-skeleton-bar--head { margin-block: var(--space-2); }
+.samograph-skeleton .samograph-skeleton-bar--para { margin-block: var(--space-3); }
+/* The trailing rail a real section gets from the last `.samograph-field`'s
+   `margin-block` sitting against the section's own padding — the grid `gap`
+   only spaces fields from each other, never from the section edge. */
+.samograph-skeleton-field:last-child { margin-bottom: var(--space-2); }
+/* The upcoming-meetings block carries its own heading, so it stands alone on
+   the section rhythm. */
+/* The hero and the upcoming block are both full-width slabs and would read as
+   one if they touched; the 8px comes back out of the hero's own height, so the
+   pair still measures the 142.28 + 245.28 the loaded page measures. */
+.samograph-skeleton--row .samograph-skeleton-bar--hero { margin-bottom: var(--space-2); }
+.samograph-skeleton--row .samograph-skeleton-bar--head { margin-block: var(--space-5); }
+.samograph-skeleton--row .samograph-skeleton-bar--row { margin-bottom: var(--space-4); }
+/* The dashboard's danger zone is a field plus a lone action button. The child
+   combinator matters: the confirm field holds a control of its own, and it must
+   not take the standalone button's leading rail. */
+.samograph-skeleton--row .samograph-skeleton-field { margin-block: var(--space-5); }
+.samograph-skeleton--row > .samograph-skeleton-bar--control { margin-top: var(--space-5); }
+
+/* Centred, because `<main>` no longer centres it: `--page-max` keeps the page
+   at the app width and the form column centres itself (see `--content-max`).
+   Without this the /auth placeholder sat at the page's left edge and the
+   loaded card jumped right when it arrived. */
+.samograph-skeleton--form { max-width: var(--width-form); margin-inline: auto; }
+.samograph-skeleton--page { max-width: var(--width-prose); }
+/* Same argument, the other two routes: /settings renders in a `--width-prose`
+   content column and the dashboard list is uncapped, so capping either
+   placeholder at `--width-form` would move the content sideways on arrival.
+   Their own spacing lives in the groups and the bar margins, so the outer grid
+   gap goes to zero. */
+.samograph-skeleton--panel { max-width: var(--width-prose); gap: 0; }
+.samograph-skeleton--row { max-width: none; gap: 0; }
+
+/* Below `--bp-md` the loaded pages grow: the keyterms textarea takes a row, the
+   add-to-call hero stacks, a call row goes to two lines, and prose that fitted
+   one line on a 720px column wraps to two. A skeleton that does not grow with
+   them re-introduces exactly the jump it exists to remove, so these are the
+   same heights measured against the loaded pages at 390 (PR body). */
+@media (max-width: 767.98px) {
+  :root {
+    --skeleton-area-h: 176px;
+    --skeleton-hero-h: 190px;
+    --skeleton-row-h: 119px;
+    --skeleton-para-h: 87px;
+  }
+
+  /* The two single lines that wrap: a field's hint under its control, and the
+     last line of the account block. */
+  .samograph-skeleton-field > .samograph-skeleton-bar:last-child:nth-child(3),
+  .samograph-skeleton-group:last-of-type > .samograph-skeleton-bar:last-child {
+    height: 35px;
+  }
+}
+
+@keyframes samograph-skeleton-shimmer {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samograph-skeleton span[aria-hidden="true"] { animation: none; }
+}
+/* ===== end Slice 5 ===== */
+@keyframes samograph-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--green) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 0%, transparent);
+  }
+}
+

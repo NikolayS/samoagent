@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Mobile audit M7 — the dashboard call row.
@@ -10,7 +9,7 @@ import { join } from "node:path";
  * target. This guard pins the new shape: a title line, a wrapping meta line, and
  * a row that is at least one `--control-h` (44px) tall at every width.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8")
+const css = readGlobalsCss()
   .replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

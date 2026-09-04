@@ -1,0 +1,399 @@
+/* ===== Slice 2 — Controls: buttons, fields, alerts, inline confirm ===== */
+/* Button (DESIGN-MODEL §4 "Button — `.samograph-btn`", PLAN PR 7).
+ *
+ * The base owns the BOX — including `border`, declared here rather than
+ * inherited from the bare `button` rule. Inheriting it was the bug: a
+ * `.samograph-btn` on an <a> got no border at all while its <button> sibling
+ * got `1px solid var(--line)`, and `--ghost { border: 0 }` made a ghost button
+ * 2px shorter and narrower than everything on its row. Variants now change
+ * COLOUR only, so every button on a line is the same box.
+ *
+ * DEVIATION from DESIGN-MODEL §4, which writes the base as
+ * `border: 1px solid transparent`: the base border-color is `--control-border`
+ * and the base fill is `--surface`, i.e. the base IS the neutral variant.
+ * Every call site today does carry a colour variant, so nothing in the app
+ * renders the base colours as-is. It is a real box anyway for two reasons.
+ * First, `.samograph-btn` on an `<a>` never got a border at all — anchors
+ * don't match the `button` rule this base replaces — so the base is the only
+ * place that can give a link-button the same box as the `<button>` beside it.
+ * Second, a button that loses or never gets its variant (a typo, a new variant
+ * landing in a later PR) then degrades to a plain neutral control instead of
+ * disappearing into the page — a transparent base makes that failure silent.
+ * Colour variants still override all three properties, so the model's intent —
+ * base owns geometry, variant owns colour — holds unchanged.
+ */
+.samograph-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--control-h);
+  padding: 0 var(--space-4);
+  line-height: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  /* `.samograph-btn` is worn by <a> as often as by <button> (UpcomingMeetings
+     renders four). A button is a box, not a link: no underline. */
+  text-decoration: none;
+  /* The box above is pinned to ONE line (`height` + `line-height: 1`), so the
+     label must be pinned to one line too — otherwise a long `--sm` label in a
+     narrow row ("Undo skip auto-record", "Download (no chat)") wraps and the
+     second line paints outside the border (#279 review NB2). Where the box is
+     allowed to grow instead — the coarse/narrow block below — this is relaxed
+     back to `normal` so the label wraps into a taller button. */
+  white-space: nowrap;
+  transition: color 140ms, background-color 140ms, border-color 140ms;
+}
+.samograph-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.samograph-btn--primary { color: var(--ground); background: var(--ink); border-color: var(--ink); }
+/* `--secondary` is `--ink-soft`, not `--muted`: DESIGN-MODEL §4 — "a secondary
+   button must not read as disabled", which matters now that disabled is itself
+   `--muted` on a fill. */
+.samograph-btn--secondary { color: var(--ink-soft); background: transparent; border-color: var(--control-border); }
+.samograph-btn--ghost { color: var(--muted); background: transparent; border-color: transparent; }
+.samograph-btn--danger { color: var(--crit); background: transparent; border-color: var(--crit); }
+/* `:where()` keeps the filled-danger modifier at single-class specificity so
+   the `[disabled]` recipe below still outranks it. */
+.samograph-btn--danger:where(.samograph-btn--solid) { color: white; background: var(--crit); border-color: var(--crit); }
+
+/* Hover/active never reach a disabled button — that is what `:not([disabled])`
+   buys, and it retires the three `[disabled]:hover` undo rules this block used
+   to carry. */
+.samograph-btn--primary:not([disabled]):hover { background: color-mix(in srgb, var(--ink) 88%, var(--surface)); border-color: color-mix(in srgb, var(--ink) 88%, var(--surface)); }
+.samograph-btn--secondary:not([disabled]):hover { color: var(--ink); background: var(--hover-surface); border-color: var(--ink); }
+.samograph-btn--ghost:not([disabled]):hover { color: var(--ink); background: var(--hover-surface); border-color: transparent; }
+.samograph-btn--danger:not([disabled]):hover { color: white; background: var(--crit); border-color: var(--crit); }
+.samograph-btn--danger:where(.samograph-btn--solid):not([disabled]):hover { background: color-mix(in srgb, var(--crit) 88%, black); border-color: color-mix(in srgb, var(--crit) 88%, black); }
+.samograph-btn:not([disabled]):active { transform: translateY(1px); }
+
+/* Disabled: an explicit fill + hairline + label ink. `opacity: .5` ALONE put
+   grey ink on the grey ground in BOTH themes (the reported illegible disabled
+   "Save settings"); no opacity multiplier survives here, because multiplying a
+   measured colour re-creates the collapse it is meant to fix. This rule sits
+   last so it wins the specificity ties with the variants above. */
+.samograph-btn[disabled] {
+  color: var(--btn-disabled-fg);
+  background: var(--btn-disabled-bg);
+  border-color: var(--btn-disabled-border);
+  cursor: not-allowed;
+}
+.samograph-btn[aria-busy="true"] { cursor: progress; }
+
+/* `--on-panel` (DESIGN-MODEL §4 Button variants; PLAN PR 12 "replaces
+ * hand-written in-panel button rules").
+ *
+ * The transcript instrument is theme-INVARIANT: `.samograph-instrument-foot`
+ * paints `--panel-surface` #141413 under the LIGHT theme as well as the dark
+ * one. A button in there taking the page's theme-relative ink is unreadable —
+ * Share and Try again (`--secondary`) measured 1.57:1 on that surface in light
+ * mode, and Delete (`--danger`) 2.90:1. Every ink below is panel-relative, so
+ * both themes read identically.
+ *
+ * Scoped by ancestor rather than a new `--on-panel` class because the footer
+ * is the only place this applies (`PerCallTranscript` renders exactly one
+ * `<footer class="samograph-controls samograph-instrument-foot">`) and no
+ * markup needs to move; both halves of that class pair are covered so the
+ * rules survive either class being dropped. */
+.samograph-controls .samograph-btn,
+.samograph-instrument-foot .samograph-btn { color: var(--on-panel-ink); background: transparent; border-color: var(--on-panel-border); }
+.samograph-controls .samograph-btn--primary,
+.samograph-instrument-foot .samograph-btn--primary { color: var(--panel-ground); background: var(--on-panel-ink); border-color: var(--on-panel-ink); }
+.samograph-controls .samograph-btn--secondary,
+.samograph-instrument-foot .samograph-btn--secondary { color: var(--on-panel-ink); background: transparent; border-color: var(--on-panel-border); }
+.samograph-controls .samograph-btn--ghost,
+.samograph-instrument-foot .samograph-btn--ghost { color: var(--on-panel-muted); background: transparent; border-color: transparent; }
+.samograph-controls .samograph-btn--danger,
+.samograph-instrument-foot .samograph-btn--danger { color: var(--on-panel-crit); background: transparent; border-color: var(--on-panel-crit); }
+.samograph-controls .samograph-btn--danger:where(.samograph-btn--solid),
+.samograph-instrument-foot .samograph-btn--danger:where(.samograph-btn--solid) { color: var(--panel-ground); background: var(--on-panel-crit); border-color: var(--on-panel-crit); }
+.samograph-controls .samograph-btn:not([disabled]):hover,
+.samograph-instrument-foot .samograph-btn:not([disabled]):hover { color: var(--panel-ground); background: var(--on-panel-ink); border-color: var(--on-panel-ink); }
+.samograph-controls .samograph-btn--danger:not([disabled]):hover,
+.samograph-instrument-foot .samograph-btn--danger:not([disabled]):hover { color: var(--panel-ground); background: var(--on-panel-crit); border-color: var(--on-panel-crit); }
+/* (0,3,0) — outranks every panel variant above, as the page recipe does on the page. */
+.samograph-controls .samograph-btn[disabled],
+.samograph-instrument-foot .samograph-btn[disabled] { color: var(--on-panel-disabled-fg); background: var(--on-panel-disabled-bg); border-color: var(--on-panel-disabled-border); }
+.samograph-field { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
+.samograph-field > label, .samograph-field > input, .samograph-field > select, .samograph-field > textarea { margin-top: 0; }
+.samograph-field-hint { margin: 0; color: var(--muted); font-size: var(--text-xs); }
+/* Select — a native <select> with `appearance: none` and our own affordance:
+   a full-height bordered end-cap (::before) with a masked chevron (::after)
+   painted in --muted, so it is correct in both themes. Both pseudo-elements are
+   pointer-events: none — the whole control stays one hit target. The mask must
+   stay on its own element: masking the cap would erase its hairline and fill. */
+.samograph-select { position: relative; display: block; width: 100%; }
+.samograph-select > select {
+  appearance: none; -webkit-appearance: none;
+  display: block; width: 100%; height: var(--control-h); margin: 0;
+  padding: 0 calc(var(--control-h) + var(--space-2)) 0 var(--space-3);
+  font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--control-border); border-radius: var(--radius-control);
+  cursor: pointer;
+}
+/* Both halves of the mobile field contract for the styled select, and they sit
+   HERE — after `.samograph-select > select` — on purpose. A media query adds no
+   specificity, so the `font: inherit` above (0,1,1, and a shorthand, so it
+   re-resets font-size) would win on source order over the shared 16px rule in
+   the base field block. `--field-max` is likewise a DESKTOP affordance: it
+   stops a four-character enum spanning a 1120px column, but on a 350px phone
+   the column is already narrower than the 22rem cap and any cap there reads as
+   a broken field (mobile audit M8). */
+@media (max-width: 767.98px) {
+  .samograph-select > select { font-size: 16px; }
+}
+
+@media (min-width: 768px) {
+  .samograph-select { max-width: var(--field-max); }
+}
+
+.samograph-select::before {
+  content: ""; position: absolute; inset-block: 1px; inset-inline-end: 1px;
+  width: calc(var(--control-h) - 2px); pointer-events: none;
+  border-inline-start: 1px solid var(--line);
+  border-start-end-radius: calc(var(--radius-control) - 1px);
+  border-end-end-radius: calc(var(--radius-control) - 1px);
+  background: color-mix(in srgb, var(--ink) 3%, var(--surface));
+}
+.samograph-select::after {
+  content: ""; position: absolute; pointer-events: none;
+  top: 50%; margin-top: -3px; inset-inline-end: calc((var(--control-h) - 10px) / 2);
+  width: 10px; height: 6px; background: var(--muted);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-size: 10px 6px; mask-size: 10px 6px;
+  -webkit-mask-position: center; mask-position: center;
+}
+.samograph-select:hover > select { border-color: var(--ink); }
+.samograph-select:hover::before { background: var(--hover-surface); }
+.samograph-select:hover::after { background: var(--ink); }
+/* `border-color` is restated here because `.samograph-select > select` above
+   sets `border` and outranks the shared `select:focus-visible` rule on source
+   order (both are 0,1,1) — without it a focused select keeps its resting
+   border while every input darkens to --ink. */
+.samograph-select > select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-color: var(--ink); }
+.samograph-select > select:disabled { color: var(--muted); background: var(--field-bg-disabled); cursor: not-allowed; }
+.samograph-select:has(> select:disabled)::before { background: var(--field-bg-disabled); }
+.samograph-select:has(> select:disabled)::after { background: var(--faint); }
+input:where(:not([type="checkbox"], [type="radio"])), select, textarea { background: var(--surface); border-color: var(--control-border); }
+textarea { resize: vertical; font-family: var(--font-mono); }
+/* Alert / Banner (DESIGN-MODEL §4, PLAN desktop PR 8). One box, four tones, and
+   `components/Alert.tsx` is the only thing that writes these class names.
+   The old box drew `border: 1px solid currentColor` around tone-coloured copy,
+   so a warning was a wall of ochre text in an ochre ring. Now the tone is a 3px
+   inline-start rail plus a 8% tint, and the copy stays at `--ink` — one reading
+   colour in both themes. `display: flow-root` and NOT flex: the copy is a
+   sentence that routinely contains an `<a>` or a `<span>`, and a flex root
+   would promote each of those to a flex item and open a `gap` inside the
+   sentence ("link to <email> ." with 16px holes). Title and action get their
+   own block boxes instead. */
+.samograph-alert {
+  --alert-tone: var(--ink-soft);
+  display: flow-root;
+  border: 1px solid var(--line);
+  border-inline-start: var(--alert-rail) solid var(--alert-tone);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+}
+/* The title claims its own line, so the copy starts under it, not beside it. */
+.samograph-alert-title { display: block; font-weight: 600; color: var(--ink); }
+/* `width: fit-content` + `margin-inline-start: auto` parks the action block at
+   the far end of the box — the block-layout equivalent of `justify-self: end`,
+   with no flex context to leak into the sentence above it. */
+.samograph-alert-action { display: block; width: fit-content; margin-block-start: var(--space-3); margin-inline-start: auto; }
+.samograph-alert--error { --alert-tone: var(--crit); color: var(--ink); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
+.samograph-alert--warn { --alert-tone: var(--warn); color: var(--ink); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.samograph-alert--success { --alert-tone: var(--success-ink); color: var(--ink); background: color-mix(in srgb, var(--success-ink) 8%, var(--surface)); }
+.samograph-alert--info { --alert-tone: var(--ink-soft); color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
+.samograph-toggle { display: flex; align-items: flex-start; gap: var(--space-3); margin-block: var(--space-4); cursor: pointer; }
+.samograph-toggle input { margin-top: 0.2rem; }
+.samograph-toggle span { display: grid; gap: var(--space-1); }
+.samograph-toggle .samograph-field-hint { display: block; }
+/* ----- Switch vs checkbox (design PR 9) -------------------------------------
+   Two forms, one class family (DESIGN-MODEL §4). They are told apart by the
+   ARIA attribute rather than by an extra class, so the pixels cannot drift
+   from the announced semantics — you cannot add `role="switch"` and forget to
+   add the class, which is exactly the bug the audit found ("`role="switch"` on
+   auto-record rendered as a plain checkbox").
+
+   Both keep their implicit `<label>` association: the input stays a real
+   `<input type="checkbox">` inside the label, so the accessible name, the
+   whole-label hit target, Space-to-toggle and the checked/disabled semantics
+   are the browser's, not ours. */
+.samograph-toggle input[type="checkbox"]:not([role="switch"]) {
+  accent-color: var(--ink);
+  width: 18px;
+  height: 18px;
+}
+
+.samograph-toggle input[role="switch"] {
+  appearance: none;
+  -webkit-appearance: none;
+  /* A long hint beside it must not squeeze the track in the flex row. */
+  flex: none;
+  /* The knob is absolutely positioned; the track is its containing block. */
+  position: relative;
+  /* Overrides the 0.2rem nudge that aligns a small square box with the first
+     line of the label — a 24px track next to a ~22px line needs none. */
+  margin-top: 0;
+  /* The forced-colours block below gives the track a real border; without this
+     the border would come out of the 40x24 box (there is no blanket
+     `* { box-sizing }` in this sheet). */
+  box-sizing: border-box;
+  width: var(--switch-w);
+  height: var(--switch-h);
+  border: 0;
+  border-radius: var(--radius-pill);
+  /* DEVIATION from DESIGN-MODEL §4, which names `--line-strong`: the OFF track
+     and the knob are a state indicator (WCAG 2.2 SC 1.4.11, 3:1). `--ground`
+     on `--line-strong` is 1.9:1 in dark mode (#111110 on #45433d) — the knob
+     disappears. `--muted` is the same neutral one step further from the ground
+     and measures 5.0:1 light (#f4f2ed on #6b675c) and 5.6:1 dark (#111110 on
+     #918c80) with a single declaration. */
+  background: var(--muted);
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease);
+}
+
+.samograph-toggle input[role="switch"]::before {
+  content: "";
+  position: absolute;
+  top: var(--switch-pad);
+  left: var(--switch-pad);
+  width: var(--switch-knob);
+  height: var(--switch-knob);
+  border-radius: var(--radius-pill);
+  /* The page ground, so the knob reads as a hole punched through the track in
+     both themes and against both track colours. */
+  background: var(--ground);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.samograph-toggle input[role="switch"]:checked { background: var(--ink); }
+.samograph-toggle input[role="switch"]:checked::before { transform: translateX(var(--switch-travel)); }
+.samograph-toggle input[role="switch"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Disabled, WITHOUT the `opacity: .45` the rest of the system uses. Opacity
+   composites the track back toward the page ground: measured light-theme, the
+   OFF track goes #6b675c -> #b6b4ac against an unchanged #f4f2ed knob, i.e.
+   5.0:1 -> 1.9:1, and a disabled switch stops saying whether it is on. Since
+   the whole point of the control is that its two states are legible, the
+   colours keep their contrast and "you cannot change this" is carried by the
+   three other signals: the cursor, a hairline ring on the track, and the label
+   text stepping down to `--muted`. */
+.samograph-toggle input[role="switch"]:disabled {
+  cursor: not-allowed;
+  box-shadow: inset 0 0 0 var(--border) var(--btn-disabled-border);
+}
+.samograph-toggle:has(input[role="switch"]:disabled) {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+/* Forced-colours modes (Windows high contrast) replace author colours
+   wholesale, so a track whose state lives in `background` reads as one flat box
+   in both states. Give it a real border and paint the knob and the ON track in
+   system colours, which those modes keep. */
+@media (forced-colors: active) {
+  .samograph-toggle input[role="switch"] {
+    border: var(--border) solid ButtonText;
+    background: ButtonFace;
+  }
+  .samograph-toggle input[role="switch"]::before { background: ButtonText; }
+  .samograph-toggle input[role="switch"]:checked { background: Highlight; }
+  .samograph-toggle input[role="switch"]:checked::before { background: HighlightText; }
+  .samograph-toggle input[role="switch"]:disabled { border-color: GrayText; }
+  .samograph-toggle input[role="switch"]:disabled::before { background: GrayText; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samograph-toggle input[role="switch"],
+  .samograph-toggle input[role="switch"]::before { transition: none; }
+}
+.samograph-chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0.15rem 0.45rem; font-size: var(--text-xs); font-weight: 700; }
+.samograph-danger-zone { border-top: var(--border-strong) solid var(--crit); padding-top: var(--space-5); }
+.samograph-danger-zone-title { color: var(--crit); }
+.samograph-danger-confirm { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
+.samograph-danger-delete { margin-top: var(--space-5); }
+.samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
+/* ----- Touch targets (mobile audit M3) -------------------------------------
+   A finger is not a cursor: 24 actions in this product measured under 44 CSS
+   px at 390 (`← Dashboard` 85 × 20, `Reconnect in Settings` 144 × 17, a footer
+   link 49 × 17). #279 fixed the button scale itself; what is left is everything
+   that is not a button. This block raises them to `--tap-min` on a coarse pointer — and also on a narrow viewport, so the
+   rule is visible to a desktop browser resized to a phone width (that is how
+   the audit measured, and how the guard screenshots are taken).
+
+   Boxed controls take the height directly. Inline links in prose cannot: a
+   `min-height` is ignored on an inline box and `display: block` would break the
+   sentence around it, so they keep their layout and grow an invisible
+   pseudo-element hit area instead. */
+@media (pointer: coarse), (max-width: 767.98px) {
+  /* `min-height` clamps a fixed `height`, so the 44px floor holds on its own;
+     `height: auto` is what stops a label that wraps to two lines on a narrow
+     screen from overflowing a box pinned to one line of text. */
+  .samograph-btn {
+    height: auto;
+    min-height: var(--tap-min);
+    padding-block: var(--space-2);
+    /* The box grows here, so a long label wraps INTO it rather than being held
+       on one line that widens the row past the viewport (#279 review NB2). */
+    white-space: normal;
+  }
+
+  /* `.samograph-btn--sm { height: var(--control-h-sm) }` is declared later in
+     this sheet at the same (0,1,0) specificity, so a bare `.samograph-btn--sm`
+     here would lose on source order and silently re-pin 36px — the `min-height`
+     above would still hold the box at 44, hiding the dead declaration. The
+     compound is (0,2,0) and wins wherever either rule moves to. Every `--sm`
+     in the app is written alongside `.samograph-btn`, so it matches them all. */
+  .samograph-btn.samograph-btn--sm {
+    height: auto;
+  }
+
+  .samograph-call-back,
+  .samograph-download-transcript {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+  }
+
+  /* The share URL is a whole link on its own line and must keep wrapping
+     (`overflow-wrap: anywhere`), so it takes a block-level flex box rather than
+     the inline one above, which would size to the unwrapped URL. */
+  .samograph-share-url {
+    display: flex;
+    align-items: center;
+    min-height: var(--tap-min);
+  }
+
+  /* The label is the target, not the 13px checkbox inside it. Alignment stays
+     as designed (`flex-start`) — only the floor is added. */
+  .samograph-toggle {
+    min-height: var(--tap-min);
+  }
+
+  /* Unclassed anchors are the prose/footer/nav links — the ones with no box of
+     their own. `position: relative` makes the anchor the containing block; the
+     pseudo-element is a child of it, so a tap anywhere in the 44px band still
+     activates the link, and being `absolute` it takes no space in the line. */
+  a:not([class]) {
+    position: relative;
+  }
+
+  a:not([class])::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+}
+
+/* ===== end Slice 2 ===== */
+

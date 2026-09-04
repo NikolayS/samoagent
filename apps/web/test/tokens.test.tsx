@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { render } from "@testing-library/react";
 import { createElement } from "react";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { Landing } from "../components/Landing.tsx";
 import { installDom } from "./setup.tsx";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 installDom();
 
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const css = readGlobalsCss();
 const clean = css.replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 const root = clean.match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";

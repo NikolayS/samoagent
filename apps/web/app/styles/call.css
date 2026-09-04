@@ -1,0 +1,203 @@
+/* =============================================================================
+ * Per-call transcript page (SPEC §4.1, Stories 1/2/5)
+ * ========================================================================== */
+
+.samograph-percall {
+  margin-top: 0.5rem;
+}
+
+/* Status chip — `.samograph-status[data-status-kind]`. A left accent bar keyed
+   to the per-kind token, always paired with the text label (never color-only). */
+.samograph-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--state-pending);
+  border-radius: 10px;
+}
+
+.samograph-status[data-status-kind="pending"] {
+  border-left-color: var(--state-pending);
+}
+.samograph-status[data-status-kind="joining"] {
+  border-left-color: var(--state-joining);
+}
+.samograph-status[data-status-kind="live"] {
+  border-left-color: var(--state-live);
+}
+.samograph-status[data-status-kind="ended"] {
+  border-left-color: var(--state-ended);
+}
+.samograph-status[data-status-kind="error"] {
+  border-left-color: var(--state-error);
+}
+
+.samograph-status-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.samograph-status[data-status-kind="error"] .samograph-status-label {
+  color: var(--crit);
+}
+
+/* Live: a pulsing dot beside the "Live" label (the label still carries meaning
+   for color-blind / screen-reader users — the dot is decorative). */
+.samograph-status[data-status-kind="live"] .samograph-status-label::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--green);
+  animation: samograph-live-pulse 1.6s ease-out infinite;
+}
+
+.samograph-status-message {
+  margin: 0;
+  color: var(--muted);
+}
+
+.samograph-status-code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Degraded / SAMOGRAPH-WARNING banner (SPEC §3 Story 5, §4.5). */
+.samograph-degraded-banner {
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--warn) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line));
+  border-radius: 8px;
+}
+
+.samograph-transcript-actions {
+  margin: 0.75rem 0;
+}
+
+.samograph-download-transcript {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--green-deep);
+  background: var(--green-soft);
+  border: 1px solid color-mix(in srgb, var(--green) 30%, var(--line));
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.samograph-download-transcript:hover {
+  color: var(--green-deep);
+  border-color: var(--green);
+}
+
+/* Never-silent terminal card (SPEC §5.16). This is an `Alert tone="danger"`,
+   so the box — tint, `--line` border, tone rail, radius — comes from
+   `.samograph-alert`. Redeclaring any of it here would win on source order and
+   erase the rail, which is exactly what this rule used to do. Spacing only. */
+.samograph-stream-error {
+  margin: 0.75rem 0;
+}
+
+.samograph-stream-error p {
+  margin: 0;
+}
+
+/* Transcript feed. A monospaced, tabular-nums column makes the leading
+   `[YYYY-MM-DD HH:MM:SS]` timestamp align into a fixed gutter across lines; a
+   left tally rail (a vertical rule + a per-line counter) tracks the flow. */
+.samograph-transcript {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  counter-reset: samograph-line;
+  /* The tally rail: one continuous 2px vertical rule at x=2.4rem. */
+  background: linear-gradient(var(--line), var(--line)) 2.4rem 0 / 2px 100%
+    no-repeat;
+}
+
+.samograph-transcript > li {
+  counter-increment: samograph-line;
+  position: relative;
+  padding: 0.15rem 0 0.15rem 3.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.55;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+/* Per-line tally number, right-aligned in the gutter left of the rail. */
+.samograph-transcript > li::before {
+  content: counter(samograph-line);
+  position: absolute;
+  left: 0;
+  top: 0.15rem;
+  width: 1.9rem;
+  text-align: right;
+  font-size: 0.78em;
+  color: var(--muted);
+}
+
+/* Streaming partial line: muted text + a rationed pink caret at the live edge —
+   the one place pink appears in the read-along. */
+.samograph-transcript > li.samograph-line-partial {
+  color: var(--muted);
+}
+
+.samograph-transcript > li.samograph-line-partial::after {
+  content: "";
+  display: inline-block;
+  width: 0.5ch;
+  height: 1.05em;
+  margin-left: 0.15em;
+  vertical-align: text-bottom;
+  background: var(--pink);
+  border-radius: 1px;
+  animation: samograph-caret 1s steps(1, end) infinite;
+}
+
+@keyframes samograph-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Inline SAMOGRAPH-WARNING system note (SPEC §4.5) — warn-toned, clearly not a
+   meeting utterance. `role="note"` carries the same distinction non-visually. */
+.samograph-warning-line {
+  margin: 0;
+  font-weight: 600;
+  color: var(--warn);
+}
+
+/* The warning's own <li> is NOT a transcript row: it has one child, not four
+   columns. Without this it matched only `.samograph-instrument-lines li`, whose
+   `56px 82px 66px minmax(480px, 1fr)` track list gives the list an intrinsic
+   minimum of ~684px — so a single warning made the whole transcript scroll
+   horizontally on a 390px phone (#280 review). One full-width cell instead, at
+   every width; the four-column grid of real rows is untouched. */
+.samograph-instrument-lines > li.samograph-warning-row {
+  display: block;
+  padding: 8px 16px;
+}
+
+/* Same as every other instrument row: no page-level tally counter, which would
+   otherwise print over the first characters of the warning. */
+.samograph-percall .samograph-warning-row::before,
+.samograph-percall .samograph-warning-row::after {
+  content: none;
+}
+

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Mobile audit M3 (`scratchpad/ui-audit/MOBILE-AUDIT.md`).
@@ -19,7 +18,7 @@ import { join } from "node:path";
  *
  * The fix is one media block, so this guard pins the block and its members.
  */
-const raw = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const raw = readGlobalsCss();
 const css = raw.replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

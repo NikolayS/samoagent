@@ -1,9 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { render } from "@testing-library/react";
 import { PageSkeleton } from "../components/PageSkeleton.tsx";
 import { installDom } from "./setup.tsx";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 installDom();
 
@@ -31,7 +30,7 @@ installDom();
  *     the winner for each bar of the rendered component. It runs in CI, where
  *     Chrome does not, and it fails for the same reason the pixels did.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
 /** The /dashboard content column at a 1024px viewport (`--width-app` minus the gutters). */
 const COLUMN = 960;

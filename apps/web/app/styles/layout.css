@@ -1,0 +1,410 @@
+.samograph-page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  /* The trailing rail is the savebar's reserved ground (M6): never smaller than
+     a floating bar plus the home-indicator inset, so a sticky bar at the end of
+     a page always has somewhere to come to rest that is not on top of a
+     control. `--space-16` stays the floor for every other page. */
+  padding: var(--space-8) var(--gutter) max(var(--space-16), calc(var(--savebar-h) + var(--safe-bottom)));
+}
+
+/* `--form` / `--prose` narrow the CONTENT, not the page (DESIGN-MODEL §5,
+   "Alignment fix"): `<main>` keeps the shared page container so its left edge
+   tracks the nav, and the reading width lands on the content column. */
+.samograph-page--form {
+  --content-max: var(--width-form);
+}
+
+.samograph-page--prose {
+  --content-max: var(--width-prose);
+}
+
+.samograph-page--prose > *,
+.samograph-page--form > * {
+  max-width: var(--content-max);
+}
+
+/* An action row (design audit §4, DESIGN-MODEL §4 Button — "width: never
+   stretches"). One or more controls on a line, each at its intrinsic width,
+   wrapping onto the next line instead of stretching or being clipped. It is
+   the wrapper that owns the layout, so a button pair can sit inside a grid
+   container without becoming two full-width grid items.
+
+   This is the ONE `.samograph-actions` rule — it also serves the two older
+   consumers (InlineConfirm, MagicLinkRequestForm), whose `--space-2` gap and
+   `--space-5` top margin it keeps unchanged. A second rule further down the
+   sheet would not extend this one; it would silently win declaration by
+   declaration on source order. */
+.samograph-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.samograph-actions > * {
+  flex: 0 0 auto;
+}
+
+/* ----- Page header (DESIGN-MODEL §4 "Page header", PLAN.md desktop PR 5) -----
+   Every route grew its own heading block, so the H1 size, the space under it and
+   the place secondary text went were three different answers — and on
+   `/calls/[id]` the raw meeting URL was rendered INSIDE the H1. `PageHeader`
+   emits ONE shape (eyebrow / title / description / actions) and this is its one
+   set of rules. A page-specific class composes ON TOP of these (the call view
+   keeps its own tighter gap and mobile sizes, #283), so every declaration here
+   is the base an override can win over. */
+.samograph-page-header {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-8);
+}
+
+/* The text column is its own grid so the eyebrow/title/description rhythm is
+   independent of the gap between that column and the actions slot. */
+.samograph-page-header-text {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.samograph-page-header-eyebrow {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.samograph-page-header-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: var(--leading-tight);
+}
+
+.samograph-page-header-description {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.samograph-page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Mobile-first: the actions sit UNDER the title and only move beside it once
+   there is room (DESIGN-MODEL §5). The `--has-actions` modifier is set by the
+   component, so the two-column grid is never declared on a header that has a
+   single child to put in it. */
+@media (min-width: 768px) {
+  .samograph-page-header--has-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-4);
+  }
+}
+
+/* ----- Section rhythm (DESIGN-MODEL §4 "Card / Section", §5) ----------------
+   Structure from hairlines and whitespace, not nested boxes: a run of related
+   content is separated from the next by ONE 1px rule and `--space-6` of padding.
+   The gap between two things inside a section is always smaller than the gap
+   around the group they belong to. */
+.samograph-section {
+  padding-block: var(--space-6);
+  border-top: var(--border) solid var(--line);
+}
+
+/* The dashboard's other two peer sections are rendered by sibling components
+   (`AddToCallForm`, `UpcomingMeetings`); they join the shared rhythm here rather
+   than each carrying a private `margin-block`, which is what let four sections
+   at four spacings read as one block. */
+.samograph-dash-hero,
+.samograph-upcoming-meetings {
+  padding-block: var(--space-6);
+  border-top: var(--border) solid var(--line);
+}
+
+/* A rule immediately under the page header separates nothing — the header's own
+   `--space-8` already ended it. */
+.samograph-page-header + .samograph-section {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.samograph-page-header + .samograph-dash-hero {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* …and through a wrapper. On /settings the first section is the first child of
+   the <form> that follows the header, not a sibling of it, so the adjacent
+   rules above never matched and the page opened with a divider under its H1
+   (#295 review). At (0,3,0) this also outranks `.samograph-settings-section`'s
+   own heavier `border-top`, which is the declaration that drew that line. */
+.samograph-page-header + * > .samograph-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Title (+ optional description) of a section: the pair is one group, so it
+   takes the tight `--space-1` gap and the group is what carries the space down
+   to the section's content. */
+.samograph-section-header {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.samograph-section-title {
+  margin: 0;
+}
+
+.samograph-section-description {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.samograph-app-nav {
+  border-bottom: var(--border) solid var(--line);
+  background: var(--surface);
+}
+
+/* The app shell (mobile audit M2). Below --bp-md the header is brand + a 44x44
+   disclosure and nothing else, so it rests at 56px instead of the 129px the old
+   `flex-wrap: wrap` patch produced; the links, the account line and the theme
+   control live in ONE place in the DOM — the disclosure panel — and are moved
+   by CSS, not duplicated. At >= 768px that panel is `display: contents`, which
+   dissolves it back into the header row: the desktop layout is what it was. */
+.samograph-app-nav-inner {
+  /* Same container as `.samograph-page` — see `--page-max`. */
+  max-width: var(--page-max);
+  min-height: 56px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-6);
+  /* The panel is the second flex row: it must sit flush under the bar. */
+  row-gap: 0;
+}
+
+.samograph-app-nav-toggle {
+  width: var(--control-h);
+  height: var(--control-h);
+  margin-left: auto;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+}
+
+.samograph-app-nav-toggle:hover {
+  background: var(--hover-surface);
+}
+
+/* Three rules drawn from one box — no icon font, no emoji, no dependency. */
+.samograph-app-nav-toggle-bars,
+.samograph-app-nav-toggle-bars::before,
+.samograph-app-nav-toggle-bars::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 1px;
+}
+
+.samograph-app-nav-toggle-bars {
+  position: relative;
+}
+
+.samograph-app-nav-toggle-bars::before,
+.samograph-app-nav-toggle-bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.samograph-app-nav-toggle-bars::before { top: -6px; }
+.samograph-app-nav-toggle-bars::after { top: 6px; }
+
+.samograph-app-nav-links,
+.samograph-app-nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.samograph-app-brand {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* --- Below --bp-md: the menu is a disclosure panel under the bar. --- */
+@media (max-width: 767.98px) {
+  /* Holds the bar open at 56px so opening the panel does not shift the brand
+     (the 44px disclosure alone would let the row collapse to 44). */
+  .samograph-app-brand {
+    min-height: 56px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* The collapse is `display: none`, not the `hidden` attribute: `hidden`
+     would also hide the panel from assistive tech at >= 768px, where it is
+     visible — React cannot see the viewport, but this media query can. */
+  .samograph-app-nav-menu[data-open="false"] {
+    display: none;
+  }
+
+  .samograph-app-nav-menu {
+    flex-basis: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+    padding-block: var(--space-4);
+    border-top: var(--border) solid var(--line);
+  }
+
+  .samograph-app-nav-menu .samograph-app-nav-links {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  /* A link in the panel is a tap target, not a word in a row. */
+  .samograph-app-nav-menu .samograph-app-nav-links a {
+    display: flex;
+    align-items: center;
+    min-height: var(--control-h);
+  }
+
+  .samograph-app-nav-menu .samograph-app-nav-right {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  /* An address is data: ellipsise it, never re-wrap it mid-token into
+     something that reads as a different address. */
+  .samograph-app-nav-menu :is(.samograph-account-email) {
+    min-width: 0;
+    flex-basis: 100%;
+    overflow: hidden;
+    overflow-wrap: normal;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* --- At >= --bp-md the panel dissolves back into the header row. --- */
+@media (min-width: 768px) {
+  .samograph-app-nav-inner {
+    min-height: 64px;
+    padding: var(--space-2) var(--gutter);
+    flex-wrap: nowrap;
+  }
+
+  .samograph-app-nav-toggle { display: none; }
+
+  /* Not a box up here: the panel's children ARE the header row. */
+  .samograph-app-nav-menu[data-open] { display: contents; }
+
+  .samograph-app-nav-right { margin-left: auto; }
+}
+
+/* Horizontal safe area (M6 review). `viewport-fit=cover` lets the page paint
+   under the notch, so in landscape on a notched phone the notch eats into the
+   gutter — the nav's leftmost link, the page's left rail, the landing hero's
+   first line. Every element that OWNS the gutter yields to the inset here.
+
+   One grouped rule, and it sits after the @media blocks that restate these
+   paddings (the landing hero at --bp-lg, the hero/footer below --bp-md, the
+   app nav at --bp-md): each of those carries the same `var(--gutter)` inline and varies only
+   the BLOCK padding, so overriding the inline half in one place is equivalent
+   at every width. `max()` collapses to plain `--gutter` wherever the inset is
+   0 — i.e. everywhere except a notched phone held sideways. */
+.samograph-page,
+.samograph-app-nav-inner,
+.samograph-site-nav,
+.samograph-landing-hero,
+.samograph-site-footer {
+  padding-inline: max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right));
+}
+
+/* The PUBLIC shell (/auth, /auth/callback, /c/<token>) has no menu to disclose:
+   no primary links, no account line, no Log out — only the theme control. It
+   therefore renders no hamburger and no panel; the theme control is a direct
+   child of the bar and rides inline at every width (mobile audit M8, from the
+   #284 review). */
+.samograph-app-nav-inner > .samograph-app-nav-right {
+  margin-left: auto;
+}
+
+.samograph-skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ground);
+  background: var(--ink);
+  transform: translateY(-200%);
+}
+
+.samograph-skip-link:focus {
+  color: var(--ground);
+  transform: translateY(0);
+}
+
+/* Compact segmented theme control; each hit target remains 44px tall. */
+.samograph-theme-switcher {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: var(--ground);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+}
+
+.samograph-theme-switcher__option {
+  min-width: var(--control-h);
+  min-height: var(--control-h);
+  margin: 0;
+  padding: 0 11px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.samograph-theme-switcher__option:hover {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: transparent;
+}
+
+.samograph-theme-switcher__option[aria-pressed="true"] {
+  color: var(--ground);
+  background: var(--ink);
+  font-weight: 500;
+}
+

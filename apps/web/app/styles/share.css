@@ -1,0 +1,22 @@
+/* =============================================================================
+ * Owner / share controls & read-only share page
+ * ========================================================================== */
+
+.samograph-controls,
+.samograph-owner-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.samograph-share-page-header {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.samograph-share-disclosure {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+

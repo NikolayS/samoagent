@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Button borders + a legible disabled state (design PR 7, plus PR 12's
@@ -36,7 +37,7 @@ import { join } from "node:path";
  *     separators simply vanished in dark mode (PLAN PR 12: "Lifts `--line` in
  *     dark").
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

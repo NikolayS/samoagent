@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Follow-up from the #280 review. An inline `SAMOGRAPH-WARNING` line is rendered
@@ -15,7 +14,7 @@ import { join } from "node:path";
  * warning row did not, so the whole transcript scrolled horizontally at 390px
  * the moment a warning existed. The warning row is one full-width cell instead.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const css = readGlobalsCss();
 
 /**
  * The rule body for `selector`, or `null` when the sheet does not declare it.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Mobile audit M5 — the landing page (`docs/design/AUDIT-2026-09-04.md` "/ landing"
@@ -29,7 +29,7 @@ import { join } from "node:path";
  *    `--bp-md`, 64px at/above it, with `padding: 0 var(--gutter)`. The landing
  *    now uses the same three numbers so the two headers are one geometry.
  */
-const raw = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const raw = readGlobalsCss();
 const css = raw.replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

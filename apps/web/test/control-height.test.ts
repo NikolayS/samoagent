@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * One control height (design audit, PR 2). The app shipped SEVEN heights for
@@ -17,7 +16,7 @@ import { join } from "node:path";
  *
  * This guard fails if any control drifts back off the scale.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 const root = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

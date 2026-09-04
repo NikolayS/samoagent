@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Desktop PR 5 + PR 6 (`docs/design/PLAN.md`) — a real heading scale, a shared
@@ -15,7 +15,7 @@ import { join } from "node:path";
  * "Page header" / "Card / Section" define `.samograph-page-header` and
  * `.samograph-section` as the two structures that carry that hierarchy.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(
+const css = readGlobalsCss().replace(
   /\/\*[\s\S]*?\*\//g,
   "",
 );

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 const web = join(import.meta.dir, "..");
-const css = readFileSync(join(web, "app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 const defined = new Set([...css.matchAll(/\.((?:samograph-)[\w-]+)/g)].map((m) => m[1]));
 
 function tsxFiles(dir: string): string[] {

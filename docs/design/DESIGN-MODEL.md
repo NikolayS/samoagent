@@ -52,7 +52,8 @@ All other token values below match the source audit as merged with the mobile re
 
 ## 3. Tokens
 
-Additions to `:root` in `apps/web/app/globals.css`. Existing tokens stay; nothing is renamed.
+Additions to `:root` in `apps/web/app/styles/tokens.css` (the registry `apps/web/app/globals.css`
+imports first — see PLAN.md PR 14). Existing tokens stay; nothing is renamed.
 
 ```css
 /* Control geometry — the single answer to "how tall is a control?" */
@@ -373,7 +374,8 @@ only.
 
 | test | what it enforces | implication |
 |---|---|---|
-| `test/no-dead-css.test.ts` | every `samograph-*` class used in a `.tsx` must have a rule in `globals.css` | define a class before using it |
+| `test/no-dead-css.test.ts` | every `samograph-*` class used in a `.tsx` must have a rule in the stylesheet | define a class before using it |
+| `test/stylesheet-split.test.ts` | `globals.css` is an import manifest whose resolved order still matches the pre-split sheet | move rules between `app/styles/*.css` only with the snapshot updated deliberately |
 | `test/css-tokens-defined.test.ts` | every `var(--x)` with no fallback must be defined in the stylesheet | new tokens land in `:root`, not only inside a `@media` block |
 | `test/alert-contrast.test.ts` | alert copy clears 4.5:1 on its tint in light and dark | applies to the Alert component work |
 | `test/greenroom-tokens.test.ts` | the `--google-btn-*` values, literally | never touch these — Google-mandated |

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * The native `<select>` had NO styling of its own (design audit, PR 1): it fell
@@ -14,7 +13,7 @@ import { join } from "node:path";
  * spanning the column. These are the load-bearing declarations; this guard
  * keeps them from silently regressing.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 const root = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

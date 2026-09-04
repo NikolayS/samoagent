@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Form fields are iOS-safe and one geometry (mobile audit M8, `docs/design`
@@ -21,7 +21,7 @@ import { join } from "node:path";
  * This guard fails if the 16px floor, the desktop-only cap, or the single
  * auth geometry regresses.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 
 /** Every `@media` block with this query, concatenated. */

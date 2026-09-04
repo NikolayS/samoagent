@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Design PR 8 — `docs/design/DESIGN-MODEL.md` §4 "Alert / Banner":
@@ -14,7 +15,7 @@ import { join } from "node:path";
  * the tone can never quietly fall back into the copy colour again.
  */
 const web = join(import.meta.dir, "..");
-const css = readFileSync(join(web, "app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
 function body(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
