@@ -37,6 +37,16 @@ export function gestureFromEventType(eventType: number): Gesture | null {
   }
 }
 
+/** Normalize the text- and system-event shapes emitted by simulator and hardware. */
+export function gestureFromEvent(event: {
+  textEvent?: { eventType?: number };
+  sysEvent?: { eventType?: number; eventSource?: number };
+}): Gesture | null {
+  const subEvent = event.textEvent ?? event.sysEvent;
+  if (!subEvent) return null;
+  return gestureFromEventType(subEvent.eventType ?? OsEventTypeList.CLICK_EVENT);
+}
+
 /**
  * Owns the wearer-visible whisper queue and gesture-to-cue protocol.
  *

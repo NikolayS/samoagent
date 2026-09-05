@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { G2Controller, gestureFromEventType, terminalCloseMessage } from "./controller.ts";
+import {
+  G2Controller,
+  gestureFromEvent,
+  gestureFromEventType,
+  terminalCloseMessage,
+} from "./controller.ts";
 import { makeWhisper } from "../../../packages/shared/whisper/index.ts";
 
 describe("G2Controller", () => {
@@ -21,6 +26,15 @@ describe("G2Controller", () => {
     expect(gestureFromEventType(SdkEventType.SCROLL_TOP_EVENT)).toBe("SCROLL_TOP");
     expect(gestureFromEventType(SdkEventType.SCROLL_BOTTOM_EVENT)).toBe("SCROLL_BOTTOM");
     expect(gestureFromEventType(SdkEventType.DOUBLE_CLICK_EVENT)).toBe("DOUBLE_CLICK");
+  });
+  it("treats an omitted text event type as the protobuf-default click", () => {
+    expect(gestureFromEvent({ textEvent: {} })).toBe("CLICK");
+  });
+  it("maps gestures delivered as system events", () => {
+    expect(gestureFromEvent({ sysEvent: { eventType: 3 } })).toBe("DOUBLE_CLICK");
+  });
+  it("ignores events without a text or system gesture payload", () => {
+    expect(gestureFromEvent({ audioEvent: {} } as never)).toBeNull();
   });
   it("wires queue to display and gestures to semantic cues", async () => {
     const shown: string[] = [];
