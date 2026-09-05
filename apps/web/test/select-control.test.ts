@@ -38,8 +38,13 @@ describe("control geometry tokens", () => {
 });
 
 describe(".samograph-select", () => {
-  it("caps the wrapper at --field-max", () => {
-    expect(rule(".samograph-select")).toMatch(/max-width\s*:\s*var\(--field-max\)/);
+  it("does not cap the wrapper unconditionally", () => {
+    // The `max-width: var(--field-max)` cap moved into
+    // `@media (min-width: 768px)` (mobile audit M8): on a 350px phone column a
+    // 22rem cap makes a field look broken, not tidy. `test/mobile-fields.test.ts`
+    // owns both halves of that contract — the cap is still there at >= 768px.
+    expect(rule(".samograph-select")).not.toMatch(/max-width/);
+    expect(rule(".samograph-select")).toMatch(/width\s*:\s*100%/);
   });
 
   it("drops the UA appearance so the chevron is ours", () => {
