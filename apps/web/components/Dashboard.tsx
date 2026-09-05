@@ -14,8 +14,8 @@ export interface DashboardProps {
   client: AppApiClient;
   /** Navigate away (injected so the component is testable without next router). */
   redirect: (path: string) => void;
-  /** Story-4 pre-fill: seed the paste input (e.g. after a COULD_NOT_JOIN "Try again"). */
-  initialUrl?: string;
+  /** Story-4 retry — the call whose meeting URL seeds the paste input, resolved from the API-loaded list so the FULL URL, Zoom passcode included, is restored. */
+  retryCallId?: string;
 }
 
 type Status = "loading" | "ready" | "redirecting";
@@ -74,14 +74,12 @@ function CallRow({ call, now }: { call: Call; now: number }) {
   const when = createdAt ? relativeTime(createdAt, now) : "";
   return (
     <li className="samograph-call-item">
-      {/* Whole-row link into the per-call transcript page; `?url=` carries the
-          DISPLAY-SAFE url so that page's Story-4 "Try again" (COULD_NOT_JOIN)
-          can pre-fill the paste input without the address bar, the browser
-          history or a copied link carrying the meeting password. */}
+      {/* The per-call page reads the meeting URL from `GET /calls/:id`, so no
+          URL — safe or otherwise — travels through the address bar. */}
       <a
         className="samograph-call-row"
         data-status-kind={view.kind}
-        href={`/calls/${encodeURIComponent(call.id)}?url=${encodeURIComponent(safeUrl)}`}
+        href={`/calls/${encodeURIComponent(call.id)}`}
         aria-label={rowAriaLabel(title, view, cta)}
       >
         <span className="samograph-call-body">
@@ -137,7 +135,7 @@ function CallRow({ call, now }: { call: Call; now: number }) {
  * the sign-in page instead of rendering an empty, broken dashboard. The API
  * already enforces 401, so this is UX, not a security boundary.
  */
-export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
+export function Dashboard({ client, redirect, retryCallId }: DashboardProps) {
   const [status, setStatus] = useState<Status>("loading");
   const [calls, setCalls] = useState<Call[]>([]);
   const calendarAuthFailure = useCallback(() => {
@@ -190,6 +188,9 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
   const now = Date.now();
   const active = calls.filter((c) => !statusView(c.status).isTerminal);
   const past = calls.filter((c) => statusView(c.status).isTerminal);
+  const retryUrl = retryCallId
+    ? calls.find((c) => c.id === retryCallId)?.meetingUrl ?? ""
+    : "";
 
   return (
     <>
@@ -197,7 +198,7 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
         title="Your calls"
         description="Every call samograph has joined, live and finished. Open one to watch or read its transcript."
       />
-      <AddToCallForm client={client} initialUrl={initialUrl} autoFocus={calls.length === 0} onCreated={() => void load()} />
+      <AddToCallForm client={client} initialUrl={retryUrl} autoFocus={calls.length === 0} onCreated={() => void load()} />
       <UpcomingMeetings client={client} onAuthFailure={calendarAuthFailure} onCreated={() => void load()} />
       {calls.length === 0 ? (
         <section aria-label="Your calls" className="samograph-empty-state">

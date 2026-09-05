@@ -178,6 +178,13 @@ export interface AppApiClient {
   /** `GET /calls` — the caller's tenant's calls (newest first); throws on 401. */
   listCalls(): Promise<Call[]>;
   /**
+   * `GET /calls/:id` — read ONE call (owner view, §5.6). This is how the
+   * per-call page learns the meeting URL: the old query-string carrier dropped
+   * Zoom passcodes and exposed join data to address-bar history (#286).
+   * Throws `AppApiError`.
+   */
+  getCall(callId: string): Promise<Call>;
+  /**
    * `GET /settings` — the caller's hosted settings, the option catalog, and the
    * read-only `signin` block (§5.12, S5-1 item 8); throws on 401.
    */
@@ -429,6 +436,26 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
       });
       // 204 No Content on success; a cross-tenant/unknown call is 404 (RLS-hidden).
       if (!res.ok) await throwTyped(res, "SAMO-AUTHZ-001");
+    },
+    async getCall(callId) {
+      const res = await fetch(`${baseUrl}/calls/${encodeURIComponent(callId)}`, {
+        credentials: "same-origin",
+      });
+      if (!res.ok) await throwTyped(res, "SAMO-AUTHZ-001");
+      const data = (await res.json()) as {
+        id?: unknown;
+        meeting_url?: unknown;
+        status?: unknown;
+        status_reason?: unknown;
+        created_at?: unknown;
+      };
+      return toCall(
+        typeof data.id === "string" ? data.id : callId,
+        typeof data.meeting_url === "string" ? data.meeting_url : "",
+        data.status as CallStatus,
+        typeof data.status_reason === "string" ? data.status_reason : undefined,
+        typeof data.created_at === "string" ? data.created_at : undefined,
+      );
     },
     async deleteAccount() {
       const res = await fetch(`${baseUrl}/account`, {
