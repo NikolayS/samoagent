@@ -1410,6 +1410,11 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   white-space: nowrap;
 }
 
+.samograph-line-date,
+.samograph-line-clock {
+  white-space: pre;
+}
+
 .samograph-line-speaker {
   display: inline-flex;
   min-width: 8ch;
@@ -1569,17 +1574,46 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
   }
 }
 
-@media (max-width: 40rem) {
+/*
+ * Below --bp-lg (1024px) the four-column row is not squeezed, it is reflowed:
+ * row 1 = speaker + clock, row 2 = the full-width utterance. At 390px this takes the
+ * utterance from ~114px (33% of the content box) to the whole content width at 14px.
+ */
+@media (max-width: 63.99rem) {
   .samograph-instrument-lines > li.samograph-transcript-row {
-    grid-template-columns: 42px 10ch fit-content(12ch) minmax(0, 1fr);
-    gap: 8px;
-    font-size: 0.72rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "speaker time"
+      "utterance utterance";
+    gap: 2px var(--space-3);
+    align-items: baseline;
+    padding: 8px 16px;
+  }
+
+  .samograph-percall .samograph-line-number {
+    display: none;
+  }
+
+  .samograph-line-speaker {
+    grid-area: speaker;
+    min-width: 0;
   }
 
   .samograph-line-time {
-    white-space: normal;
-    overflow-wrap: normal;
-    word-break: normal;
+    grid-area: time;
+    justify-self: end;
+    font-size: var(--text-xs);
+  }
+
+  .samograph-line-date {
+    display: none;
+  }
+
+  .samograph-line-utterance {
+    grid-area: utterance;
+    overflow: visible;
+    font-size: var(--text-base);
+    line-height: var(--leading-prose);
   }
 }
 
