@@ -249,10 +249,10 @@
   --skeleton-head-h: 25px;
   --skeleton-control-h: var(--control-h);
   --skeleton-area-h: 157px;
-  --skeleton-row-h: 72px;
+  --skeleton-row-h: 71px;
   --skeleton-para-h: 43px;
-  --skeleton-hero-h: 116px;
-  --skeleton-block-h: 180px;
+  --skeleton-hero-h: 134px;
+  --skeleton-block-h: 245px;
 }
 
 /* Public landing (simplified, issue #241) plus the transcript-panel primitives
@@ -1841,16 +1841,29 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 /* An `<h1>` carries margins the grid gap does not; `<h2>` likewise. Matching
    them here is what keeps the section rules in the skeleton at the same
    y-offsets as the section rules in the loaded page. */
-.samograph-skeleton .samograph-skeleton-bar--title { margin-block: var(--space-5); }
-.samograph-skeleton .samograph-skeleton-bar--head { margin-block: var(--space-3); }
+/* The page header: title over a description line, then the header's own
+   `--space-8` rail before the first section — `.samograph-page-header`'s
+   geometry, so the first rule of the skeleton lands where the first rule of the
+   page lands. */
+.samograph-skeleton-header {
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-5) var(--space-8);
+}
+.samograph-skeleton .samograph-skeleton-bar--head { margin-block: var(--space-2); }
 .samograph-skeleton .samograph-skeleton-bar--para { margin-block: var(--space-3); }
 /* The trailing rail a real section gets from the last `.samograph-field`'s
    `margin-block` sitting against the section's own padding — the grid `gap`
    only spaces fields from each other, never from the section edge. */
-.samograph-skeleton-field:last-child { margin-bottom: var(--space-3); }
+.samograph-skeleton-field:last-child { margin-bottom: var(--space-2); }
 /* The upcoming-meetings block carries its own heading, so it stands alone on
    the section rhythm. */
-.samograph-skeleton--row .samograph-skeleton-bar--block { margin-block: var(--space-6); }
+/* The hero and the upcoming block are both full-width slabs and would read as
+   one if they touched; the 8px comes back out of the hero's own height, so the
+   pair still measures the 142.28 + 245.28 the loaded page measures. */
+.samograph-skeleton--row .samograph-skeleton-bar--hero { margin-bottom: var(--space-2); }
+.samograph-skeleton--row .samograph-skeleton-bar--head { margin-block: var(--space-5); }
+.samograph-skeleton--row .samograph-skeleton-bar--row { margin-bottom: var(--space-4); }
 /* The dashboard's danger zone is a field plus a lone action button. The child
    combinator matters: the confirm field holds a control of its own, and it must
    not take the standalone button's leading rail. */
@@ -1879,8 +1892,8 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 @media (max-width: 767.98px) {
   :root {
     --skeleton-area-h: 176px;
-    --skeleton-hero-h: 172px;
-    --skeleton-row-h: 120px;
+    --skeleton-hero-h: 190px;
+    --skeleton-row-h: 119px;
     --skeleton-para-h: 87px;
   }
 

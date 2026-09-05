@@ -48,9 +48,9 @@ describe("skeleton tokens", () => {
     "--skeleton-para-h": "43px",         // two lines of prose — 43.38
     "--skeleton-control-h": "var(--control-h)",
     "--skeleton-area-h": "157px",        // the keyterms textarea, rows=6
-    "--skeleton-row-h": "72px",          // one `.samograph-call-item` — 72.08
-    "--skeleton-hero-h": "116px",        // the add-to-call form — 115.75
-    "--skeleton-block-h": "180px",       // upcoming meetings — 180.48
+    "--skeleton-row-h": "71px",          // one `.samograph-call-item` — 71.08
+    "--skeleton-hero-h": "134px",        // the add-to-call hero — 142.28 less its 8px rail
+    "--skeleton-block-h": "245px",       // upcoming meetings — 245.28
   };
   for (const [name, value] of Object.entries(expected)) {
     it(`defines ${name} exactly`, () => expect(token(name)).toBe(value));
@@ -103,6 +103,15 @@ describe(".samograph-skeleton", () => {
     });
   }
 
+  it("gives the header the geometry of .samograph-page-header", () => {
+    const head = rule(".samograph-skeleton-header");
+    expect(head).toMatch(/display\s*:\s*grid/);
+    expect(head).toMatch(/gap\s*:\s*var\(--space-3\)/);
+    // The header's own rail before the first section — `--space-8`, the same
+    // one `.samograph-page-header` uses.
+    expect(head).toMatch(/margin-block\s*:\s*var\(--space-5\) var\(--space-8\)/);
+  });
+
   it("gives a section the geometry of .samograph-settings-section", () => {
     const group = rule(".samograph-skeleton-group");
     expect(group).toMatch(/display\s*:\s*grid/);
@@ -122,8 +131,8 @@ describe(".samograph-skeleton", () => {
     // stayed at its desktop height would re-introduce the jump.
     const mobile = css.match(/@media\s*\(max-width:\s*767\.98px\)\s*\{\s*:root\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(normalize(mobile)).toContain("--skeleton-area-h: 176px;");
-    expect(normalize(mobile)).toContain("--skeleton-hero-h: 172px;");
-    expect(normalize(mobile)).toContain("--skeleton-row-h: 120px;");
+    expect(normalize(mobile)).toContain("--skeleton-hero-h: 190px;");   // 198.28 less the rail
+    expect(normalize(mobile)).toContain("--skeleton-row-h: 119px;");    // 119.08
     expect(normalize(mobile)).toContain("--skeleton-para-h: 87px;");
   });
 

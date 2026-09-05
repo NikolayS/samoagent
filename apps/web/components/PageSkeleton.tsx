@@ -44,6 +44,16 @@ function field(kinds: readonly Bar[], key: number) {
   );
 }
 
+/** `.samograph-page-header` — a title over a one-line description. */
+function header() {
+  return (
+    <div className="samograph-skeleton-header">
+      {bar("title", "t")}
+      {bar("text", "d")}
+    </div>
+  );
+}
+
 function group(children: ReactNode, key: number) {
   return (
     <div key={key} className="samograph-skeleton-group">
@@ -80,7 +90,7 @@ export function PageSkeleton({ variant = "page", count = 3 }: PageSkeletonProps)
       <span className="samograph-visually-hidden">Loading…</span>
       {variant === "panel" ? (
         <>
-          {bar("title")}
+          {header()}
           {/* Transcription: preset + hint, keyterms textarea, language. */}
           {group(
             <>
@@ -114,7 +124,7 @@ export function PageSkeleton({ variant = "page", count = 3 }: PageSkeletonProps)
         </>
       ) : variant === "row" ? (
         <>
-          {bar("title")}
+          {header()}
           {/* The add-to-call hero, then the upcoming-meetings block (which
               brings its own heading). */}
           {bar("hero")}

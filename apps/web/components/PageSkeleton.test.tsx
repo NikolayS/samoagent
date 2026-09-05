@@ -36,9 +36,14 @@ describe("PageSkeleton", () => {
     const { getByRole } = render(<PageSkeleton variant="panel" />);
     const loading = getByRole("status", { name: "Loading" });
     expect(loading.className).toBe("samograph-skeleton samograph-skeleton--panel");
+    // The page header: a title over a one-line description.
+    expect(classes(loading.querySelector(".samograph-skeleton-header")!)).toEqual([
+      "samograph-skeleton-bar samograph-skeleton-bar--title",
+      "samograph-skeleton-bar",
+    ]);
     expect(classes(loading)).toEqual([
       "samograph-visually-hidden",
-      "samograph-skeleton-bar samograph-skeleton-bar--title",
+      "samograph-skeleton-header",
       "samograph-skeleton-group",
       "samograph-skeleton-group",
       "samograph-skeleton-group",
@@ -72,7 +77,7 @@ describe("PageSkeleton", () => {
     expect(loading.className).toBe("samograph-skeleton samograph-skeleton--row");
     expect(classes(loading)).toEqual([
       "samograph-visually-hidden",
-      "samograph-skeleton-bar samograph-skeleton-bar--title",
+      "samograph-skeleton-header",
       "samograph-skeleton-bar samograph-skeleton-bar--hero",
       "samograph-skeleton-bar samograph-skeleton-bar--block",
       // Active calls
