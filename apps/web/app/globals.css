@@ -657,6 +657,25 @@ button:hover {
   .samograph-app-nav-right { margin-left: auto; }
 }
 
+/* Horizontal safe area (M6 review). `viewport-fit=cover` lets the page paint
+   under the notch, so in landscape on a notched phone the notch eats into the
+   gutter — the nav's leftmost link, the page's left rail, the landing hero's
+   first line. Every element that OWNS the gutter yields to the inset here.
+
+   One grouped rule, and it sits after the @media blocks that restate these
+   paddings (the landing hero/footer at 59.99rem and 40rem, the app nav at
+   768px): each of those carries the same `var(--gutter)` inline and varies only
+   the BLOCK padding, so overriding the inline half in one place is equivalent
+   at every width. `max()` collapses to plain `--gutter` wherever the inset is
+   0 — i.e. everywhere except a notched phone held sideways. */
+.samograph-page,
+.samograph-app-nav-inner,
+.samograph-site-nav,
+.samograph-landing-hero,
+.samograph-site-footer {
+  padding-inline: max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right));
+}
+
 /* The PUBLIC shell (/auth, /auth/callback, /c/<token>) has no menu to disclose:
    no primary links, no account line, no Log out — only the theme control. It
    therefore renders no hamburger and no panel; the theme control is a direct
@@ -1279,7 +1298,8 @@ textarea { resize: vertical; font-family: var(--font-mono); }
    here, and `.samograph-page` reserves at least the bar's own height of ground
    beneath it, so scrolling to the end always clears every control), and the bar
    must read as ABOVE the page rather than as another rule inside the form —
-   hence the full-bleed edge, the upward shadow and the stacking context below.
+   hence the upward shadow, the stacking context below, and the edge-to-edge
+   bleed on the widths where the column is the page (see the --bp-md block).
 
    Deliberately NOT `padding-bottom` on this wrapper: the wrapper is the bar's
    containing block, and a sticky box is never pushed DOWN past its flow
@@ -1298,13 +1318,8 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  /* Negative gutter + matching inline padding: the bar spans the ground edge to
-     edge instead of floating as a column-width slab with --ground either side,
-     while its contents stay on the form's own left rail. */
-  margin-inline: calc(var(--gutter) * -1);
   padding-block: var(--space-3);
   padding-bottom: calc(var(--space-3) + var(--safe-bottom));
-  padding-inline: var(--gutter);
   background: var(--surface);
   border-top: var(--border-strong) solid var(--line-strong);
   box-shadow: var(--elev-savebar);
@@ -1315,6 +1330,25 @@ textarea { resize: vertical; font-family: var(--font-mono); }
    it. */
 .samograph-settings .samograph-field {
   scroll-margin-bottom: calc(var(--savebar-h) + var(--safe-bottom) + var(--space-3));
+}
+
+/* Where the bar may bleed, and where it may not (M6 review NB3). Since #241/#287
+   `<main>` is the full --page-max box and `.samograph-settings` is a --width-prose
+   column LEFT-aligned inside it, so cancelling the page gutter with negative
+   margins up there would push the bar 32px past the column's left edge and still
+   leave it hundreds of px short of the page's right edge — a slab aligned to
+   nothing. Above --bp-md the bar therefore spans its own column, exactly.
+
+   Below --bp-md the content box (<= 704px at 768) is narrower than the 720px cap,
+   so the column IS the page's content box and cancelling the page's inline
+   padding lands the bar precisely on the two screen edges. The expression mirrors
+   the page's own `max(--gutter, --safe-*)` term by term, so it cancels exactly in
+   landscape too and never adds a scrollable pixel. */
+@media (max-width: 767.98px) {
+  .samograph-savebar {
+    margin-inline: calc(-1 * max(var(--gutter), var(--safe-left))) calc(-1 * max(var(--gutter), var(--safe-right)));
+    padding-inline: max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right));
+  }
 }
 
 .samograph-savebar-status {

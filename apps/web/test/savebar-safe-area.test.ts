@@ -40,12 +40,38 @@ const layout = readFileSync(join(import.meta.dir, "../app/layout.tsx"), "utf8");
 
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 
-function rule(selector: string): string {
+function rule(selector: string, scope = css): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
-  return normalize(css.match(new RegExp(`(?:^|[};])\\s*${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? "");
+  return normalize(scope.match(new RegExp(`(?:^|[};{])\\s*${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? "");
 }
 
 const token = (name: string) => normalize(root.match(new RegExp(`${name}\\s*:\\s*([^;]+);`))?.[1] ?? "");
+
+/** Every `@media <query>` block in the sheet, concatenated. */
+function block(query: string): string {
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+  const found: string[] = [];
+  for (const match of css.matchAll(new RegExp(`@media\\s*${escaped}`, "g"))) {
+    let depth = 0;
+    for (let i = css.indexOf("{", match.index!); i < css.length; i += 1) {
+      if (css[i] === "{") depth += 1;
+      else if (css[i] === "}" && --depth === 0) {
+        found.push(css.slice(match.index!, i + 1));
+        break;
+      }
+    }
+  }
+  return found.join("\n");
+}
+
+const mobile = block("(max-width: 767.98px)");
+
+/** The one grouped rule that yields the page gutter to a landscape notch. */
+const gutterRule = normalize(
+  css.match(/([^{}]*\.samograph-page[^{}]*)\{([^}]*padding-inline[^}]*)\}/)?.[0] ?? "",
+);
+
+const INLINE_INSET = "max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right))";
 
 describe("viewport-fit=cover (M6, audit §7)", () => {
   it("exports a viewport from app/layout.tsx that opts into the safe area", () => {
@@ -103,10 +129,8 @@ describe("the savebar reserves its own footprint (M6, audit §3 / d01)", () => {
     expect(bar).toMatch(/min-height\s*:\s*calc\(var\(--savebar-h\) \+ var\(--safe-bottom\)\)/);
   });
 
-  it("reads as a bar ABOVE the page: full bleed, elevated, own stacking order", () => {
+  it("reads as a bar ABOVE the page: elevated, own stacking order", () => {
     const bar = rule(".samograph-savebar");
-    expect(bar).toMatch(/margin-inline\s*:\s*calc\(var\(--gutter\) \* -1\)/);
-    expect(bar).toMatch(/padding-inline\s*:\s*var\(--gutter\)/);
     expect(bar).toMatch(/z-index\s*:\s*2/);
     expect(bar).toMatch(/background\s*:\s*var\(--surface\)/);
     expect(bar).toMatch(/box-shadow\s*:\s*var\(--elev-savebar\)/);
@@ -117,6 +141,53 @@ describe("the savebar reserves its own footprint (M6, audit §3 / d01)", () => {
     expect(rule(".samograph-savebar")).toMatch(
       /padding-bottom\s*:\s*calc\(var\(--space-3\) \+ var\(--safe-bottom\)\)/,
     );
+  });
+});
+
+describe("horizontal insets — landscape on a notched phone (M6 review)", () => {
+  it("yields the page gutter to the notch on every element that owns one", () => {
+    // `viewport-fit=cover` extends the page under the notch, so the four
+    // containers that own the --gutter have to give it back. One grouped rule,
+    // placed after the @media blocks that restate those paddings (all of which
+    // carry the same --gutter inline and vary only the block padding).
+    for (const selector of [
+      ".samograph-page",
+      ".samograph-app-nav-inner",
+      ".samograph-site-nav",
+      ".samograph-landing-hero",
+      ".samograph-site-footer",
+    ]) {
+      expect(gutterRule).toContain(selector);
+    }
+    expect(gutterRule).toContain(`padding-inline: ${INLINE_INSET}`);
+  });
+
+  it("uses --safe-left and --safe-right somewhere, not just defines them", () => {
+    expect(css).toMatch(/var\(--safe-left\)/);
+    expect(css).toMatch(/var\(--safe-right\)/);
+  });
+});
+
+describe("the savebar's bleed is exact at every width (M6 review NB3)", () => {
+  it("spans the settings column, not a stray 784px slab, on the wide page", () => {
+    // Since #287 `<main>` is the full 1120px page and `.samograph-settings` is
+    // a 720px column inside it, so a negative --gutter margin would bleed 32px
+    // past a LEFT-aligned column and stop 272px short of the page's right edge.
+    // Above the breakpoint the bar simply spans its column.
+    const bar = rule(".samograph-savebar");
+    expect(bar).not.toMatch(/margin-inline/);
+    expect(bar).not.toMatch(/padding-inline/);
+  });
+
+  it("bleeds to the screen edge below --bp-md, where the column IS the page", () => {
+    // Below 768px the content box (<= 704px) is narrower than the 720px cap, so
+    // the column fills it and cancelling the page's inline padding lands the bar
+    // exactly on the viewport edges — including the inset in landscape.
+    const bar = rule(".samograph-savebar", mobile);
+    expect(bar).toContain(
+      "margin-inline: calc(-1 * max(var(--gutter), var(--safe-left))) calc(-1 * max(var(--gutter), var(--safe-right)))",
+    );
+    expect(bar).toContain(`padding-inline: ${INLINE_INSET}`);
   });
 });
 
