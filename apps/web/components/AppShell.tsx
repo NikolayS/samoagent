@@ -77,30 +77,40 @@ export function AppShell({
       <header className="samograph-app-nav">
         <div className="samograph-app-nav-inner">
           <a className="samograph-app-brand" href={variant === "public" ? "/" : "/dashboard"}>samograph</a>
-          <button
-            type="button"
-            className="samograph-app-nav-toggle"
-            aria-label="Menu"
-            aria-expanded={menuOpen}
-            aria-controls="app-nav-menu"
-            ref={toggleRef}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <span className="samograph-app-nav-toggle-bars" aria-hidden="true" />
-          </button>
-          <div className="samograph-app-nav-menu" id="app-nav-menu" data-open={menuOpen ? "true" : "false"}>
-            {variant === "app" ? (
-              <nav className="samograph-app-nav-links" aria-label="Primary">
-                <a href="/dashboard" aria-current={pathname === "/dashboard" ? "page" : undefined}>Dashboard</a>
-                <a href="/settings" aria-current={pathname === "/settings" ? "page" : undefined}>Settings</a>
-              </nav>
-            ) : null}
+          {/* The public shell has nothing to disclose — no links, no account
+              line, no Log out — so it renders no hamburger and no panel: the
+              theme control sits inline in the bar (mobile audit M8, from the
+              #284 review). A disclosure over one control is not a menu. */}
+          {variant === "app" ? (
+            <>
+              <button
+                type="button"
+                className="samograph-app-nav-toggle"
+                aria-label="Menu"
+                aria-expanded={menuOpen}
+                aria-controls="app-nav-menu"
+                ref={toggleRef}
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <span className="samograph-app-nav-toggle-bars" aria-hidden="true" />
+              </button>
+              <div className="samograph-app-nav-menu" id="app-nav-menu" data-open={menuOpen ? "true" : "false"}>
+                <nav className="samograph-app-nav-links" aria-label="Primary">
+                  <a href="/dashboard" aria-current={pathname === "/dashboard" ? "page" : undefined}>Dashboard</a>
+                  <a href="/settings" aria-current={pathname === "/settings" ? "page" : undefined}>Settings</a>
+                </nav>
+                <div className="samograph-app-nav-right">
+                  <AccountEmail email={accountEmail} />
+                  <ThemeSwitcher />
+                  <LogoutButton client={client!} redirect={redirect ?? (() => {})} />
+                </div>
+              </div>
+            </>
+          ) : (
             <div className="samograph-app-nav-right">
-              {variant === "app" ? <AccountEmail email={accountEmail} /> : null}
               <ThemeSwitcher />
-              {variant === "app" ? <LogoutButton client={client!} redirect={redirect ?? (() => {})} /> : null}
             </div>
-          </div>
+          )}
         </div>
       </header>
       <main id="main" className={`samograph-page${pageClassName ? ` ${pageClassName}` : ""}`} tabIndex={-1}>

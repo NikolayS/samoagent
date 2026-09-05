@@ -162,27 +162,46 @@
 .samograph-landing *, .samograph-landing *::before, .samograph-landing *::after { box-sizing: border-box; }
 .samograph-landing a { color: inherit; text-decoration: none; }
 .samograph-landing a:hover { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-.samograph-site-nav { min-height: 68px; padding: 0 56px; display: flex; align-items: center; justify-content: space-between; gap: 32px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.samograph-site-nav { min-height: 56px; padding: 0 var(--gutter); display: flex; align-items: center; justify-content: space-between; gap: 32px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .samograph-nav-actions { display: flex; align-items: center; gap: 16px; }
 .samograph-brand { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; gap: 10px; font-size: .95rem; font-weight: 700; letter-spacing: -.02em; }.samograph-brand img { border: 1px solid var(--line); border-radius: 4px; }.samograph-brand span span { color: var(--faint); }
-.samograph-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border: 1px solid var(--ink); border-radius: 6px; color: var(--ground) !important; background: var(--ink); font-size: .74rem; font-weight: 500; }
+.samograph-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border: 1px solid var(--ink); border-radius: 6px; color: var(--ground) !important; background: var(--ink); font-size: var(--text-xs); font-weight: 500; }
 .samograph-button--compact { padding: 0 15px; }.samograph-button:hover { opacity: .82; text-decoration: none !important; }
-.samograph-landing-hero { max-width: none; margin: 0; padding: 104px 56px 128px; display: flex; flex-direction: column; align-items: flex-start; gap: 22px; }
+.samograph-landing-hero { max-width: none; margin: 0; padding: 104px var(--gutter) 128px; display: flex; flex-direction: column; align-items: flex-start; gap: 22px; }
 .samograph-landing-hero > * { margin: 0; }
 .samograph-landing-hero h1 { max-width: 900px; font-size: 2.65rem; line-height: 1.14; font-weight: 700; letter-spacing: -.02em; }
 .samograph-landing-hero > p { color: var(--ink-soft); font-size: .85rem; }
 .samograph-hero-actions { display: flex; align-items: center; gap: 20px; }
 .samograph-hero-secondary { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted) !important; font-size: .75rem; }
-.samograph-instrument { min-width: 780px; color: var(--panel-muted); background: var(--panel-ground); border: 1px solid var(--panel-line); font-size: .7rem; }
+.samograph-instrument { min-width: min(780px, 100%); color: var(--panel-muted); background: var(--panel-ground); border: 1px solid var(--panel-line); font-size: var(--text-xs); }
 .samograph-instrument-head, .samograph-instrument-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 16px; background: var(--panel-surface); }.samograph-instrument-head { border-bottom: 1px solid var(--panel-line); }.samograph-instrument-head > div, .samograph-instrument-state, .samograph-instrument-foot > div { display: flex; align-items: center; gap: 14px; }.samograph-instrument i, .samograph-instrument-head i { color: var(--panel-line); font-style: normal; }.samograph-instrument strong { color: var(--panel-ink); font-weight: 500; }.samograph-instrument-state > span:last-child { font-variant-numeric: tabular-nums; }.samograph-instrument-state > span > b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-live); animation: samograph-refined-pulse 1.6s ease-in-out infinite; }
 .samograph-instrument-lines { list-style: none; margin: 0; padding: 18px 0 20px; }.samograph-instrument-lines li { display: grid; grid-template-columns: 56px 82px 66px minmax(480px, 1fr); gap: 14px; min-height: 33px; align-items: start; color: var(--panel-ink); font-size: .78rem; line-height: 1.5; }.samograph-line-number { height: 100%; padding-right: 14px; color: var(--panel-gutter); border-right: 1px solid var(--panel-line); text-align: right; font-variant-numeric: tabular-nums; }.samograph-instrument-lines time, .samograph-instrument-lines b { color: var(--panel-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
-.samograph-instrument-foot { border-top: 1px solid var(--panel-line); font-size: .66rem; }.samograph-instrument-foot b { padding: 2px 8px; border: 1px solid var(--panel-line); }.samograph-instrument-foot i { margin: 0 3px; }
-.samograph-site-footer { font-family: var(--font-mono); padding: 40px 56px 48px; display: flex; flex-direction: column; align-items: center; gap: 18px; color: var(--muted); font-size: .73rem; text-align: center; border-top: 1px solid var(--line); }.samograph-site-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }.samograph-site-footer nav span { display: flex; gap: 12px; }.samograph-site-footer i, .samograph-site-footer small { color: var(--faint); font-style: normal; }
+.samograph-instrument-foot { border-top: 1px solid var(--panel-line); font-size: var(--text-xs); }.samograph-instrument-foot b { padding: 2px 8px; border: 1px solid var(--panel-line); }.samograph-instrument-foot i { margin: 0 3px; }
+.samograph-site-footer { font-family: var(--font-mono); padding: 40px var(--gutter) 48px; display: flex; flex-direction: column; align-items: center; gap: 18px; color: var(--muted); font-size: var(--text-xs); text-align: center; border-top: 1px solid var(--line); }
+/* The separator is a sibling of a 44px touch target inside a flex span. With
+   the default `align-items: stretch` its 7x44 box painted the glyph at the
+   TOP of that box, one line above the link text it belongs to — the defect
+   the audit measured at every width. Centring keeps the pair on one line,
+   and wrapping still moves a separator with its own link because they share
+   the span. */
+.samograph-site-footer nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; }.samograph-site-footer nav span { display: flex; align-items: center; gap: 12px; }.samograph-site-footer i, .samograph-site-footer small { color: var(--faint); font-style: normal; }.samograph-site-footer small { font-size: var(--text-xs); }
 .samograph-site-footer a { color: inherit; text-decoration: none; }.samograph-site-footer a:hover { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .samograph-site-footer nav a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; }
 @keyframes samograph-refined-pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
-@media (max-width: 59.99rem) { .samograph-site-nav { padding: 12px 32px; }.samograph-landing-hero { padding: 72px 32px 96px; } }
-@media (max-width: 40rem) { .samograph-site-nav { padding: 10px 20px; }.samograph-brand > span,.samograph-button--compact { display: none; }.samograph-landing-hero { padding: 52px 20px 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px 20px 44px; } }
+/* The landing header is the app header: 56px below --bp-md, 64px at and
+   above it, on the shared --gutter. Before this it was 68px on a private
+   56px gutter — audit finding 7, "two design languages in one product". */
+@media (min-width: 768px) { .samograph-site-nav { min-height: 64px; } }
+@media (max-width: 59.99rem) { .samograph-landing-hero { padding: 72px var(--gutter) 96px; } }
+/* Below 40rem, two decisions:
+   - 350px of content buys two of these three: the wordmark (153px), the CTA
+     (112px) and the 154px theme switcher. The name of the product and the way
+     in win; theme follows the OS here and is still switchable inside the app.
+   - The three footer links wrap at this width, and a leading separator would
+     then dangle at the start of the wrapped row. Drop the glyphs and let a
+     wider gap separate the links. Above 40rem all three fit on one line
+     (400px of links in a >=576px content box), so the separators stay. */
+@media (max-width: 40rem) { .samograph-site-footer nav { column-gap: var(--space-4); }.samograph-site-footer nav i { display: none; }.samograph-brand { font-size: .82rem; }.samograph-nav-actions .samograph-theme-switcher { display: none; }.samograph-landing-hero { padding: 52px var(--gutter) 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px var(--gutter) 44px; } }
 @media (prefers-reduced-motion: reduce) { .samograph-instrument-state > span > b { animation: none; } }
 
 /* Dark by OS preference. The explicit `data-theme` blocks below have higher
@@ -360,6 +379,20 @@ textarea {
   /* --leading-tight pins a ONE-line control to an exact height; a textarea
      wraps, so its lines stay on the body rhythm. */
   line-height: var(--leading-normal);
+}
+
+/* iOS Safari ZOOMS the page whenever a focused field's text is under 16px —
+   and it does not zoom back out on blur, so the rest of the form ends up
+   off-screen. `--text-base` is 14px, so every field on this app tripped it.
+   Below --bp-md the field font is therefore 16px: a viewport fix, not a change
+   to the type scale (mobile audit M8, "Forms on mobile"). The same block drops
+   `--field-max` (below), so a mobile field is full-column at 16px. */
+@media (max-width: 767.98px) {
+  input:where(:not([type="checkbox"], [type="radio"])),
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 .samograph-keyterms {
@@ -556,6 +589,15 @@ button:hover {
   .samograph-app-nav-right { margin-left: auto; }
 }
 
+/* The PUBLIC shell (/auth, /auth/callback, /c/<token>) has no menu to disclose:
+   no primary links, no account line, no Log out — only the theme control. It
+   therefore renders no hamburger and no panel; the theme control is a direct
+   child of the bar and rides inline at every width (mobile audit M8, from the
+   #284 review). */
+.samograph-app-nav-inner > .samograph-app-nav-right {
+  margin-left: auto;
+}
+
 .samograph-skip-link {
   position: absolute;
   top: 0;
@@ -652,7 +694,7 @@ button:hover {
    painted in --muted, so it is correct in both themes. Both pseudo-elements are
    pointer-events: none — the whole control stays one hit target. The mask must
    stay on its own element: masking the cap would erase its hairline and fill. */
-.samograph-select { position: relative; display: block; width: 100%; max-width: var(--field-max); }
+.samograph-select { position: relative; display: block; width: 100%; }
 .samograph-select > select {
   appearance: none; -webkit-appearance: none;
   display: block; width: 100%; height: var(--control-h); margin: 0;
@@ -661,6 +703,22 @@ button:hover {
   border: 1px solid var(--control-border); border-radius: var(--radius-control);
   cursor: pointer;
 }
+/* Both halves of the mobile field contract for the styled select, and they sit
+   HERE — after `.samograph-select > select` — on purpose. A media query adds no
+   specificity, so the `font: inherit` above (0,1,1, and a shorthand, so it
+   re-resets font-size) would win on source order over the shared 16px rule in
+   the base field block. `--field-max` is likewise a DESKTOP affordance: it
+   stops a four-character enum spanning a 1120px column, but on a 350px phone
+   the column is already narrower than the 22rem cap and any cap there reads as
+   a broken field (mobile audit M8). */
+@media (max-width: 767.98px) {
+  .samograph-select > select { font-size: 16px; }
+}
+
+@media (min-width: 768px) {
+  .samograph-select { max-width: var(--field-max); }
+}
+
 .samograph-select::before {
   content: ""; position: absolute; inset-block: 1px; inset-inline-end: 1px;
   width: calc(var(--control-h) - 2px); pointer-events: none;
@@ -1099,6 +1157,24 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   max-width: var(--width-form);
   margin-inline: auto;
   gap: var(--space-4);
+}
+
+/* ONE field geometry on /auth (mobile audit M8 §6).
+   The page used to stack three different controls in a 480px column: a 40px
+   input, a 36px submit and a 40px Google button. All three are now the 44px
+   control recipe at full column width — `--control-h` for height (which also
+   clears Google's stated 40px minimum, so branding is honored, not bent) and
+   `width: 100%` so the stack has one left and one right edge. The radii still
+   differ by 2px because Google's 4px is mandated; that is the one deviation.
+   `display: block` is deliberate — the label/input pair carries its own
+   rhythm through `margin-top`, and a grid gap would double it. */
+.samograph-auth-form {
+  display: block;
+}
+
+.samograph-auth-form > .samograph-btn {
+  width: 100%;
+  margin-top: var(--space-3);
 }
 
 .samograph-auth-sent {

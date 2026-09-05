@@ -44,10 +44,13 @@ const toPx = (value: number, unit: string) => (unit === "px" ? value : value * 1
  * The M1 transcript-row waiver was exactly that, once #280 landed.
  */
 const OWNED_ELSEWHERE = new Map<string, string>([
-  ['.samograph-button { font-size: .74rem }', "M5 — landing (globals.css 137–171)"],
-  ['.samograph-instrument { font-size: .7rem }', "M5 — landing (globals.css 137–171)"],
-  ['.samograph-instrument-foot { font-size: .66rem }', "M5 — landing (globals.css 137–171)"],
-  ['.samograph-site-footer { font-size: .73rem }', "M5 — landing (globals.css 137–171)"],
+  // Empty on purpose. `.samograph-button`, `.samograph-instrument`,
+  // `.samograph-instrument-foot` and `.samograph-site-footer` were fixed by M5
+  // (#290) and `.samograph-instrument-lines > li.samograph-transcript-row` by
+  // M1 (#280), so every one of those waivers is gone and all five selectors are
+  // enforced by this guard like everything else. An entry is a temporary
+  // parking space for one in-flight PR, never a permanent exemption — delete it
+  // the moment that PR lands, which the staleness case below now forces.
 ]);
 
 /** The allowlist key for one measured literal: selector AND exact value. */

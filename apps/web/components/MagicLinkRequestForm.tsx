@@ -106,7 +106,10 @@ export function MagicLinkRequestForm({ client }: MagicLinkRequestFormProps) {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate>
+    // `samograph-auth-form` is the /auth geometry contract (mobile audit M8):
+    // the email field, this submit and "Continue with Google" are one 44px
+    // full-width stack rather than three sizes in a 480px column.
+    <form className="samograph-auth-form" onSubmit={onSubmit} noValidate>
       <label htmlFor={emailId}>Email</label>
       <input
         id={emailId}
