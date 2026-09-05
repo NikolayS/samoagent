@@ -594,9 +594,9 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
 /* ----- Touch targets (mobile audit M3) -------------------------------------
    A finger is not a cursor: 24 actions in this product measured under 44 CSS
-   px at 390 (`← Dashboard` 85 × 20, `Reconnect in Settings` 144 × 17, every
-   `.samograph-btn` at 36, `.samograph-btn--sm` at 28). This block raises them
-   to `--tap-min` on a coarse pointer — and also on a narrow viewport, so the
+   px at 390 (`← Dashboard` 85 × 20, `Reconnect in Settings` 144 × 17, a footer
+   link 49 × 17). #279 fixed the button scale itself; what is left is everything
+   that is not a button. This block raises them to `--tap-min` on a coarse pointer — and also on a narrow viewport, so the
    rule is visible to a desktop browser resized to a phone width (that is how
    the audit measured, and how the guard screenshots are taken).
 
@@ -616,9 +616,17 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   }
 
   .samograph-call-back,
-  .samograph-download-transcript,
-  .samograph-share-url {
+  .samograph-download-transcript {
     display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+  }
+
+  /* The share URL is a whole link on its own line and must keep wrapping
+     (`overflow-wrap: anywhere`), so it takes a block-level flex box rather than
+     the inline one above, which would size to the unwrapped URL. */
+  .samograph-share-url {
+    display: flex;
     align-items: center;
     min-height: var(--tap-min);
   }
