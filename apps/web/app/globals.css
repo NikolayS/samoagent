@@ -143,6 +143,11 @@
   --control-h-xs: 28px;
   --radius-control: var(--radius-md);
   --field-max: 22rem;
+  /* The smallest a tap target may be on a touch screen (WCAG 2.2 AA target
+     size, iOS HIG, Material). Distinct from `--control-h`: that is how tall a
+     control is drawn everywhere; this is the floor a *hit area* must clear on
+     a coarse pointer, and it may be met by an invisible pseudo-element. */
+  --tap-min: 44px;
 
   /* Safe area (mobile audit M6). iOS reports the notch and the home indicator
      ONLY when the document opts in with `viewport-fit=cover` — that half lives
@@ -619,7 +624,7 @@ button:hover {
   background: transparent;
   border: 0;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   font-weight: 400;
   letter-spacing: 0.01em;
   transition:
@@ -732,6 +737,78 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-danger-delete { margin-top: var(--space-5); }
 .samograph-danger-error, .samograph-delete-error { color: var(--crit); }
 .samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
+/* ----- Touch targets (mobile audit M3) -------------------------------------
+   A finger is not a cursor: 24 actions in this product measured under 44 CSS
+   px at 390 (`← Dashboard` 85 × 20, `Reconnect in Settings` 144 × 17, a footer
+   link 49 × 17). #279 fixed the button scale itself; what is left is everything
+   that is not a button. This block raises them to `--tap-min` on a coarse pointer — and also on a narrow viewport, so the
+   rule is visible to a desktop browser resized to a phone width (that is how
+   the audit measured, and how the guard screenshots are taken).
+
+   Boxed controls take the height directly. Inline links in prose cannot: a
+   `min-height` is ignored on an inline box and `display: block` would break the
+   sentence around it, so they keep their layout and grow an invisible
+   pseudo-element hit area instead. */
+@media (pointer: coarse), (max-width: 767.98px) {
+  /* `min-height` clamps a fixed `height`, so the 44px floor holds on its own;
+     `height: auto` is what stops a label that wraps to two lines on a narrow
+     screen from overflowing a box pinned to one line of text. */
+  .samograph-btn {
+    height: auto;
+    min-height: var(--tap-min);
+    padding-block: var(--space-2);
+  }
+
+  /* `.samograph-btn--sm { height: var(--control-h-sm) }` is declared later in
+     this sheet at the same (0,1,0) specificity, so a bare `.samograph-btn--sm`
+     here would lose on source order and silently re-pin 36px — the `min-height`
+     above would still hold the box at 44, hiding the dead declaration. The
+     compound is (0,2,0) and wins wherever either rule moves to. Every `--sm`
+     in the app is written alongside `.samograph-btn`, so it matches them all. */
+  .samograph-btn.samograph-btn--sm {
+    height: auto;
+  }
+
+  .samograph-call-back,
+  .samograph-download-transcript {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+  }
+
+  /* The share URL is a whole link on its own line and must keep wrapping
+     (`overflow-wrap: anywhere`), so it takes a block-level flex box rather than
+     the inline one above, which would size to the unwrapped URL. */
+  .samograph-share-url {
+    display: flex;
+    align-items: center;
+    min-height: var(--tap-min);
+  }
+
+  /* The label is the target, not the 13px checkbox inside it. Alignment stays
+     as designed (`flex-start`) — only the floor is added. */
+  .samograph-toggle {
+    min-height: var(--tap-min);
+  }
+
+  /* Unclassed anchors are the prose/footer/nav links — the ones with no box of
+     their own. `position: relative` makes the anchor the containing block; the
+     pseudo-element is a child of it, so a tap anywhere in the 44px band still
+     activates the link, and being `absolute` it takes no space in the line. */
+  a:not([class]) {
+    position: relative;
+  }
+
+  a:not([class])::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+}
+
 /* ===== end Slice 2 ===== */
 
 /* ===== Slice 4 — Dashboard ===== */
