@@ -346,10 +346,18 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
       expect(valueOf(light, "google-btn-ink")).toBe(LIGHT.ink);
     });
 
-    it("gives .samograph-google-signin Google's mandated 40px height and 4px radius", () => {
+    it("clears Google's 40px height minimum and keeps its 4px radius", () => {
       const rule = flatBlockBody("\\.samograph-google-signin");
       expect(rule.length).toBeGreaterThan(0);
-      expect(/min-height\s*:\s*40px\s*;/.test(rule)).toBe(true);
+      // Google states 40px as a MINIMUM, not a fixed height, so the button
+      // takes the app's control height (--control-h: 44px, asserted in
+      // test/control-height.test.ts) instead of standing 4px short of every
+      // other control on the page. The radius IS fixed by the guidelines.
+      expect(/min-height\s*:\s*var\(--control-h\)\s*;/.test(rule)).toBe(true);
+      const controlHeight = Number(
+        /--control-h\s*:\s*(\d+)px/.exec(flatBlockBody(":root"))?.[1] ?? "0",
+      );
+      expect(controlHeight).toBeGreaterThanOrEqual(40);
       expect(/border-radius\s*:\s*4px\s*;/.test(rule)).toBe(true);
       // Chrome comes from the tokens above — never a raw hex, never a Greenroom hue.
       expect(rule).toContain("var(--google-btn-bg)");

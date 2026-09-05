@@ -4,6 +4,7 @@ import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import {
   formatRenderLine,
   formatTranscriptTimestamp,
+  splitTranscriptTimestamp,
   initialTranscriptState,
   isTerminalStatus,
   SAMOGRAPH_WARNING_SPEAKER,
@@ -406,7 +407,7 @@ export function PerCallTranscript({
               <li key={l.seq} className="samograph-line samograph-transcript-row">
                 <span className="samograph-visually-hidden">{formatRenderLine(l)}</span>
                 <span className="samograph-line-number" aria-hidden="true">{l.seq}</span>
-                <time className="samograph-line-time" aria-hidden="true">{formatTranscriptTimestamp(l.ts)}</time>
+                <TranscriptTime ts={l.ts} />
                 <b
                   className="samograph-line-speaker"
                   aria-hidden="true"
@@ -428,7 +429,7 @@ export function PerCallTranscript({
             >
               <span className="samograph-visually-hidden">{formatRenderLine(state.partial)}</span>
               <span className="samograph-line-number" aria-hidden="true">{state.partial.seq}</span>
-              <time className="samograph-line-time" aria-hidden="true">{formatTranscriptTimestamp(state.partial.ts)}</time>
+              <TranscriptTime ts={state.partial.ts} />
               <b
                 className="samograph-line-speaker"
                 aria-hidden="true"
@@ -465,6 +466,27 @@ export function PerCallTranscript({
         </div>
       </footer>
     </section>
+  );
+}
+
+/**
+ * The row timestamp, split so the date half can be dropped below the 1024px reflow
+ * breakpoint (it repeats on every row); the full value stays in `title`/`dateTime`.
+ */
+function TranscriptTime({ ts }: { ts: string }) {
+  const formatted = formatTranscriptTimestamp(ts);
+  const parts = splitTranscriptTimestamp(formatted);
+  return (
+    <time className="samograph-line-time" aria-hidden="true" title={formatted}>
+      {parts ? (
+        <>
+          <span className="samograph-line-date">{parts.date}</span>
+          <span className="samograph-line-clock">{parts.clock}</span>
+        </>
+      ) : (
+        formatted
+      )}
+    </time>
   );
 }
 

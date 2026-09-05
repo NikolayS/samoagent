@@ -89,6 +89,18 @@ export function formatTranscriptTimestamp(value: string): string {
   return date.toISOString().slice(0, 19).replace("T", " ");
 }
 
+/**
+ * Split a canonical display timestamp into its date and clock halves so the row can
+ * drop the (per-row identical) date on narrow viewports without losing the full string.
+ * The trailing space stays on the date half, so the two spans still read as one value.
+ */
+export function splitTranscriptTimestamp(
+  value: string,
+): { date: string; clock: string } | null {
+  if (!CANONICAL_TS.test(value)) return null;
+  return { date: `${value.slice(0, 10)} `, clock: value.slice(11) };
+}
+
 export function initialTranscriptState(
   status: CallStatus = "PENDING",
 ): TranscriptViewState {
