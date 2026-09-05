@@ -116,6 +116,17 @@ const nextConfig = {
                 has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
                 destination: `${apiOrigin}/calls/:id`,
               },
+              {
+                // Only the client's settings fetch (not the /settings page navigation).
+                source: "/settings",
+                has: [{ type: "header", key: "sec-fetch-dest", value: "empty" }],
+                destination: `${apiOrigin}/settings`,
+              },
+              {
+                // Account deletion is a client fetch; there is no /account page.
+                source: "/account",
+                destination: `${apiOrigin}/account`,
+              },
               { source: "/__dev/:path*", destination: `${apiOrigin}/__dev/:path*` },
             ],
           };

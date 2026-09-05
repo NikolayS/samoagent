@@ -158,3 +158,29 @@ describe("next.config.mjs — Calendar OAuth rewrites (#240)", () => {
     ]);
   });
 });
+
+/**
+ * Settings + account dev-proxy rewrites.
+ *
+ * `/settings` is BOTH a Next page and a client `fetch`, so it must be gated on
+ * `sec-fetch-dest: empty`. There is no `/account` page, so that rewrite stays
+ * ungated and handles the client's delete fetch directly.
+ */
+describe("next.config.mjs — settings + account dev-proxy rewrites", () => {
+  it("proxies the client's /settings fetch (dest empty) to the app-api", () => {
+    expect(ruleFor("/settings")).toEqual({
+      source: "/settings",
+      has: SEC_FETCH_DEST_EMPTY,
+      destination: `${ORIGIN}/settings`,
+    });
+  });
+
+  it("proxies /account UNGATED (there is no /account page)", () => {
+    const rule = ruleFor("/account");
+    expect(rule).toEqual({
+      source: "/account",
+      destination: `${ORIGIN}/account`,
+    });
+    expect(Object.keys(rule ?? {}).sort()).toEqual(["destination", "source"]);
+  });
+});
