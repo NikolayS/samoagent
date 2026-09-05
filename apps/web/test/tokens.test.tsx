@@ -94,18 +94,36 @@ describe("Slice 1 typography regressions", () => {
 
   afterEach(() => style.remove());
 
-  it("keeps the landing on the mono stack", () =>
-    expect(rule(/\.samograph-landing(?![-\w])/)).toMatch(/font-family\s*:\s*var\(--font-mono\)/));
-
-  it("overrides the global heading family after the global heading rule", () => {
-    const landingHeadings = rule(/:where\(\.samograph-landing\) h1\s*,\s*:where\(\.samograph-landing\) h2\s*,\s*:where\(\.samograph-landing\) h3/);
-    expect(landingHeadings).toMatch(/font-family\s*:\s*var\(--font-mono\)/);
-
-    const globalHeadingIndex = clean.search(/h1\s*,\s*h2\s*,\s*h3\s*\{/);
-    const landingHeadingIndex = clean.search(/:where\(\.samograph-landing\) h1\s*,\s*:where\(\.samograph-landing\) h2\s*,\s*:where\(\.samograph-landing\) h3\s*\{/);
-    expect(globalHeadingIndex).toBeGreaterThanOrEqual(0);
-    expect(landingHeadingIndex).toBeGreaterThan(globalHeadingIndex);
+  /* REVERSED by PLAN PR 13 ("converge the landing on the app's design
+   * language"; audit finding 7 "two design languages in one product").
+   *
+   * These two cases used to pin the OPPOSITE invariant: `.samograph-landing`
+   * had to carry `font-family: var(--font-mono)`, and a
+   * `:where(.samograph-landing) h1,h2,h3` block had to re-force mono *after*
+   * the global `h1,h2,h3 { font-family: var(--font-display) }` rule so it won
+   * on source order. That was the whole mechanism keeping the landing on a
+   * second type system, and it is what PR 13 removes: the landing renders in
+   * Inter like every app page, and the heading override is deleted rather than
+   * flipped, because with mono gone its `font-weight`/`line-height` were
+   * already restated by `h1` and `.samograph-landing-hero h1`.
+   *
+   * The pair is kept — inverted, not deleted — so the landing's type family
+   * stays under guard in both directions: neither rule may come back. Mono
+   * survives where it carries meaning, which the `--call-url` / `--keyterms` /
+   * `.samograph-instrument` cases below and in `landing-converge.test.ts`
+   * pin. */
+  it("puts the landing on the app body stack, not a private mono stack", () => {
+    expect(rule(/\.samograph-landing(?![-\w])/)).not.toMatch(/font-family/);
+    expect(rule(/\.samograph-site-footer(?![-\w])/)).not.toMatch(/font-family/);
   });
+
+  it("has no landing-only override of the global heading family", () => {
+    expect(clean).not.toMatch(/:where\(\.samograph-landing\)\s*h[123]/);
+    expect(rule(/h1\s*,\s*h2\s*,\s*h3/)).toMatch(/font-family\s*:\s*var\(--font-display\)/);
+  });
+
+  it("keeps mono on the landing's transcript-instrument demo", () =>
+    expect(rule(/\.samograph-instrument(?![-\w])/)).toMatch(/font-family\s*:\s*var\(--font-mono\)/));
 
   it("pins the landing heading weight and historical line heights", () => {
     const { container } = render(createElement(Landing));
