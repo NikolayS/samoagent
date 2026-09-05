@@ -134,6 +134,11 @@
   --control-h: 44px;
   --radius-control: var(--radius-md);
   --field-max: 22rem;
+  /* The smallest a tap target may be on a touch screen (WCAG 2.2 AA target
+     size, iOS HIG, Material). Distinct from `--control-h`: that is how tall a
+     control is drawn everywhere; this is the floor a *hit area* must clear on
+     a coarse pointer, and it may be met by an invisible pseudo-element. */
+  --tap-min: 44px;
 
   /* Interaction */
   --focus-ring: var(--ink);
@@ -445,7 +450,7 @@ button:hover {
   background: transparent;
   border: 0;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   font-weight: 400;
   letter-spacing: 0.01em;
   transition:
@@ -556,6 +561,59 @@ textarea { min-height: 6rem; resize: vertical; font-family: var(--font-mono); }
 .samograph-danger-delete { margin-top: var(--space-5); }
 .samograph-danger-error, .samograph-delete-error { color: var(--crit); }
 .samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
+/* ----- Touch targets (mobile audit M3) -------------------------------------
+   A finger is not a cursor: 24 actions in this product measured under 44 CSS
+   px at 390 (`← Dashboard` 85 × 20, `Reconnect in Settings` 144 × 17, every
+   `.samograph-btn` at 36, `.samograph-btn--sm` at 28). This block raises them
+   to `--tap-min` on a coarse pointer — and also on a narrow viewport, so the
+   rule is visible to a desktop browser resized to a phone width (that is how
+   the audit measured, and how the guard screenshots are taken).
+
+   Boxed controls take the height directly. Inline links in prose cannot: a
+   `min-height` is ignored on an inline box and `display: block` would break the
+   sentence around it, so they keep their layout and grow an invisible
+   pseudo-element hit area instead. */
+@media (pointer: coarse), (max-width: 767.98px) {
+  /* `.samograph-btn` sets a fixed `height`, which beats a bare `min-height`;
+     release it to `auto` so the minimum can win. */
+  .samograph-btn,
+  .samograph-btn--sm {
+    height: auto;
+    min-height: var(--tap-min);
+    padding-block: var(--space-2);
+  }
+
+  .samograph-call-back,
+  .samograph-download-transcript,
+  .samograph-share-url {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+  }
+
+  .samograph-toggle {
+    align-items: center;
+    min-height: var(--tap-min);
+  }
+
+  /* Unclassed anchors are the prose/footer/nav links — the ones with no box of
+     their own. `position: relative` makes the anchor the containing block; the
+     pseudo-element is a child of it, so a tap anywhere in the 44px band still
+     activates the link, and being `absolute` it takes no space in the line. */
+  a:not([class]) {
+    position: relative;
+  }
+
+  a:not([class])::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+}
+
 /* ===== end Slice 2 ===== */
 
 /* ===== Slice 4 — Dashboard ===== */
