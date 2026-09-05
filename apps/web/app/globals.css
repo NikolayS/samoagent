@@ -127,6 +127,14 @@
   --width-form: 480px;
   --gutter: var(--space-8);
 
+  /* The page container (design audit §3, PLAN.md PR 4). ONE max-width and ONE
+     gutter, shared by the app-nav inner box and by `<main>`, so their left
+     edges coincide at every viewport width. Reading width is a property of the
+     CONTENT column (`--content-max`), never of the page — capping `<main>`
+     itself made the two boxes centre independently and pushed the settings H1
+     200px away from the wordmark. */
+  --page-max: var(--width-app);
+
   /* Control geometry — the single answer to "how tall is a control?".
      `--radius-control` is the one radius for every interactive box, and
      `--field-max` caps short fields (selects, enums) so a four-character value
@@ -387,17 +395,41 @@ button:hover {
 }
 
 .samograph-page {
-  max-width: var(--width-app);
+  max-width: var(--page-max);
   margin: 0 auto;
   padding: var(--space-8) var(--gutter) var(--space-16);
 }
 
+/* `--form` / `--prose` narrow the CONTENT, not the page (DESIGN-MODEL §5,
+   "Alignment fix"): `<main>` keeps the shared page container so its left edge
+   tracks the nav, and the reading width lands on the content column. */
 .samograph-page--form {
-  max-width: var(--width-form);
+  --content-max: var(--width-form);
 }
 
 .samograph-page--prose {
-  max-width: var(--width-prose);
+  --content-max: var(--width-prose);
+}
+
+.samograph-page--prose > *,
+.samograph-page--form > * {
+  max-width: var(--content-max);
+}
+
+/* An action row (design audit §4, DESIGN-MODEL §4 Button — "width: never
+   stretches"). One or more controls on a line, each at its intrinsic width,
+   wrapping onto the next line instead of stretching or being clipped. It is
+   the wrapper that owns the layout, so a button pair can sit inside a grid
+   container without becoming two full-width grid items. */
+.samograph-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.samograph-actions > * {
+  flex: 0 0 auto;
 }
 
 .samograph-app-nav {
@@ -412,7 +444,8 @@ button:hover {
    by CSS, not duplicated. At >= 768px that panel is `display: contents`, which
    dissolves it back into the header row: the desktop layout is what it was. */
 .samograph-app-nav-inner {
-  max-width: var(--width-app);
+  /* Same container as `.samograph-page` — see `--page-max`. */
+  max-width: var(--page-max);
   min-height: 56px;
   margin: 0 auto;
   padding: 0 var(--gutter);
@@ -1382,8 +1415,13 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   margin-bottom: 1rem;
 }
 
+/* The calendar card owns its stack instead of borrowing `.samograph-signin`'s
+   grid (design audit §4, PLAN.md PR 3): as a grid item every child — the
+   button pair included — was stretched to the 656px column width. */
 .samograph-calendar-card {
-  margin-block: 1.5rem;
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-6);
 }
 
 /* =============================================================================
