@@ -32,10 +32,12 @@ const toPx = (value: number, unit: string) => (unit === "px" ? value : value * 1
  * reports them in its PR body instead. Each entry MUST name the owning PR.
  */
 const OWNED_ELSEWHERE = new Map<string, string>([
-  [".samograph-button", "M5 — landing (globals.css 137–171)"],
-  [".samograph-instrument", "M5 — landing (globals.css 137–171)"],
-  [".samograph-instrument-foot", "M5 — landing (globals.css 137–171)"],
-  [".samograph-site-footer", "M5 — landing (globals.css 137–171)"],
+  // The four landing selectors that stood here (`.samograph-button`,
+  // `.samograph-instrument`, `.samograph-instrument-foot`,
+  // `.samograph-site-footer`) were fixed by M5 and are now enforced by this
+  // guard like everything else. An entry is a temporary parking space for one
+  // in-flight PR, never a permanent exemption — delete it the moment that PR
+  // lands.
   [".samograph-instrument-lines > li.samograph-transcript-row", "M1 — transcript (globals.css 1559–1585)"],
 ]);
 
