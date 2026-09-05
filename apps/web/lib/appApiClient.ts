@@ -38,6 +38,12 @@ export interface Call {
    * calls and when the server recorded no specific reason.
    */
   statusReason?: string;
+  /**
+   * ISO-8601 creation timestamp from the server's `created_at`. Optional: a
+   * `Call` synthesised locally (or an older server) may not carry one, and the
+   * dashboard simply omits the row's relative time when it is absent.
+   */
+  createdAt?: string;
 }
 
 /**
@@ -300,6 +306,7 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
     meetingUrl: string,
     status: CallStatus,
     statusReason?: string,
+    createdAt?: string,
   ): Call {
     return {
       id,
@@ -307,6 +314,7 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
       provider: meetingProviderForUrl(meetingUrl) ?? "google_meet",
       status,
       ...(statusReason !== undefined ? { statusReason } : {}),
+      ...(createdAt !== undefined ? { createdAt } : {}),
     };
   }
 
@@ -401,8 +409,18 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
       // is camelCase; serialize to the server contract, deserialize back.
       const res = await post("/calls", { meeting_url: input.meetingUrl });
       if (!res.ok) await throwTyped(res, "SAMO-CALL-URL");
-      const data = (await res.json()) as { id: string; status: CallStatus };
-      return toCall(data.id, input.meetingUrl, data.status);
+      const data = (await res.json()) as {
+        id: string;
+        status: CallStatus;
+        created_at?: unknown;
+      };
+      return toCall(
+        data.id,
+        input.meetingUrl,
+        data.status,
+        undefined,
+        typeof data.created_at === "string" ? data.created_at : undefined,
+      );
     },
     async deleteCall(callId) {
       const res = await fetch(`${baseUrl}/calls/${encodeURIComponent(callId)}`, {
@@ -430,6 +448,7 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
           meeting_url?: unknown;
           status?: unknown;
           status_reason?: unknown;
+          created_at?: unknown;
         }>;
       };
       const rows = Array.isArray(data.calls) ? data.calls : [];
@@ -442,6 +461,7 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
             meeting_url: string;
             status: CallStatus;
             status_reason?: unknown;
+            created_at?: unknown;
           } => typeof r.id === "string" && typeof r.meeting_url === "string",
         )
         .map((r) =>
@@ -450,6 +470,7 @@ export function createHttpAppApiClient(baseUrl = ""): AppApiClient {
             r.meeting_url,
             r.status,
             typeof r.status_reason === "string" ? r.status_reason : undefined,
+            typeof r.created_at === "string" ? r.created_at : undefined,
           ),
         );
     },

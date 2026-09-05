@@ -61,7 +61,7 @@ describe("Dashboard — fetches and renders the tenant's calls (SPEC §3 Story 1
 
     fireEvent.click(await view.findByRole("button", { name: "Add samograph to Planning" }));
 
-    await view.findByRole("link", { name: /Starting call https:\/\/meet\.google\.com\/abc-defg-hij/ });
+    await view.findByRole("link", { name: /Starting call Google Meet · abc-defg-hij/ });
     expect(client.requests.filter((request) => request.path === "/calls" && request.method === "GET")).toHaveLength(2);
   });
 
@@ -177,16 +177,113 @@ describe("Dashboard — Slice 4 call rows", () => {
     expect(endedRow?.querySelector(".samograph-call-cta-open")).not.toBeNull();
   });
 
-  it("preserves the full meeting URL in the URL title and row accessible name", async () => {
-    const url = "https://meet.google.com/a-very-long-meeting-code?authuser=person%40example.com";
+  it("shows the display-safe URL, never the query string, in the title attribute and accessible name", async () => {
+    const url = "https://meet.google.com/abc-defg-hij?authuser=person%40example.com";
     const client = createFakeAppApiClient({
       seedCalls: [{ id: "long", meetingUrl: url, provider: "google_meet", status: "ENDED" }],
     });
     const { findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
-    const urlSpan = await findByText(url);
+    const urlSpan = await findByText("https://meet.google.com/abc-defg-hij");
     expect(urlSpan.classList.contains("samograph-call-url")).toBe(true);
-    expect(urlSpan.getAttribute("title")).toBe(url);
-    expect(urlSpan.closest("a.samograph-call-row")?.getAttribute("aria-label")).toContain(url);
+    expect(urlSpan.getAttribute("title")).toBe("https://meet.google.com/abc-defg-hij");
+    expect(urlSpan.closest("a.samograph-call-row")?.getAttribute("aria-label")).toContain(
+      "Google Meet · abc-defg-hij",
+    );
+  });
+});
+
+/**
+ * Mobile audit M7 (`d02`, `m04`). The row used to BE the raw meeting URL: a Zoom
+ * `?pwd=` join secret rendered verbatim as the row's headline, with nothing else
+ * to identify the call. The row is now title / meta (chip + time) / CTA, and no
+ * part of the query string reaches the DOM.
+ */
+describe("Dashboard — M7 call row: title, meta, no query strings", () => {
+  const PWD_URL =
+    "https://us04web.zoom.us/j/75208520803?pwd=GmbJ6pA9rUojNjPj7iNnLAvbpcF2uU.1";
+  const seedPwdCall = (extra: Partial<Call> = {}) =>
+    createFakeAppApiClient({
+      seedCalls: [
+        { id: "c_pwd", meetingUrl: PWD_URL, provider: "zoom", status: "ENDED", ...extra },
+      ],
+    });
+
+  it("never renders the Zoom meeting password anywhere in the row", async () => {
+    const client = seedPwdCall();
+    const { container, findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await findByText("Zoom · 752 0852 0803");
+    const html = container.innerHTML;
+    expect(html).not.toContain("pwd=");
+    expect(html).not.toContain("GmbJ6pA9rUojNjPj7iNnLAvbpcF2uU.1");
+    // Including the href into the per-call page, which used to carry ?url=<raw>.
+    const row = container.querySelector("a.samograph-call-row");
+    expect(row?.getAttribute("href")).toBe(
+      `/calls/c_pwd?url=${encodeURIComponent("https://us04web.zoom.us/j/75208520803")}`,
+    );
+  });
+
+  it("leads the row with a readable title and demotes the URL to the meta line", async () => {
+    const client = seedPwdCall();
+    const { container, findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    const title = await findByText("Zoom · 752 0852 0803");
+    expect(title.classList.contains("samograph-call-title")).toBe(true);
+
+    const body = container.querySelector(".samograph-call-body");
+    // Exactly two lines in the body: the title, then the meta line.
+    expect(Array.from(body?.children ?? [], (el) => el.className)).toEqual([
+      "samograph-call-title",
+      "samograph-call-meta",
+    ]);
+    const meta = container.querySelector(".samograph-call-meta");
+    expect(meta?.querySelector(".samograph-status-chip")?.textContent).toBe("Ended");
+    expect(meta?.querySelector(".samograph-call-url")?.textContent).toBe(
+      "https://us04web.zoom.us/j/75208520803",
+    );
+  });
+
+  it("puts a relative time in the meta line, with the exact timestamp as its title", async () => {
+    const createdAt = new Date(Date.now() - 3 * 60 * 60_000).toISOString();
+    const client = seedPwdCall({ createdAt });
+    const { container, findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await findByText("Zoom · 752 0852 0803");
+    const time = container.querySelector(".samograph-call-meta time.samograph-call-time");
+    expect(time?.textContent).toBe("3 h ago");
+    expect(time?.getAttribute("datetime")).toBe(createdAt);
+    expect(time?.getAttribute("title")).toBe(new Date(createdAt).toLocaleString());
+  });
+
+  it("omits the time element entirely when the call has no timestamp", async () => {
+    const client = seedPwdCall();
+    const { container, findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await findByText("Zoom · 752 0852 0803");
+    expect(container.querySelector(".samograph-call-time")).toBeNull();
+  });
+
+  it("keeps the CTA as the row's last child so it can hug the right edge", async () => {
+    const client = seedPwdCall();
+    const { container, findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await findByText("Zoom · 752 0852 0803");
+    const row = container.querySelector("a.samograph-call-row");
+    expect(Array.from(row?.children ?? [], (el) => el.className)).toEqual([
+      "samograph-call-body",
+      "samograph-call-cta samograph-call-cta-open",
+    ]);
+  });
+
+  it("names an unrecognised link by its host rather than echoing it", async () => {
+    const client = createFakeAppApiClient({
+      seedCalls: [
+        {
+          id: "c_other",
+          meetingUrl: "https://us04web.zoom.us/wc/join/75208520803?pwd=secret",
+          provider: "zoom",
+          status: "ENDED",
+        },
+      ],
+    });
+    const { container, findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
+    await findByText("us04web.zoom.us");
+    expect(container.innerHTML).not.toContain("secret");
   });
 });
 

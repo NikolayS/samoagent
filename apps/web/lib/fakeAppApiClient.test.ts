@@ -54,12 +54,15 @@ describe("FakeAppApiClient — records request shape, no network", () => {
     const call = await client.createCall({
       meetingUrl: "https://meet.google.com/abc-defg-hij",
     });
-    expect(call).toEqual({
+    const { createdAt, ...rest } = call;
+    expect(rest).toEqual({
       id: "call_1",
       meetingUrl: "https://meet.google.com/abc-defg-hij",
       provider: "google_meet",
       status: "PENDING",
     });
+    // The fake stamps `created_at` the way the server does (exact value is the clock).
+    expect(Number.isNaN(Date.parse(createdAt ?? ""))).toBe(false);
     expect(client.requests).toEqual([
       {
         path: "/calls",
