@@ -33,7 +33,7 @@ import {
 import { createTranscriptHandler, createTranscriptTextHandler } from "./transcript-http.ts";
 import { SESSION_COOKIE_NAME } from "../app-api/auth/session.ts";
 import { stopServerBounded } from "../../packages/shared/serverLifecycle.ts";
-import { G2Relay, isG2Path, type G2Socket } from "./g2Relay.ts";
+import { createG2Mount, type G2SocketData } from "./g2Mount.ts";
 
 /** What an upgraded socket carries until {@link WebSocketHandler.open} wires it. */
 interface StreamSocketData {
@@ -42,7 +42,6 @@ interface StreamSocketData {
   conn?: StreamConnection;
   recheck?: ReturnType<typeof setInterval>;
 }
-interface G2SocketData { kind: "g2-app" | "g2-agent"; roomId?: string }
 type WsSocketData = StreamSocketData | G2SocketData;
 
 export interface WsHubServerDeps {
@@ -85,12 +84,7 @@ const STREAM_PATH = /^\/calls\/([^/]+)\/stream$/;
 const TRANSCRIPT_PATH = /^\/calls\/([^/]+)\/transcript$/;
 const TRANSCRIPT_TXT_PATH = /^\/calls\/([^/]+)\/transcript\.txt$/;
 
-export function g2ClientIp(request: Request, peerAddress: string | undefined): string {
-  if (peerAddress === "127.0.0.1" || peerAddress === "::1" || peerAddress === "::ffff:127.0.0.1") {
-    return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || peerAddress;
-  }
-  return peerAddress ?? "unknown";
-}
+export { g2ClientIp } from "./g2Mount.ts";
 
 /** Start the ws-hub HTTP+WS server. Returns the live server + its shared Hub. */
 export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
@@ -104,7 +98,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
   // unbounded full-transcript reads while the WS surface is capped (§5.7). One
   // instance shared by both handlers; default so the surface is never uncapped.
   const restCaps = deps.restCaps ?? new RequestRateCaps();
-  const g2 = new G2Relay();
+  const g2 = createG2Mount();
 
   const transcriptHandler = createTranscriptHandler({
     sql: deps.sql,
@@ -133,10 +127,8 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
     async fetch(req, srv): Promise<Response | undefined> {
       const url = new URL(req.url);
       if (url.pathname === "/health") return new Response("ok", { status: 200 });
-      if (url.pathname === "/g2/ws") { const upgraded = srv.upgrade(req, { data: { kind: "g2-app" } }); return upgraded ? undefined : new Response("expected a websocket upgrade", { status: 426 }); }
-      const agent = /^\/g2\/rooms\/([^/]+)\/agent$/.exec(url.pathname);
-      if (agent) { const upgraded = srv.upgrade(req, { data: { kind: "g2-agent", roomId: agent[1] } }); return upgraded ? undefined : new Response("expected a websocket upgrade", { status: 426 }); }
-      if (isG2Path(url.pathname)) return g2.fetch(req, g2ClientIp(req, srv.requestIP(req)?.address));
+      const g2Response = await g2.fetch(req, srv);
+      if (g2Response !== null) return g2Response;
       // The `.txt` download must be matched BEFORE the JSON `/transcript` route.
       if (TRANSCRIPT_TXT_PATH.test(url.pathname)) return transcriptTextHandler(req);
       if (TRANSCRIPT_PATH.test(url.pathname)) return transcriptHandler(req);
@@ -158,8 +150,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
 
     websocket: {
       async open(ws: ServerWebSocket<WsSocketData>) {
-        if (ws.data.kind === "g2-app") { g2.openApp(ws as unknown as G2Socket); return; }
-        if (ws.data.kind === "g2-agent") { g2.openAgent(ws as unknown as G2Socket, ws.data.roomId!); return; }
+        if (ws.data.kind === "g2-app" || ws.data.kind === "g2-agent") { g2.open(ws as ServerWebSocket<G2SocketData>); return; }
         const streamData = ws.data as StreamSocketData;
         const socket: StreamSocket = {
           send: (data) => {
@@ -204,8 +195,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
       },
 
       message(ws: ServerWebSocket<WsSocketData>, _message) {
-        if (ws.data.kind === "g2-app") { g2.messageApp(ws as unknown as G2Socket, _message as string | ArrayBufferView); return; }
-        if (ws.data.kind === "g2-agent") { g2.messageAgent(ws as unknown as G2Socket, _message as string | ArrayBufferView); return; }
+        if (ws.data.kind === "g2-app" || ws.data.kind === "g2-agent") { g2.message(ws as ServerWebSocket<G2SocketData>, _message); return; }
         const conn = (ws.data as StreamSocketData).conn;
         if (!conn) return;
         // Account every client→server command against the share command-rate cap
@@ -230,8 +220,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
       },
 
       close(ws: ServerWebSocket<WsSocketData>) {
-        if (ws.data.kind === "g2-app") { g2.closeApp(ws as unknown as G2Socket); return; }
-        if (ws.data.kind === "g2-agent") { g2.closeAgent(ws as unknown as G2Socket); return; }
+        if (ws.data.kind === "g2-app" || ws.data.kind === "g2-agent") { g2.close(ws as ServerWebSocket<G2SocketData>); return; }
         const data = ws.data as StreamSocketData;
         if (data.recheck) clearInterval(data.recheck);
         data.conn?.close();

@@ -212,7 +212,10 @@ export class G2Relay {
     const room = [...this.rooms.values()].find((item) => item.app === socket);
     if (message.type === "cue" && room) {
       const cue = normalizeCueSemantic(message.cue);
-      if (cue) room.agent?.send(JSON.stringify({ type: "cue", cue }));
+      if (cue) {
+        room.agent?.send(JSON.stringify({ type: "cue", cue }));
+        console.info("g2 relay: cue");
+      }
     }
   }
 
@@ -265,10 +268,12 @@ export class G2Relay {
       room.touchedAt = this.now();
       if (room.app) {
         room.app.send(JSON.stringify({ type: "whisper", ...whisper }));
+        console.info("g2 relay: whisper delivered");
         return json({ queued: false });
       }
       if (room.queue.size() >= room.queue.hardMax) return json({ error: "queue full" }, 429);
       room.queue.push(whisper);
+      console.info("g2 relay: whisper queued");
       return json({ queued: true }, 202);
     }
 
@@ -309,6 +314,7 @@ export class G2Relay {
       touchedAt: this.now(),
     };
     this.rooms.set(room.id, room);
+    console.info("g2 relay: paired");
     pending.socket.send(
       JSON.stringify({ type: "paired", device_token: room.deviceToken }),
     );
