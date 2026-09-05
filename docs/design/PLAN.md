@@ -102,16 +102,15 @@ the conflict surface — PRs touching disjoint regions can run in parallel.
 
 ## Follow-ups
 
-Untracked items from the wave-3 UI audit still open (condensed from `FOLLOWUPS.md`):
+Items from the wave-3 UI audit genuinely still open (condensed from `FOLLOWUPS.md`; the prior
+eight items in this section — transcript-row reflow, `TranscriptTime` `dateTime`, the public-nav
+hamburger, `meetingUrl.ts` host shapes + guard anchor, the touch-targets allowlist hole, the
+`Dashboard.test.tsx` autofocus flake, and both `GET /calls/:id`/`GET /settings` 401 items — were
+all fixed by #288, #289 and #302 and are ticked in `FOLLOWUPS.md`):
 
-- Transcript rows lacking `samograph-transcript-row` fall to a wide minmax grid → horizontal scroll at 390px when a warning row exists (#280 review). Small PR; RED = CSS/component test.
-- `TranscriptTime` doc comment references a `dateTime` attribute that isn't actually rendered (#280 review NB2).
-- `AppShell` variant=public shows a hamburger menu over just the theme switcher on `/auth` and `/c/[token]` — should render the toggle only for `variant=app` (#284 review NB1); fold into M8.
-- `meetingUrl.ts` doesn't handle `zoom.us/w/`, `zoom.us/my/`, or uppercase Meet codes (falls to bare host); the M4 CSS guard's `indexOf("@media (max-width: 48rem)")` match is ambiguous — anchor on a unique comment instead (#283 re-review NB1/NB2).
-- Touch-targets guard allowlist: a new sub-12px literal under an already-allowlisted selector passes silently — tighten the guard to selector+value pairs (#281 review).
-- `Dashboard.test.tsx` "autofocuses the paste input" is flaky under full-suite CI (jsdom's `document.activeElement` is process-global) — assert via `toHaveFocus()` after an explicit focus reset in `beforeEach`, or await `act()` (#281 M3 note).
-- Server: `GET /calls/:id` (`apps/app-api/calls/http.ts:547-571`) has no `unauthenticated()` branch — an expired session returns a bodyless 403 instead of 401, so the client-side redirect to `/auth` never fires; fix like sibling handlers (`hasShareCredential ? denied() : unauthenticated()`), RED = wire test (#297 review NB1).
-- Add a bodyless-401 wire test for `GET /settings` → `AppApiError(401)` (the shape that motivated the `apiError.ts` fix) (#297 NB3).
+- `aria-disabled` is not covered anywhere in `apps/web` — `.samograph-btn[disabled]`-only selectors have no live gap today (`<a>` can't be `disabled`), but hardening `.samograph-btn[aria-disabled="true"]` + `:not([aria-disabled="true"])` on hover gates is optional future work (#293 review INFO).
+- `POST /calls` returns `{ id, status }` with no `created_at`, so `createHttpAppApiClient.createCall`'s `typeof data.created_at === "string"` branch can never fire against the real server while `FakeAppApiClient.createCall` stamps one — harmless today (a refetch fills it in), but the fake is more capable than the server; add `created_at` to the 201 body or drop the client branch (#285 review INFO).
+- `meetingUrl.ts` `parse()`'s `https://`-prefix retry produces cosmetic garbage titles for non-web schemes (`file:///etc/passwd` → "file", `ftp://host/x` → "ftp") — not a security issue and unreachable in practice (create-call validates the provider first); worth a `"Meeting"` fallback if this file is touched again (#285 review INFO).
 
 ## Status legend
 
