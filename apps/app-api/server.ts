@@ -75,6 +75,7 @@ import { InMemoryRateLimiter } from "./auth/rate-limit.ts";
 
 process.on("unhandledRejection", (reason) => {
   console.error("[app-api] unhandledRejection:", reason);
+  process.exit(1);
 });
 
 /**
