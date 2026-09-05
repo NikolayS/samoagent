@@ -372,14 +372,20 @@ h1 {
   line-height: var(--leading-tight);
 }
 
+/* A section title has to OUTRANK body copy. `h2` was `--text-md` (16px) over a
+   `--text-base` (14px) body — a 2px step, which is why the dashboard's four
+   peer sections read as one undifferentiated column (design audit; DESIGN-MODEL
+   §3 "Type scale"). 20 / 16 / 14 is the scale; the sizes come from the tokens so
+   the steps stay related. */
 h2 {
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: -.01em;
+  line-height: var(--leading-tight);
 }
 
 h3 {
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   font-weight: 600;
 }
 
@@ -538,6 +544,131 @@ button:hover {
 
 .samograph-actions > * {
   flex: 0 0 auto;
+}
+
+/* ----- Page header (DESIGN-MODEL §4 "Page header", PLAN.md desktop PR 5) -----
+   Every route grew its own heading block, so the H1 size, the space under it and
+   the place secondary text went were three different answers — and on
+   `/calls/[id]` the raw meeting URL was rendered INSIDE the H1. `PageHeader`
+   emits ONE shape (eyebrow / title / description / actions) and this is its one
+   set of rules. A page-specific class composes ON TOP of these (the call view
+   keeps its own tighter gap and mobile sizes, #283), so every declaration here
+   is the base an override can win over. */
+.samograph-page-header {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-8);
+}
+
+/* The text column is its own grid so the eyebrow/title/description rhythm is
+   independent of the gap between that column and the actions slot. */
+.samograph-page-header-text {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.samograph-page-header-eyebrow {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.samograph-page-header-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: var(--leading-tight);
+}
+
+.samograph-page-header-description {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.samograph-page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Mobile-first: the actions sit UNDER the title and only move beside it once
+   there is room (DESIGN-MODEL §5). The `--has-actions` modifier is set by the
+   component, so the two-column grid is never declared on a header that has a
+   single child to put in it. */
+@media (min-width: 768px) {
+  .samograph-page-header--has-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-4);
+  }
+}
+
+/* ----- Section rhythm (DESIGN-MODEL §4 "Card / Section", §5) ----------------
+   Structure from hairlines and whitespace, not nested boxes: a run of related
+   content is separated from the next by ONE 1px rule and `--space-6` of padding.
+   The gap between two things inside a section is always smaller than the gap
+   around the group they belong to. */
+.samograph-section {
+  padding-block: var(--space-6);
+  border-top: var(--border) solid var(--line);
+}
+
+/* The dashboard's other two peer sections are rendered by sibling components
+   (`AddToCallForm`, `UpcomingMeetings`); they join the shared rhythm here rather
+   than each carrying a private `margin-block`, which is what let four sections
+   at four spacings read as one block. */
+.samograph-dash-hero,
+.samograph-upcoming-meetings {
+  padding-block: var(--space-6);
+  border-top: var(--border) solid var(--line);
+}
+
+/* A rule immediately under the page header separates nothing — the header's own
+   `--space-8` already ended it. */
+.samograph-page-header + .samograph-section {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.samograph-page-header + .samograph-dash-hero {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* …and through a wrapper. On /settings the first section is the first child of
+   the <form> that follows the header, not a sibling of it, so the adjacent
+   rules above never matched and the page opened with a divider under its H1
+   (#295 review). At (0,3,0) this also outranks `.samograph-settings-section`'s
+   own heavier `border-top`, which is the declaration that drew that line. */
+.samograph-page-header + * > .samograph-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Title (+ optional description) of a section: the pair is one group, so it
+   takes the tight `--space-1` gap and the group is what carries the space down
+   to the section's content. */
+.samograph-section-header {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.samograph-section-title {
+  margin: 0;
+}
+
+.samograph-section-description {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 .samograph-app-nav {
@@ -1057,10 +1188,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 /* ===== end Slice 2 ===== */
 
 /* ===== Slice 4 — Dashboard ===== */
-.samograph-dash-hero {
-  margin-block: var(--space-5);
-}
-
 .samograph-dash-hero-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1092,14 +1219,15 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   list-style: none;
 }
 
+/* A row's rule belongs to its TOP edge only. The last row used to close the
+   list with a `border-bottom` as well, which put a second hairline `--space-6`
+   above the next section's own `border-top` — two lines with a band of nothing
+   between them, and a doubled rule against the danger zone's 2px `--crit` edge
+   (#295 review). One rule between two things, always (DESIGN-MODEL §4,
+   "Hairlines, not boxes"): the section that follows draws it. */
 .samograph-call-item,
 .samograph-meeting-item {
   border-top: 1px solid var(--line);
-}
-
-.samograph-call-item:last-child,
-.samograph-meeting-item:last-child {
-  border-bottom: 1px solid var(--line);
 }
 
 .samograph-call-row,
@@ -1249,7 +1377,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   font-size: var(--text-sm);
 }
 
-.samograph-upcoming-meetings { margin-block: var(--space-6); }
 .samograph-meeting-title {
   overflow: hidden;
   font-weight: 650;
@@ -1413,9 +1540,11 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   font-family: var(--font-mono);
 }
 
+/* The reading measure lives on the page's CONTENT column since #287
+   (`.samograph-page--prose > * { max-width: var(--content-max) }`), so the
+   per-section cap here was a second, silently redundant 720px box. What is left
+   is settings' own heavier divider; the padding comes from `.samograph-section`. */
 .samograph-settings-section {
-  max-width: var(--width-prose);
-  padding-block: var(--space-5);
   border-top: var(--border-strong) solid var(--line-strong);
 }
 
@@ -1903,6 +2032,15 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   font-family: var(--font-body);
   font-size: var(--text-xl);
   line-height: var(--leading-tight);
+}
+
+/* The call view composes `PageHeader` (desktop PR 5) but keeps the compact
+   measurements #283 shipped: the back link, title and URL sit on `--space-1`,
+   not the `--space-2` a page header uses, and the block above the transcript
+   stays `--space-4` / `--space-3` deep. The wrapper rules above own the outer
+   box; this one reaches the component's inner text column. */
+.samograph-call-view-heading .samograph-page-header-text {
+  gap: var(--space-1);
 }
 
 .samograph-call-back {

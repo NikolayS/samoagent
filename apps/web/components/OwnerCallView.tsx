@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PerCallTranscript } from "./PerCallTranscript.tsx";
 import { ShareModal } from "./ShareModal.tsx";
+import { PageHeader } from "./PageHeader.tsx";
 import type { TranscriptStreamClient } from "../lib/transcriptStreamClient.ts";
 import type { ShareApiClient } from "../lib/shareApiClient.ts";
 import type { AppApiClient } from "../lib/appApiClient.ts";
@@ -91,28 +92,36 @@ export function OwnerCallView({
 
   return (
     <section className="samograph-call-view">
-      <div className="samograph-call-view-heading">
-        <a href="/dashboard" className="samograph-call-back">← Dashboard</a>
-        {/* The H1 is the meeting NAME, not the raw join link: a 28px URL wrapped
-            over two lines and pushed the transcript below the fold on a phone
-            (mobile audit §1 D). The link below is demoted to a small line whose
-            visible TEXT and tooltip are query-stripped — a Zoom `?pwd=` is a
-            join secret and must never be on screen. Its `href` is deliberately
-            the RAW url: the link has to actually join the meeting, and a
-            password-protected Zoom room needs the query to do that. */}
-        <h1>{title}</h1>
-        {shownUrl ? (
-          <a
-            className="samograph-call-view-url"
-            href={safeExternalUrl(meetingUrl) ?? undefined}
-            target="_blank"
-            rel="noreferrer noopener"
-            title={shownUrl}
-          >
-            {shownUrl}
-          </a>
-        ) : null}
-      </div>
+      {/* The shared PageHeader (DESIGN-MODEL §4) — the back link is its eyebrow
+          and the meeting link its description. The H1 is the meeting NAME, not
+          the raw join link: a 28px URL wrapped over two lines and pushed the
+          transcript below the fold on a phone (mobile audit §1 D). The link
+          below is demoted to a small line whose visible TEXT and tooltip are
+          query-stripped — a Zoom `?pwd=` is a join secret and must never be on
+          screen. Its `href` is deliberately the RAW url: the link has to
+          actually join the meeting, and a password-protected Zoom room needs
+          the query to do that.
+          `samograph-call-view-heading` is kept so #283's compact measurements
+          (gap, margin and the mobile H1 size) still apply on top of the shared
+          rules. */}
+      <PageHeader
+        className="samograph-call-view-heading"
+        eyebrow={<a href="/dashboard" className="samograph-call-back">← Dashboard</a>}
+        title={title}
+        description={
+          shownUrl ? (
+            <a
+              className="samograph-call-view-url"
+              href={safeExternalUrl(meetingUrl) ?? undefined}
+              target="_blank"
+              rel="noreferrer noopener"
+              title={shownUrl}
+            >
+              {shownUrl}
+            </a>
+          ) : null
+        }
+      />
       <PerCallTranscript
         streamClient={streamClient}
         auth={{ kind: "session" }}

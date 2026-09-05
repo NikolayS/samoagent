@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AddToCallForm } from "./AddToCallForm.tsx";
+import { PageHeader } from "./PageHeader.tsx";
 import { AccountDangerZone } from "./AccountDangerZone.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { AppApiError, type AppApiClient, type Call } from "../lib/appApiClient.ts";
@@ -193,7 +194,10 @@ export function Dashboard({ client, redirect, retryCallId }: DashboardProps) {
 
   return (
     <>
-      <h1>Your calls</h1>
+      <PageHeader
+        title="Your calls"
+        description="Every call samograph has joined, live and finished. Open one to watch or read its transcript."
+      />
       {/* `initialUrl` lands on an UNCONTROLLED `defaultValue`, which React reads
           once, at mount. Keying the form by the resolved URL makes the prefill
           explicit: a different retry target is a different form instance, so
@@ -213,8 +217,10 @@ export function Dashboard({ client, redirect, retryCallId }: DashboardProps) {
       ) : (
         <>
           {active.length > 0 ? (
-            <section aria-label="Active calls">
-              <h2>Active calls</h2>
+            <section aria-label="Active calls" className="samograph-section">
+              <div className="samograph-section-header">
+                <h2 className="samograph-section-title">Active calls</h2>
+              </div>
               <ul className="samograph-call-list">
                 {active.map((c) => (
                   <CallRow key={c.id} call={c} now={now} />
@@ -223,8 +229,10 @@ export function Dashboard({ client, redirect, retryCallId }: DashboardProps) {
             </section>
           ) : null}
           {past.length > 0 ? (
-            <section aria-label="Past calls">
-              <h2>Past calls</h2>
+            <section aria-label="Past calls" className="samograph-section">
+              <div className="samograph-section-header">
+                <h2 className="samograph-section-title">Past calls</h2>
+              </div>
               <ul className="samograph-call-list">
                 {past.map((c) => (
                   <CallRow key={c.id} call={c} now={now} />
