@@ -43,7 +43,7 @@ const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 /** Body of the LAST rule whose selector matches exactly (source order wins in CSS). */
 function rule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
-  const matches = [...css.matchAll(new RegExp(`(?:^|[};])\\s*${escaped}\\s*\\{([^}]*)\\}`, "g"))];
+  const matches = [...css.matchAll(new RegExp(`(?:^|[};,])\\s*${escaped}\\s*\\{([^}]*)\\}`, "g"))];
   return normalize(matches.at(-1)?.[1] ?? "");
 }
 
@@ -150,7 +150,12 @@ describe("button states (DESIGN-MODEL §4 Button — states)", () => {
   });
 
   it("hovers only when enabled — no :hover rule may apply to a disabled button", () => {
-    const hovers = [...css.matchAll(/(\.samograph-btn[^{,]*:hover)\s*\{/g)].map((m) => m[1].trim());
+    // Every member of every grouped selector list, not just the one that
+    // happens to sit last before the brace.
+    const hovers = [...css.matchAll(/([^{}]+)\{/g)]
+      .flatMap((m) => m[1].split(","))
+      .map((s) => s.trim())
+      .filter((s) => s.includes(".samograph-btn") && s.includes(":hover"));
     expect(hovers.length).toBeGreaterThan(0);
     expect(hovers.filter((s) => !s.includes(":not([disabled])"))).toEqual([]);
   });
@@ -208,4 +213,58 @@ describe("dark hairlines (PLAN PR 12)", () => {
   it("leaves the light hairline alone", () => {
     expect(themes.light["--line"]).toBe("#dfdbd1");
   });
+});
+
+describe("anchor buttons are not underlined", () => {
+  it("kills the link underline on the base (UpcomingMeetings renders <a class=samograph-btn>)", () => {
+    expect(decl(rule(".samograph-btn"), "text-decoration")).toBe("none");
+  });
+});
+
+/**
+ * The transcript instrument is theme-INVARIANT: `.samograph-instrument-foot`
+ * paints `--panel-surface` #141413 in the LIGHT theme too. A `.samograph-btn`
+ * in there inheriting the page's theme-relative ink is unreadable — Share and
+ * Try again (`--secondary`, `--ink-soft` #3a382f) measure 1.57:1 on that
+ * surface in light mode, and Delete (`--danger`, `--crit` #a63a3a) 2.90:1.
+ * DESIGN-MODEL §4 answers this with the `--on-panel` variant, "replaces
+ * hand-written in-panel button rules" (PLAN PR 12).
+ */
+describe("buttons on the instrument panel (DESIGN-MODEL §4 --on-panel)", () => {
+  const PANEL_INKS = [
+    ["base", ".samograph-btn"],
+    ["--secondary", ".samograph-btn--secondary"],
+    ["--danger", ".samograph-btn--danger"],
+  ] as const;
+
+  /* The ink a button in the footer ACTUALLY renders: the panel-scoped rule if
+     one exists, otherwise the page-level variant it falls through to. Without
+     the panel rules this resolves to the theme-relative page ink — which is
+     precisely the bug, and what the RED run measures. */
+  const inkInFooter = (variant: string) =>
+    decl(rule(`.samograph-instrument-foot ${variant}`), "color") || decl(rule(variant), "color");
+
+  for (const [name, variant] of PANEL_INKS) {
+    it(`${name} takes a panel-relative ink`, () => {
+      expect(decl(rule(`.samograph-instrument-foot ${variant}`), "color").length).toBeGreaterThan(0);
+    });
+
+    for (const theme of ["light", "dark"] as const) {
+      it(`${name} ink clears 4.5:1 on --panel-surface in ${theme} mode`, () => {
+        expect(ratio(inkInFooter(variant), "var(--panel-surface)", theme)).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+
+  it("covers the `.samograph-controls` half of the footer's class pair too", () => {
+    expect(css).toContain(".samograph-controls .samograph-btn--secondary");
+    expect(css).toContain(".samograph-controls .samograph-btn--danger");
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    it(`disabled panel buttons stay legible on the panel in ${theme} mode`, () => {
+      const body = rule(".samograph-instrument-foot .samograph-btn[disabled]");
+      expect(ratio(decl(body, "color"), decl(body, "background"), theme)).toBeGreaterThanOrEqual(3);
+    });
+  }
 });

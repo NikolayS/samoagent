@@ -45,6 +45,19 @@
   --accent-live: #4ed18a;
   --signal: #ff4fb0;
 
+  /* Buttons ON the instrument panel (DESIGN-MODEL §4 Button, `--on-panel`).
+     The panel is theme-invariant, so these inks must be too: a page-relative
+     ink lands at 1.57:1 on `--panel-surface` in the light theme. `--crit` is
+     the one hue with no invariant panel counterpart, so it gets a literal —
+     the only new hex, and it lives in the registry like every other. */
+  --on-panel-ink: var(--panel-ink);
+  --on-panel-muted: var(--panel-muted);
+  --on-panel-border: var(--panel-gutter);
+  --on-panel-crit: #ff8f8f;
+  --on-panel-disabled-bg: var(--panel-strip);
+  --on-panel-disabled-fg: var(--panel-muted);
+  --on-panel-disabled-border: var(--panel-gutter);
+
   /* Compatibility aliases for pre-redesign components. */
   --green: var(--accent-live);
   --green-deep: var(--ink-soft);
@@ -678,12 +691,13 @@ button:hover {
  *
  * DEVIATION from DESIGN-MODEL §4, which writes the base as
  * `border: 1px solid transparent`: the base border-color is `--control-border`
- * and the base fill is `--surface`, i.e. the base IS the neutral variant. A
- * bare `.samograph-btn` with no variant is real in this codebase (the dense
- * row actions in UpcomingMeetings) and used to get its box from `button`;
- * a transparent base would have silently deleted it. Variants still override
- * all three properties, so the model's intent — base owns geometry, variant
- * owns colour — holds unchanged.
+ * and the base fill is `--surface`, i.e. the base IS the neutral variant.
+ * `--sm` is a SIZE, not a colour variant, so `.samograph-btn--sm` buttons and
+ * links (the dense row actions in UpcomingMeetings) carry no colour variant at
+ * all and took their box from the `button` rule; a transparent base would have
+ * silently deleted it, and the `<a>` among them never had one to begin with.
+ * Colour variants still override all three properties, so the model's intent —
+ * base owns geometry, variant owns colour — holds unchanged.
  */
 .samograph-btn {
   display: inline-flex;
@@ -699,6 +713,9 @@ button:hover {
   border-radius: var(--radius-control);
   font-size: var(--text-sm);
   font-weight: 500;
+  /* `.samograph-btn` is worn by <a> as often as by <button> (UpcomingMeetings
+     renders four). A button is a box, not a link: no underline. */
+  text-decoration: none;
   transition: color 140ms, background-color 140ms, border-color 140ms;
 }
 .samograph-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
@@ -735,6 +752,41 @@ button:hover {
   cursor: not-allowed;
 }
 .samograph-btn[aria-busy="true"] { cursor: progress; }
+
+/* `--on-panel` (DESIGN-MODEL §4 Button variants; PLAN PR 12 "replaces
+ * hand-written in-panel button rules").
+ *
+ * The transcript instrument is theme-INVARIANT: `.samograph-instrument-foot`
+ * paints `--panel-surface` #141413 under the LIGHT theme as well as the dark
+ * one. A button in there taking the page's theme-relative ink is unreadable —
+ * Share and Try again (`--secondary`) measured 1.57:1 on that surface in light
+ * mode, and Delete (`--danger`) 2.90:1. Every ink below is panel-relative, so
+ * both themes read identically.
+ *
+ * Scoped by ancestor rather than a new `--on-panel` class because the footer
+ * is the only place this applies (`PerCallTranscript` renders exactly one
+ * `<footer class="samograph-controls samograph-instrument-foot">`) and no
+ * markup needs to move; both halves of that class pair are covered so the
+ * rules survive either class being dropped. */
+.samograph-controls .samograph-btn,
+.samograph-instrument-foot .samograph-btn { color: var(--on-panel-ink); background: transparent; border-color: var(--on-panel-border); }
+.samograph-controls .samograph-btn--primary,
+.samograph-instrument-foot .samograph-btn--primary { color: var(--panel-ground); background: var(--on-panel-ink); border-color: var(--on-panel-ink); }
+.samograph-controls .samograph-btn--secondary,
+.samograph-instrument-foot .samograph-btn--secondary { color: var(--on-panel-ink); background: transparent; border-color: var(--on-panel-border); }
+.samograph-controls .samograph-btn--ghost,
+.samograph-instrument-foot .samograph-btn--ghost { color: var(--on-panel-muted); background: transparent; border-color: transparent; }
+.samograph-controls .samograph-btn--danger,
+.samograph-instrument-foot .samograph-btn--danger { color: var(--on-panel-crit); background: transparent; border-color: var(--on-panel-crit); }
+.samograph-controls .samograph-btn--danger:where(.samograph-btn--solid),
+.samograph-instrument-foot .samograph-btn--danger:where(.samograph-btn--solid) { color: var(--panel-ground); background: var(--on-panel-crit); border-color: var(--on-panel-crit); }
+.samograph-controls .samograph-btn:not([disabled]):hover,
+.samograph-instrument-foot .samograph-btn:not([disabled]):hover { color: var(--panel-ground); background: var(--on-panel-ink); border-color: var(--on-panel-ink); }
+.samograph-controls .samograph-btn--danger:not([disabled]):hover,
+.samograph-instrument-foot .samograph-btn--danger:not([disabled]):hover { color: var(--panel-ground); background: var(--on-panel-crit); border-color: var(--on-panel-crit); }
+/* (0,3,0) — outranks every panel variant above, as the page recipe does on the page. */
+.samograph-controls .samograph-btn[disabled],
+.samograph-instrument-foot .samograph-btn[disabled] { color: var(--on-panel-disabled-fg); background: var(--on-panel-disabled-bg); border-color: var(--on-panel-disabled-border); }
 .samograph-field { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
 .samograph-field > label, .samograph-field > input, .samograph-field > select, .samograph-field > textarea { margin-top: 0; }
 .samograph-field-hint { margin: 0; color: var(--muted); font-size: var(--text-xs); }
