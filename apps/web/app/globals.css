@@ -388,10 +388,12 @@
    boundary it actually marks is "the nav collapses and the hero goes compact",
    which is --bp-md's job, so it moved to 767.98px):
    - The nav's 32px flex gap does not fit a 320px phone: the box is
-     320 - 2 x --gutter(20) = 280px and the wordmark (~153px) + CTA (~112px) +
-     32px gap is ~297px, so the CTA overhung the right edge (#290 review).
-     --space-3 (12px) lands the row at ~277px.
-   - 350px of content buys two of these three: the wordmark (153px), the CTA
+     320 - 2 x --gutter = 288px (M9 made the gutter fluid, so at 320px it
+     resolves to the clamp's 16px floor, not the 20px step it used to be) and
+     the wordmark (~153px) + CTA (~112px) + 32px gap is ~297px, so the CTA
+     overhung the right edge (#290 review). --space-3 (12px) lands the row at
+     ~277px, which still clears 288px with room to spare.
+   - ~351px of content at 390px buys two of these three: the wordmark (153px), the CTA
      (112px) and the 154px theme switcher. The name of the product and the way
      in win; theme follows the OS here and is still switchable inside the app.
    - The three footer links wrap at this width, and a leading separator would
