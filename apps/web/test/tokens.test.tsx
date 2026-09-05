@@ -25,7 +25,7 @@ const expected: Record<string, string> = {
   "--radius-sm": "4px", "--radius-md": "6px", "--radius-lg": "8px", "--radius-pill": "999px",
   "--border": "1px", "--border-strong": "2px",
   "--width-app": "1120px", "--width-prose": "720px", "--width-form": "480px",
-  "--gutter": "var(--space-8)", "--focus-ring": "var(--ink)",
+  "--gutter": "clamp(var(--space-4), 5vw, var(--space-8))", "--focus-ring": "var(--ink)",
   "--hover-surface": "color-mix(in srgb, var(--ink) 5%, var(--surface))",
   "--control-border": "var(--line-strong)",
 };
@@ -72,8 +72,12 @@ describe("Slice 1 reset and shell CSS", () => {
     expect(normalize(declaration(root, "--page-max") ?? "")).toBe("var(--width-app)");
     expect(rule(/\.samograph-page--form(?![-\w])/)).toMatch(/--content-max\s*:\s*var\(--width-form\)/);
   });
-  it("reduces the gutter under 40rem", () =>
-    expect(clean).toMatch(/@media\s*\(max-width:\s*40rem\)\s*\{[\s\S]*?:root\s*\{[^}]*--gutter\s*:\s*var\(--space-5\)/));
+  // M9: the stepped `:root { --gutter: var(--space-5) }` override inside a
+  // media query became one fluid expression — 16px at 320px, 32px from 640px up.
+  it("makes the gutter fluid instead of stepped", () => {
+    expect(normalize(declaration(root, "--gutter") ?? "")).toBe("clamp(var(--space-4), 5vw, var(--space-8))");
+    expect(clean).not.toMatch(/@media[^{]*\{[^}]*:root\s*\{[^}]*--gutter\s*:/);
+  });
   it("gives select and textarea the shared focus ring", () => {
     const focusRule = [...clean.matchAll(/([^{}]+:focus-visible[^{}]*)\{([^}]*)\}/g)].find(([, selectors]) => selectors.includes("select:focus-visible") && selectors.includes("textarea:focus-visible"));
     expect(focusRule).toBeDefined();
@@ -138,9 +142,9 @@ describe("Slice 1 typography regressions", () => {
 });
 
 describe("Slice 4 responsive dashboard CSS", () => {
-  it("stacks call and meeting rows into one column under 40rem", () => {
+  it("stacks call and meeting rows into one column under --bp-md", () => {
     const slice4 = css.match(/\/\* ===== Slice 4 — Dashboard ===== \*\/([\s\S]*?)\/\* ===== end Slice 4 ===== \*\//)?.[1] ?? "";
-    const mobile = slice4.match(/@media\s*\(max-width:\s*40rem\)\s*\{([\s\S]*)\}\s*$/)?.[1] ?? "";
+    const mobile = slice4.match(/@media\s*\(max-width:\s*767\.98px\)\s*\{([\s\S]*)\}\s*$/)?.[1] ?? "";
     expect(mobile).toMatch(/\.samograph-call-row\s*,\s*\.samograph-meeting-item\s*\{[^}]*grid-template-columns\s*:\s*minmax\(0\s*,\s*1fr\)/s);
   });
 

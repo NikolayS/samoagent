@@ -11,8 +11,8 @@ import { readGlobalsCss } from "./helpers/stylesheet";
 const css = readGlobalsCss();
 const slice3 = css.slice(css.indexOf("/* ===== Slice 3 — Transcript instrument"));
 /**
- * Slice 3 contains TWO `@media (max-width: 48rem)` blocks — this one and the
- * later head/foot column stack — so `indexOf("@media (max-width: 48rem)")` is
+ * Slice 3 contains TWO `@media (max-width: 767.98px)` blocks — this one and the
+ * later head/foot column stack — so `indexOf("@media (max-width: 767.98px)")` is
  * ambiguous: reorder the file and the guard silently reads the wrong block
  * (#283 re-review NB2). Anchor on a marker comment that names this block, and
  * take the media query that immediately follows it.
@@ -21,7 +21,7 @@ const MARKER = "/* M4:compact-call-header";
 const mobile = (() => {
   const marker = slice3.indexOf(MARKER);
   if (marker < 0) return "";
-  const start = slice3.indexOf("@media (max-width: 48rem)", marker);
+  const start = slice3.indexOf("@media (max-width: 767.98px)", marker);
   if (start < 0) return "";
   // Nested-free block: read to the matching closing brace.
   let depth = 0;
@@ -45,7 +45,7 @@ describe("M4 call-view header CSS", () => {
     expect(slice3).toMatch(/\.samograph-call-view-url\s*\{[^}]*white-space\s*:\s*nowrap/s);
   });
 
-  it("has a mobile block on the 48rem boundary inside Slice 3", () => {
+  it("has a mobile block on the --bp-md boundary inside Slice 3", () => {
     expect(mobile).not.toBe("");
   });
 

@@ -17,7 +17,7 @@ import { readGlobalsCss } from "./helpers/stylesheet";
  *    as stray punctuation floating a line up, at every viewport width.
  * 2. **The mobile breakpoint hid the wordmark AND the nav CTA.** `.samograph-brand
  *    > span` and `.samograph-button--compact` were both `display: none` below
- *    40rem, so the product's name did not appear on its own landing page and the
+ *    the mobile breakpoint, so the product's name did not appear on its own page and the
  *    nav had no action — leaving a 44px unlabelled avatar and a 154px theme
  *    switcher.
  * 3. **Type floor.** The landing block carried four raw below-12px literals
@@ -81,8 +81,8 @@ describe("M5.1 — the footer separator sits on its link's line", () => {
     expect(nav.join(" ")).toMatch(/align-items\s*:\s*center/);
   });
 
-  it("drops the separators below 40rem, where the links wrap", () => {
-    const mobile = mediaBlock("(max-width: 40rem)");
+  it("drops the separators below --bp-md, where the links wrap", () => {
+    const mobile = mediaBlock("(max-width: 767.98px)");
     expect(mobile).toMatch(/\.samograph-site-footer nav i\s*\{[^}]*display\s*:\s*none/);
     expect(mobile).toMatch(
       /\.samograph-site-footer nav\s*\{[^}]*column-gap\s*:\s*var\(--space-4\)/,
@@ -91,13 +91,13 @@ describe("M5.1 — the footer separator sits on its link's line", () => {
 });
 
 describe("M5.2 — the wordmark and the nav CTA survive the mobile breakpoint", () => {
-  const mobile = () => mediaBlock("(max-width: 40rem)");
+  const mobile = () => mediaBlock("(max-width: 767.98px)");
 
-  it("no longer hides .samograph-brand > span below 40rem", () => {
+  it("no longer hides .samograph-brand > span below --bp-md", () => {
     expect(css).not.toMatch(/\.samograph-brand\s*>\s*span\s*,?[^{}]*\{[^}]*display\s*:\s*none/);
   });
 
-  it("no longer hides the nav CTA below 40rem", () => {
+  it("no longer hides the nav CTA below --bp-md", () => {
     // PLAN PR 13 replaced `.samograph-button--compact` with the shared
     // `.samograph-btn--sm`; the defect guarded here is unchanged — nothing in
     // the mobile block may hide the landing nav's one action.
@@ -118,7 +118,7 @@ describe("M5.2 — the wordmark and the nav CTA survive the mobile breakpoint", 
 
 describe("M5.3 — a 12px type floor across the landing block", () => {
   // The slice used to stop at `@keyframes samograph-refined-pulse`, which sits
-  // BEFORE the landing's own `@media` blocks (59.99rem / 40rem / reduced
+  // BEFORE the landing's own `@media` blocks (--bp-lg / --bp-md / reduced
   // motion) — so the breakpoint where the type actually shrinks was never
   // scanned (#290 review). It now runs to the theme blocks that follow the
   // whole landing section.
@@ -216,17 +216,18 @@ describe("M5.5 — the dormant instrument rule declares no width at all", () => 
 });
 
 describe("M5.6 — the landing nav fits a 320px phone (#290 review)", () => {
-  // At 320px the nav box is 320 - 2 x --gutter(20px) = 280px, and its content is
-  // the wordmark (~153px) + the CTA (~112px) + the flex gap. With the desktop
-  // 32px gap that is ~297px in a 280px box — the CTA overhangs the right edge.
-  // --space-3 (12px) brings it to ~277px, inside the box, and the theme switcher
-  // is already dropped at this width.
+  // At 320px the nav box is 320 - 2 x --gutter = 288px since M9 made the gutter
+  // fluid (clamp(16px, 5vw, 32px) resolves to 16px here, was a stepped 20px), and
+  // its content is the wordmark (~153px) + the CTA (~112px) + the flex gap. With
+  // the desktop 32px gap that is ~297px in a 288px box — the CTA overhangs the
+  // right edge. --space-3 (12px) brings it to ~277px, inside the box, and the
+  // theme switcher is already dropped at this width.
   it("keeps the 32px gap above the breakpoint", () => {
     expect(bodies(".samograph-site-nav").join(" ")).toMatch(/gap\s*:\s*32px/);
   });
 
-  it("tightens the nav gap to --space-3 below 40rem", () => {
-    expect(mediaBlock("(max-width: 40rem)")).toMatch(
+  it("tightens the nav gap to --space-3 below --bp-md", () => {
+    expect(mediaBlock("(max-width: 767.98px)")).toMatch(
       /\.samograph-site-nav\s*\{[^}]*gap\s*:\s*var\(--space-3\)/,
     );
   });

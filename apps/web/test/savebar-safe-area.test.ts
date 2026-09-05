@@ -196,8 +196,8 @@ describe("horizontal insets — landscape on a notched phone (M6 review)", () =>
         }
       }
     }
-    // The four the CSS comment names: the landing hero at 59.99rem, the hero and
-    // the footer at 40rem, the app nav at 768px. Fails loudly if a fifth appears
+    // The four the CSS comment names: the landing hero below --bp-lg, the hero
+    // and the footer below --bp-md, the app nav at --bp-md. Fails loudly if a fifth appears
     // and is never checked.
     expect(restatements).toHaveLength(4);
   });
