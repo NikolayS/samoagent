@@ -54,8 +54,13 @@ describe("Dashboard upcoming meetings", () => {
     // old shape asked `waitFor`/`findBy` to discover state that is already
     // committed, so on a loaded CI box it sat on the 1s default and failed at
     // 1006ms. `act(async () => {})` drains the microtask queue and React's work
-    // loop, after which the assertion is synchronous — it now fails INSTANTLY
-    // and loudly if the optimistic toggle regresses, instead of after a second.
+    // loop, after which every assertion is synchronous — this now fails
+    // INSTANTLY and loudly if the optimistic toggle regresses, rather than
+    // after a second. The flush is required even straight after `fireEvent`:
+    // whether that commits synchronously depends on the process-global
+    // `IS_REACT_ACT_ENVIRONMENT`, which any other file in a full-suite run can
+    // have left off — asserting without it passed alone and failed in CI.
+    await act(async () => {});
     expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
 
     view.rerender(<UpcomingMeetings client={refreshed} onAuthFailure={() => {}} />);
