@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { CalendarConnectionCard } from "./CalendarConnectionCard.tsx";
+import { PageSkeleton } from "./PageSkeleton.tsx";
 import {
   AppApiError,
   type AppApiClient,
@@ -181,10 +182,16 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
   }
 
   if (phase === "loading") {
+    // Design PR 10. The sentence this replaces was ~20px tall where four
+    // sections of form were about to land — the whole page jumped on arrival.
+    // `.samograph-settings` is kept so the placeholder inherits the page's own
+    // field scroll-margin and savebar reservation; the `panel` variant is
+    // shaped like this page's three first-paint sections (Transcription,
+    // In-call, Account — Integrations arrives on a later probe).
     return (
-      <section aria-live="polite" aria-busy="true">
-        <p role="status">Loading your settings…</p>
-      </section>
+      <div className="samograph-settings">
+        <PageSkeleton variant="panel" />
+      </div>
     );
   }
 

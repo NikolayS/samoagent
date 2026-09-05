@@ -519,8 +519,14 @@ describe("Dashboard — first-run empty & loading states (Sprint-3 polish)", () 
     const client = createFakeAppApiClient({ seedCalls: SEED });
     const { getByRole } = render(<Dashboard client={client} redirect={noopRedirect} />);
     // Before the GET /calls promise settles, a status region announces loading.
-    const status = getByRole("status");
-    expect(status.textContent).toBe("Loading your dashboard…");
+    // Design PR 10: the announcement is unchanged in kind, but the pixels are
+    // now the list that is coming (title + three call rows) rather than a
+    // one-line sentence that the arriving list shoves down the page.
+    const status = getByRole("status", { name: "Loading" });
+    expect(status.getAttribute("aria-busy")).toBe("true");
+    expect(status.textContent).toBe("Loading…");
+    expect(status.className).toBe("samograph-skeleton samograph-skeleton--row");
+    expect(status.querySelectorAll(".samograph-skeleton-bar--row").length).toBe(3);
   });
 
   it("gives first-run guidance (not just 'No calls yet') when there are no calls", async () => {

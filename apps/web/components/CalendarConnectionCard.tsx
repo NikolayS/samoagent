@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { InlineConfirm } from "./InlineConfirm.tsx";
+import { PageSkeleton } from "./PageSkeleton.tsx";
 import { AppApiError, type AppApiClient, type CalendarStatus } from "../lib/appApiClient.ts";
 import { authErrorMessage, isAuthErrorCode } from "../lib/authErrors.ts";
 import { formatDateTime, type DateTimeFormatOptions } from "../lib/formatDateTime.ts";
@@ -92,7 +93,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
       const copy = connectError ?? message;
       return <p role={failure ? "alert" : "status"} className={`samograph-alert samograph-alert--${failure ? "error" : "success"}`}>{copy}</p>;
     })() : null}
-    {!status ? <p aria-busy="true">Loading Google Calendar…</p> : status.state === "not_connected" ? <>
+    {!status ? <PageSkeleton variant="page" /> : status.state === "not_connected" ? <>
       <p>Show upcoming meetings from your calendar.</p>
       <div className="samograph-actions">
         <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>

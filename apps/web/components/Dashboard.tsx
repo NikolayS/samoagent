@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AddToCallForm } from "./AddToCallForm.tsx";
 import { AccountDangerZone } from "./AccountDangerZone.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
+import { PageSkeleton } from "./PageSkeleton.tsx";
 import { AppApiError, type AppApiClient, type Call } from "../lib/appApiClient.ts";
 import { statusView, type StatusView } from "../lib/callStatusView.ts";
 import { displayMeetingUrl, meetingTitle } from "../lib/meetingUrl.ts";
@@ -166,11 +167,8 @@ export function Dashboard({ client, redirect, initialUrl }: DashboardProps) {
   }, [load]);
 
   if (status === "loading") {
-    return (
-      <section aria-live="polite" aria-busy="true">
-        <p role="status">Loading your dashboard…</p>
-      </section>
-    );
+    // Design PR 10: the list that is coming, not a sentence about it.
+    return <PageSkeleton variant="row" count={3} />;
   }
 
   if (status === "redirecting") {
