@@ -66,7 +66,7 @@ describe(".samohost.toml release-tag-gate contract", () => {
  * Deploy-tag grammar contract.
  *
  * samohost only treats a tag as a production deploy candidate when it matches
- * (NikolayS/samohost src/commands/app.ts:1210):
+ * (NikolayS/samohost src/commands/app.ts:1212):
  *
  *   ^v(\d{4})(\d{2})(\d{2})\.([1-9]\d*)$     e.g. v20260904.1
  *
@@ -82,7 +82,7 @@ describe(".samohost.toml release-tag-gate contract", () => {
 const DEPLOY_TAG_RE = /^v(\d{4})(\d{2})(\d{2})\.([1-9]\d*)$/;
 const WORKFLOW_DIR = join(import.meta.dir, "..", ".github", "workflows");
 
-describe("deploy-tag grammar (samohost app.ts:1210)", () => {
+describe("deploy-tag grammar (samohost app.ts:1212)", () => {
   it("matches dated deploy tags and rejects npm-style tags", () => {
     expect(DEPLOY_TAG_RE.test("v20260904.1")).toBe(true);
     expect(DEPLOY_TAG_RE.test("v20260904.12")).toBe(true);
@@ -112,11 +112,94 @@ describe("deploy-tag grammar (samohost app.ts:1210)", () => {
     const wf = readFileSync(join(WORKFLOW_DIR, "release.yml"), "utf8");
     expect(wf).toMatch(/workflow_dispatch:/);
     expect(wf).toMatch(/contents:\s*write/);
+    // `gh api .../actions/workflows/...` needs the Actions read scope.
+    expect(wf).toMatch(/actions:\s*read/);
+    // Two release runs must never race; a queued one waits rather than cancels.
+    expect(wf).toMatch(/concurrency:/);
+    expect(wf).toMatch(/group:\s*release/);
+    expect(wf).toMatch(/cancel-in-progress:\s*false/);
     expect(wf).toContain("gh release create");
-    expect(wf).toContain("--target main");
-    // CI-green gate on the SHA being tagged.
+    // The release must be pinned to the SHA whose CI was verified, NOT to the
+    // moving `main` ref — `--target main` re-resolves at creation time and
+    // could tag a commit CI never greened.
+    expect(wf).toContain('--target "$SHA"');
+    expect(wf).not.toContain("--target main");
+    // CI-green gate on the SHA being tagged, plus the ancestor-of-main check
+    // samohost itself enforces.
     expect(wf).toContain("workflows/ci.yml/runs?head_sha=");
-    // The tag it computes must be in the deploy grammar.
-    expect(wf).toContain("v${today}.${n}");
+    expect(wf).toContain("git merge-base --is-ancestor");
+    // Tag arithmetic lives in the tested script, not inline in YAML.
+    expect(wf).toContain("./scripts/next-release-tag.sh");
+  });
+});
+
+/**
+ * `scripts/next-release-tag.sh` — the N arithmetic, exercised for real.
+ *
+ * N must be **max(N for today) + 1**, never "the first free N": deleting
+ * v20260904.5 out of .1 … .12 must not make us reuse .5, which is older than
+ * .12 and would be rejected by samohost's strictly-newer rule.
+ */
+const SCRIPT = join(import.meta.dir, "..", "scripts", "next-release-tag.sh");
+
+function nextTag(today: string, tags: string[]): { code: number; out: string; err: string } {
+  const proc = Bun.spawnSync(["bash", SCRIPT, today], {
+    stdin: Buffer.from(tags.join("\n") + (tags.length ? "\n" : "")),
+  });
+  return {
+    code: proc.exitCode,
+    out: new TextDecoder().decode(proc.stdout).trim(),
+    err: new TextDecoder().decode(proc.stderr).trim(),
+  };
+}
+
+describe("scripts/next-release-tag.sh", () => {
+  it("starts at .1 when the repo has no deploy tags", () => {
+    const r = nextTag("20260904", []);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe("v20260904.1");
+  });
+
+  it("ignores old npm-style tags entirely", () => {
+    const r = nextTag("20260904", ["v0.8.0", "v1.2.3", "v2.0.0-rc.1"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe("v20260904.1");
+  });
+
+  it("uses max(N)+1, not the first free N, when today's tags have a gap", () => {
+    // .5 was deleted. First-free would pick v20260904.5 — older than .12 and a
+    // name that already existed. max+1 must pick .13.
+    const tags = [
+      "v20260904.1", "v20260904.2", "v20260904.3", "v20260904.4",
+      "v20260904.6", "v20260904.7", "v20260904.8", "v20260904.9",
+      "v20260904.10", "v20260904.11", "v20260904.12",
+    ];
+    const r = nextTag("20260904", tags);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe("v20260904.13");
+  });
+
+  it("compares N numerically, not lexically (.12 beats .2)", () => {
+    const r = nextTag("20260904", ["v20260904.2", "v20260904.12"]);
+    expect(r.out).toBe("v20260904.13");
+  });
+
+  it("rolls to .1 on a new day, ignoring yesterday's high N", () => {
+    const r = nextTag("20260905", ["v20260904.12"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe("v20260905.1");
+  });
+
+  it("fails when the computed tag would not be strictly newer", () => {
+    // A future-dated tag already exists (clock skew / a mistaken tag).
+    const r = nextTag("20260904", ["v20261231.1"]);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain("not strictly newer");
+  });
+
+  it("always emits a tag in the samohost deploy grammar", () => {
+    const r = nextTag("20260904", ["v20260904.9", "v0.8.0"]);
+    expect(DEPLOY_TAG_RE.test(r.out)).toBe(true);
+    expect(r.out).toBe("v20260904.10");
   });
 });

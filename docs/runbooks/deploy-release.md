@@ -17,7 +17,7 @@ only when a new deploy tag appears.
 ## Tag grammar (non-negotiable)
 
 samohost's deploy channel accepts a tag only if it matches
-(`NikolayS/samohost src/commands/app.ts:1210`):
+(`NikolayS/samohost src/commands/app.ts:1212`):
 
 ```
 ^v(\d{4})(\d{2})(\d{2})\.([1-9]\d*)$      e.g. v20260904.1, v20260904.2
@@ -101,12 +101,19 @@ Run it once with **dry run = true** to see the computed tag, then for real.
 Manual equivalent:
 
 ```bash
-gh run list --workflow=ci.yml --branch=main --limit=1   # must be success on main HEAD
-gh release create v$(date -u +%Y%m%d).1 \
-  --target main --title "v$(date -u +%Y%m%d).1" --generate-notes
+gh run list --workflow=ci.yml --branch=main --limit=1        # must be success on main HEAD
+SHA=$(git rev-parse origin/main)                             # the SHA CI greened
+TAG=$(git tag --list 'v*' | ./scripts/next-release-tag.sh "$(date -u +%Y%m%d)")
+gh release create "$TAG" --target "$SHA" --title "$TAG" --generate-notes
 ```
 
-If today already has a `.1`, use the next free `N`.
+`N` is **max(N already used today) + 1**, never "the first free N" — deleting
+`v20260904.5` out of `.1 … .12` must not make us reuse `.5`, which is older than
+`.12` and would be rejected by the strictly-newer rule. `scripts/next-release-tag.sh`
+does that arithmetic (and the strictly-newer check) and is unit-tested.
+
+Always target the **SHA**, not `main`: `--target main` re-resolves the branch at
+creation time and can tag a commit CI never greened.
 
 `.github/workflows/npm-publish.yml` has a guard job that detects this tag shape
 and **skips the npm publish** the `release: published` event would otherwise fire.

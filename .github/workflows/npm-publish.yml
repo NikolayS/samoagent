@@ -17,7 +17,7 @@ jobs:
   #
   # After the samohost deploy-topology cutover, PRODUCTION ships only on a
   # dated release tag matching samohost's grammar
-  # (NikolayS/samohost src/commands/app.ts:1210):
+  # (NikolayS/samohost src/commands/app.ts:1212):
   #
   #     ^v(\d{4})(\d{2})(\d{2})\.([1-9]\d*)$        e.g. v20260904.1
   #

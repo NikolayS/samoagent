@@ -10,7 +10,7 @@
 #   open PR         -> PR preview   (samograph-<branch>.samo.cat), each a DBLab clone
 # (Requires the samohost release-tag feature — NikolayS/samohost#132 / PR #133.)
 #
-# RELEASE TAG GRAMMAR (samohost src/commands/app.ts:1210) — `releaseTagPattern = "v*"`
+# RELEASE TAG GRAMMAR (samohost src/commands/app.ts:1212) — `releaseTagPattern = "v*"`
 # plus `releaseTagFormat = "date"` means only tags matching
 #
 #     ^v(\d{4})(\d{2})(\d{2})\.([1-9]\d*)$        e.g. v20260904.1

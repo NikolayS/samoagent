@@ -3,7 +3,7 @@ name: Cut production release tag
 # Manual production release for the samohost deploy channel.
 #
 # samohost ships PROD only on a dated release tag matching
-# (NikolayS/samohost src/commands/app.ts:1210):
+# (NikolayS/samohost src/commands/app.ts:1212):
 #
 #     ^v(\d{4})(\d{2})(\d{2})\.([1-9]\d*)$        e.g. v20260904.1
 #
@@ -11,10 +11,11 @@ name: Cut production release tag
 # is an ancestor of `main`, and CI (.github/workflows/ci.yml, pinned by
 # `releaseCiWorkflow` in .samohost.toml) is GREEN on that exact SHA.
 #
-# This workflow does all of that mechanically: pick today's date, take the next
-# free `.N`, verify CI is green on origin/main HEAD, then cut the release from
-# `main`. It creates no deployment itself — the samohost control plane polls,
-# sees the new tag, and deploys within ~5 min.
+# This workflow does all of that mechanically: pick today's date, take
+# max(N for today) + 1, verify CI is green on origin/main HEAD and that the SHA
+# is an ancestor of origin/main, then cut the release pinned to that SHA. It
+# creates no deployment itself — the samohost control plane polls, sees the new
+# tag, and deploys within ~5 min.
 #
 # `.github/workflows/npm-publish.yml` has a guard job that recognises this tag
 # shape and skips the npm publish it would otherwise trigger.
@@ -29,6 +30,12 @@ on:
 
 permissions:
   contents: write
+  actions: read      # gh api .../actions/workflows/ci.yml/runs
+
+# Never cut two release tags at once; a queued run must wait, not be cancelled.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -79,47 +86,38 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --tags --force --quiet
-          today="$(date -u +%Y%m%d)"
-
-          # Strict-newer ordering key: (YYYYMMDD, N) with N zero-padded so it
-          # compares numerically as one integer string.
-          key() { printf '%s%09d\n' "${1:1:8}" "${1##*.}"; }
-
-          # Existing deploy tags, in samohost's grammar only. Old npm tags
-          # (v0.x, v1.2.3) never match and are ignored by the deploy channel.
-          last="$(git tag --list 'v*' | grep -E '^v[0-9]{8}\.[1-9][0-9]*$' \
-            | while read -r t; do echo "$(key "$t") $t"; done \
-            | sort | tail -n 1 | cut -d' ' -f2 || true)"   # empty when no deploy tags exist yet
-
-          # Next free N for today.
-          n=1
-          while git rev-parse -q --verify "refs/tags/v${today}.${n}" >/dev/null; do
-            n=$((n + 1))
-          done
-          tag="v${today}.${n}"
-
-          if [ -n "$last" ]; then
-            echo "last deploy tag: $last"
-            if [ "$(key "$tag")" -le "$(key "$last")" ]; then
-              echo "::error::Computed tag ${tag} is not strictly newer than ${last} (clock skew or a future-dated tag)."
-              exit 1
-            fi
-          else
-            echo "no existing deploy tags — this is the first one"
-          fi
-
+          # N is max(N for today) + 1 — see scripts/next-release-tag.sh for why
+          # "first free N" would be wrong. The script also enforces the
+          # strictly-newer rule against the newest existing deploy tag.
+          tag="$(git tag --list 'v*' | ./scripts/next-release-tag.sh "$(date -u +%Y%m%d)")"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Next release tag: $tag"
+
+      - name: Verify main HEAD is an ancestor of origin/main
+        env:
+          SHA: ${{ steps.head.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "::error::${SHA} is not an ancestor of origin/main — samohost will refuse to deploy this tag."
+            exit 1
+          fi
+          echo "${SHA} is an ancestor of origin/main."
 
       - name: Create the release
         if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
+          SHA: ${{ steps.head.outputs.sha }}
         run: |
           set -euo pipefail
+          # Pin the release to the exact SHA whose CI we verified. Targeting the
+          # branch ref instead would re-resolve it at creation time and could tag
+          # a commit that landed after the CI check — never do that here.
           gh release create "$TAG" \
-            --target main \
+            --target "$SHA" \
             --title "$TAG" \
             --generate-notes
           echo "Created release $TAG. samohost polls every ~5 min; verify https://samograph.samo.team after the deploy."
