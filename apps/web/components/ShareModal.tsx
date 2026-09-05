@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { Alert } from "./Alert.tsx";
 import {
   AppApiError,
   type ShareApiClient,
@@ -147,7 +148,7 @@ export function ShareModal({ shareClient, callId, onClose }: ShareModalProps) {
           control the bot, mint tokens, or see your other calls.
         </p>
 
-        {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+        {error ? <Alert tone="danger">{error}</Alert> : null}
 
         {phase === "loading" ? <p>Loading share status…</p> : null}
 

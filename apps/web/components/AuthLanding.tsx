@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Alert } from "./Alert.tsx";
 import { MagicLinkRequestForm } from "./MagicLinkRequestForm.tsx";
 import { GoogleSignInButton } from "./GoogleSignInButton.tsx";
 import { authErrorMessage, isAuthInfoCode } from "../lib/authErrors.ts";
@@ -72,11 +73,9 @@ export function AuthLanding({ client, redirect, errorCode }: AuthLandingProps) {
       {errorCode !== undefined ? (
         isAuthInfoCode(errorCode) ? (
           // "You cancelled" is a normal outcome, not a failure (§5.16 S5-1).
-          <p role="status" className="samograph-auth-note samograph-alert samograph-alert--info">
-            {authErrorMessage(errorCode)}
-          </p>
+          <Alert className="samograph-auth-note">{authErrorMessage(errorCode)}</Alert>
         ) : (
-          <p role="alert" className="samograph-alert samograph-alert--error">{authErrorMessage(errorCode)}</p>
+          <Alert tone="danger">{authErrorMessage(errorCode)}</Alert>
         )
       ) : null}
       {google === true ? (

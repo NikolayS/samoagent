@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Alert } from "./Alert.tsx";
 import { PerCallTranscript } from "./PerCallTranscript.tsx";
 import { ShareModal } from "./ShareModal.tsx";
 import type { TranscriptStreamClient } from "../lib/transcriptStreamClient.ts";
@@ -140,9 +141,7 @@ export function OwnerCallView({
             its recording. This can&rsquo;t be undone.
           </p>
           {deleteError ? (
-            <p className="samograph-delete-error samograph-alert samograph-alert--error" role="alert">
-              {deleteError}
-            </p>
+            <Alert tone="danger">{deleteError}</Alert>
           ) : null}
           <button
             type="button"
