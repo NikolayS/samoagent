@@ -12,14 +12,14 @@ const client = createHttpAppApiClient();
 function DashboardInner() {
   const router = useRouter();
   const params = useSearchParams();
-  // Story-4: a COULD_NOT_JOIN "Try again" returns here with the original URL so
-  // the owner can edit + explicitly re-submit (no auto-create — §5.2).
-  const initialUrl = params.get("url") ?? undefined;
+  // Story-4: carry only the call id; Dashboard resolves the full owner URL from
+  // its API-loaded list before the owner explicitly re-submits (§5.2, #286).
+  const retryCallId = params.get("retry") ?? undefined;
   return (
     <Dashboard
       client={client}
       redirect={(path) => router.replace(path)}
-      initialUrl={initialUrl}
+      retryCallId={retryCallId}
     />
   );
 }
