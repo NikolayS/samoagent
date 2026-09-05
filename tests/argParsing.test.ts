@@ -535,11 +535,11 @@ describe("argParsing", () => {
     expect(args.message).toBe("Ask about the index");
   });
 
-  it("g2-whisper defaults: normal priority, no ttl, console sink", () => {
+  it("g2-whisper leaves the sink dynamic for paired-device defaulting", () => {
     const args = parseArgs(["g2-whisper", "hi"]);
     expect(args.whisper_priority).toBe("normal");
     expect(args.whisper_ttl_ms).toBeNull();
-    expect(args.whisper_sink).toBe("console");
+    expect(args.whisper_sink).toBeNull();
   });
 
   it("g2-whisper requires text", () => {
@@ -573,7 +573,7 @@ describe("argParsing", () => {
 
   it("g2-whisper rejects an invalid sink at parse time", () => {
     expect(() => parseArgs(["g2-whisper", "hi", "--sink", "hologram"])).toThrow(
-      "argument --sink: invalid choice: 'hologram' (choose from console, fake-hud)",
+      "argument --sink: invalid choice: 'hologram' (choose from console, fake-hud, g2)",
     );
   });
 
