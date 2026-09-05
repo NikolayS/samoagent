@@ -139,7 +139,9 @@ samograph deploys automatically. **You never SSH into the VM.**
 
 1. Push your change to `main` on `NikolayS/samograph`.
 2. Wait for GitHub Actions CI to go **green** on that commit.
-3. The samohost control plane polls `main` every ~3 min and, once CI is green on your commit, deploys it to the VM for you.
+3. The samohost control plane polls on a **5-minute** timer and, once CI is green on your commit, deploys it to the VM for you.
+
+> ⚠️ **Changing with the deploy-topology cutover:** once `.samohost.toml` is registered, a merge to `main` deploys the **main preview**, not prod — production ships only on a dated `vYYYYMMDD.N` release tag. See "Deployment topology & CI/CD" below and `docs/runbooks/deploy-release.md`.
 
 **Do not** add SSH keys to, or SSH into, the samograph VM to deploy. The control plane uses its *own* SSH into the VM as internal plumbing — that already exists and works, and is not a developer/agent step.
 
@@ -249,19 +251,21 @@ The repo-level **Merge Gate (samorev)** rules in the root `CLAUDE.md` remain in 
 
 | Trigger (via CI) | Environment | URL | Database |
 |---|---|---|---|
-| push to any **dev branch** `<branch>` | ephemeral branch preview | `samograph-<branch>.samo.cat` | its own **DBLab** thin-clone / branch |
+| **open a PR** for `<branch>` | ephemeral PR preview | `samograph-<branch>.samo.cat` | its own **DBLab** thin-clone / branch |
 | **merge to `main`** | canonical main preview | `samograph-main.samo.cat` | its own DBLab clone |
-| push a **release tag** (e.g. `v*`) | **production** | `samograph.samo.team` | prod DB |
+| push a **dated release tag** `vYYYYMMDD.N` | **production** | `samograph.samo.team` | prod DB |
 
-- **Prod deploys ONLY on a release tag** — never on a branch or `main` push. A merge to `main` deploys the *preview*, not prod.
-- **DBLab** (postgres.ai Database Lab Engine) gives each preview an isolated, production-like database via a thin **clone/branch** (cheap, fast). Branch previews are torn down when the branch is deleted/merged.
+- **Prod deploys ONLY on a release tag** — never on a branch or `main` push. **After the cutover, merging to `main` will no longer ship prod**; it deploys the main *preview*. Production moves only when a new dated tag is cut.
+- **Release-tag grammar (samohost `src/commands/app.ts:1212`):** `^v(\d{4})(\d{2})(\d{2})\.([1-9]\d*)$` — e.g. `v20260904.1`. A tag deploys only if it is **strictly newer** than the last deployed tag, its SHA is an **ancestor of `main`**, and **CI is green on that exact SHA** (`.github/workflows/ci.yml`, pinned by `releaseCiWorkflow` in `.samohost.toml`). Old npm tags (`v0.x`) never match and are ignored. Cut tags with `.github/workflows/release.yml`; operator checklist in `docs/runbooks/deploy-release.md`.
+- **DBLab** (postgres.ai Database Lab Engine) gives each preview an isolated, production-like database via a thin **clone/branch** (cheap, fast). Previews are created **per OPEN PR** (by `samohost trigger run --pr-previews` on a 5-minute timer), **not** per branch push, and are torn down when the PR is closed/merged.
 - Entrypoints: prod/preview app-api = `apps/app-api/server.ts` with `SAMO_ENV=<prod|preview>` (fail-closed on missing/dev-default secrets); local dev = `apps/app-api/dev-server.ts` + `SAMO_ENV=dev`. Live stack (ingest+ws-hub composed) = `apps/ws-hub/dev-live-server.ts`.
 
 ### Current machinery — the VM "samohost" system (as of 2026-07-08; some details still being mapped)
 - Hetzner VM: `ssh -p 2223 dev@116.203.249.135` (root via passwordless `sudo`). A **"samohost"** system already provides per-env previews: templated systemd units `samograph-web@<env>` / `samograph-live@<env>`, per-env checkouts under `/opt/samograph/envs/<env>`, a per-env `.env` with a DBLab-derived `DATABASE_URL`, per-env Caddy site config, and per-env ports.
 - **Real prod** = `/opt/samograph/app` (units `samograph-web.service` / `samograph-live.service`) → **`samograph.samo.team`**. The `@samograph-main` instance → `samograph-main.samo.cat` is a **preview** (NB: earlier handoff docs mislabel samo.cat as prod — it is not).
-- ⚠️ **Current mapping is WRONG vs the target:** samohost currently auto-deploys `main` → **prod (`samo.team`)**, un-tag-gated, and `samograph-main.samo.cat` is a stale preview. Target: `main` → the main *preview*; **prod only on a release tag**.
-- ⚠️ **Prod entrypoint fragility:** `/opt/samograph/start-prod.sh` still execs `apps/app-api/dev-server.ts`, which is built to **refuse to boot under `SAMO_ENV=prod`** — it must be pointed at `server.ts` (the cutover). Prod is currently up only because it's coasting on a stale old process; a service restart crashes the API until the cutover lands.
+- ⚠️ **Current mapping is WRONG vs the target:** samohost currently auto-deploys `main` → **prod (`samo.team`)**, un-tag-gated, and `samograph-main.samo.cat` is a stale preview. Target: `main` → the main *preview*; **prod only on a dated release tag**. The control plane polls on a **5-minute** timer (an earlier note said ~3 min).
+- ✅ **Prod entrypoint: FIXED.** `/opt/samograph/start-prod.sh` now execs `apps/app-api/server.ts` (it previously execed `dev-server.ts`, which refuses to boot under `SAMO_ENV=prod`). A service restart is safe; the earlier "coasting on a stale process" warning no longer applies.
+- ⚠️ **No standing main-preview auto-refresh** (samohost issue #150). The `--branch main` env must be created once by hand (`samohost env create <vm> samograph --branch main --db dblab`) and does not redeploy on new `main` commits until #150 lands.
 - Being mapped (read-only VM investigation): the DBLab endpoint/version/token, Caddy wildcard + on-demand TLS, Cloudflare `*.samo.cat` DNS + API token, and the exact samohost trigger/entrypoint a CI job would call.
 
 ### To build
