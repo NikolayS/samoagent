@@ -152,9 +152,17 @@ describe("button states (DESIGN-MODEL §4 Button — states)", () => {
   it("hovers only when enabled — no :hover rule may apply to a disabled button", () => {
     // Every member of every grouped selector list, not just the one that
     // happens to sit last before the brace.
+    //
+    // `:not(.samograph-btn)` is stripped first (PLAN PR 13): the landing's link
+    // reset is written `.samograph-landing a:not(.samograph-btn):hover`, which
+    // mentions the class in order to EXCLUDE buttons — the opposite of what
+    // this guard hunts for. Matching it on the raw string flagged the one rule
+    // in the sheet that guarantees no hover reaches a button at all. Note the
+    // strip is exact: `:not([disabled])`, the token this guard requires, is
+    // untouched.
     const hovers = [...css.matchAll(/([^{}]+)\{/g)]
       .flatMap((m) => m[1].split(","))
-      .map((s) => s.trim())
+      .map((s) => s.trim().replaceAll(":not(.samograph-btn)", ""))
       .filter((s) => s.includes(".samograph-btn") && s.includes(":hover"));
     expect(hovers.length).toBeGreaterThan(0);
     expect(hovers.filter((s) => !s.includes(":not([disabled])"))).toEqual([]);
