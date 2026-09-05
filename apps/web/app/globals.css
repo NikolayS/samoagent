@@ -725,11 +725,20 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   /* `min-height` clamps a fixed `height`, so the 44px floor holds on its own;
      `height: auto` is what stops a label that wraps to two lines on a narrow
      screen from overflowing a box pinned to one line of text. */
-  .samograph-btn,
-  .samograph-btn--sm {
+  .samograph-btn {
     height: auto;
     min-height: var(--tap-min);
     padding-block: var(--space-2);
+  }
+
+  /* `.samograph-btn--sm { height: var(--control-h-sm) }` is declared later in
+     this sheet at the same (0,1,0) specificity, so a bare `.samograph-btn--sm`
+     here would lose on source order and silently re-pin 36px — the `min-height`
+     above would still hold the box at 44, hiding the dead declaration. The
+     compound is (0,2,0) and wins wherever either rule moves to. Every `--sm`
+     in the app is written alongside `.samograph-btn`, so it matches them all. */
+  .samograph-btn.samograph-btn--sm {
+    height: auto;
   }
 
   .samograph-call-back,

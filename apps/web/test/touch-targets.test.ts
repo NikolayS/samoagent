@@ -89,6 +89,77 @@ function tapBlock(): string {
   return "";
 }
 
+/**
+ * Which `height` an element with these classes ends up with on a phone.
+ *
+ * jsdom implements no cascade for a stylesheet it never loaded, so this is a
+ * deliberately small resolver over the two things that decide a winner here:
+ * specificity (class count — every rule that reaches these buttons is a plain
+ * class chain) and source order. Rules considered are the unconditional ones
+ * plus those inside the coarse-pointer block, which is what a 390px phone
+ * matches. Anything more exotic than a class chain is ignored rather than
+ * guessed at, so a future selector cannot make this quietly lie.
+ */
+type Rule = { selectors: string[]; body: string; at: number };
+
+/** Walks braces so a rule nested in an at-rule is read as a rule, not as text. */
+function rulesIn(source: string, offset: number, keepAtRule: (prelude: string) => boolean): Rule[] {
+  const rules: Rule[] = [];
+  let i = 0;
+  let preludeStart = 0;
+  while (i < source.length) {
+    if (source[i] === "}") {
+      i += 1;
+      preludeStart = i;
+      continue;
+    }
+    if (source[i] !== "{") {
+      i += 1;
+      continue;
+    }
+    const prelude = source.slice(preludeStart, i).trim();
+    let depth = 0;
+    let end = i;
+    for (; end < source.length; end += 1) {
+      if (source[end] === "{") depth += 1;
+      else if (source[end] === "}" && (depth -= 1) === 0) break;
+    }
+    const inner = source.slice(i + 1, end);
+    if (prelude.startsWith("@")) {
+      if (keepAtRule(prelude)) rules.push(...rulesIn(inner, offset + i + 1, keepAtRule));
+    } else {
+      rules.push({ selectors: prelude.split(","), body: inner, at: offset + preludeStart });
+    }
+    i = end + 1;
+    preludeStart = i;
+  }
+  return rules;
+}
+
+function resolveHeight(classes: string[]): string {
+  const owned = new Set(classes);
+  let winner = { specificity: -1, order: -1, value: "" };
+  // Only the unconditional rules and the coarse-pointer block are in play; any
+  // other at-rule may or may not apply on a phone, so it is left out rather
+  // than guessed at.
+  const rules = rulesIn(css, 0, (prelude) => prelude.includes("(pointer: coarse)"));
+
+  for (const rule of rules) {
+    const height = [...rule.body.matchAll(/(?:^|[;\s])height\s*:\s*([^;}]+)/g)].pop()?.[1];
+    if (!height) continue;
+    for (const raw of rule.selectors) {
+      const selector = raw.trim();
+      if (!selector || !/^(\.[\w-]+)+$/.test(selector)) continue; // class chains only
+      const parts = selector.split(".").filter(Boolean);
+      if (!parts.every((name) => owned.has(name))) continue;
+      if (parts.length > winner.specificity || (parts.length === winner.specificity && rule.at > winner.order)) {
+        winner = { specificity: parts.length, order: rule.at, value: normalize(height) };
+      }
+    }
+  }
+  return winner.value;
+}
+
 describe("touch targets — 44px on a coarse pointer", () => {
   const block = tapBlock();
 
@@ -109,6 +180,17 @@ describe("touch targets — 44px on a coarse pointer", () => {
     expect(btn).toMatch(/min-height\s*:\s*var\(--tap-min\)/);
     expect(btn).toMatch(/height\s*:\s*auto/);
     expect(block).toMatch(/\.samograph-btn--sm/);
+  });
+
+  it("makes the --sm height override actually win the cascade", () => {
+    // Review finding (NON-BLOCKING, PR #281): `.samograph-btn--sm { height:
+    // var(--control-h-sm) }` sits AFTER this media block at the same (0,1,0)
+    // specificity, so it re-pins 36px and the block's `height: auto` is dead.
+    // `min-height` still clamps the box to 44px, which is why nothing looked
+    // wrong — but a label that wraps stays boxed against a one-line height.
+    // Asserting the declaration is present is not enough; resolve the cascade.
+    expect(resolveHeight(["samograph-btn", "samograph-btn--sm"])).toBe("auto");
+    expect(resolveHeight(["samograph-btn"])).toBe("auto");
   });
 
   it("gives the call-view back link and the share-page download a real box", () => {
