@@ -1,7 +1,7 @@
 /* =============================================================================
  * samograph.dev — the app stylesheet manifest (PLAN.md desktop PR 14)
  *
- * This file used to be the whole sheet: 2797 lines, every concern in one
+ * This file used to be the whole sheet: 2830 lines, every concern in one
  * scroll. It is now the single build entry Next.js loads from
  * `app/layout.tsx`, and it does exactly one thing — declare the concern files
  * in `./styles/` IN SOURCE ORDER.
@@ -11,9 +11,10 @@
  * a pure MOVE — not one rule, declaration or value changed — and
  * `test/stylesheet-split.test.ts` proves it: the imports below, concatenated
  * and minified, are byte-equal to a committed snapshot of the pre-split sheet
- * (`test/__fixtures__/globals.pre-split.min.css`). Reorder two lines and that
- * test fails. Every other CSS guard reads the sheet through
- * `test/helpers/stylesheet.ts`, which resolves these imports.
+ * (`test/__fixtures__/globals.pre-split.min.css`, taken from
+ * `73216f0:apps/web/app/globals.css`). Reorder two lines and that test fails.
+ * Every other CSS guard reads the sheet through `test/helpers/stylesheet.ts`,
+ * which resolves these imports.
  *
  * Two places where the ORIGINAL ORDER beat tidy grouping, and stay that way:
  *

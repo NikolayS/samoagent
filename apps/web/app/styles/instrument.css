@@ -128,7 +128,7 @@
 }
 
 /* M4:compact-call-header — the unique anchor for apps/web/test/call-header-css.test.ts.
-   Slice 3 holds more than one `@media (max-width: 48rem)` block, so the guard
+   Slice 3 holds more than one `@media (max-width: 767.98px)` block, so the guard
    locates THIS one by this marker, not by the media query text. Keep the marker
    immediately above the block.
 
@@ -138,7 +138,7 @@
    specificity over the later same-width block, which stacks the
    head and foot into a column — that block sits among the transcript-row rules
    another change owns, so it is overridden here rather than edited. */
-@media (max-width: 48rem) {
+@media (max-width: 767.98px) {
   .samograph-call-view-heading {
     margin-bottom: var(--space-3);
   }
@@ -395,7 +395,7 @@
   border-radius: var(--radius-pill);
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 767.98px) {
   .samograph-percall .samograph-status.samograph-instrument-head,
   .samograph-percall .samograph-controls.samograph-instrument-foot {
     align-items: flex-start;
@@ -413,7 +413,7 @@
  * row 1 = speaker + clock, row 2 = the full-width utterance. At 390px this takes the
  * utterance from ~114px (33% of the content box) to the whole content width at 14px.
  */
-@media (max-width: 63.99rem) {
+@media (max-width: 1023.98px) {
   .samograph-instrument-lines > li.samograph-transcript-row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:

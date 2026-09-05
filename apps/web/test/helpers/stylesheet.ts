@@ -1,7 +1,7 @@
 /**
  * One reader for the app stylesheet (PLAN.md desktop PR 14).
  *
- * `app/globals.css` used to be one 2797-line file and ~20 guard tests read it
+ * `app/globals.css` used to be one 2830-line file and ~20 guard tests read it
  * with `readFileSync(".../app/globals.css")`. PR 14 split it by CONCERN into
  * `app/styles/*.css`, with `globals.css` kept as the single build entry that
  * `@import`s them **in the original source order** — the cascade is source
@@ -52,8 +52,65 @@ export function readGlobalsCssNoComments(): string {
   return stripComments(readGlobalsCss());
 }
 
+/**
+ * Strip `/* … *\/` comments — and ONLY comments.
+ *
+ * A bare `css.replace(/\/\*[\s\S]*?\*\//g, "")` is wrong: `/*` has no meaning
+ * inside a string or an unquoted `url(…)`, so a value like
+ * `content: "/* not a comment *\/"` or `url(/img/a*\/b.png)` makes that regex
+ * eat everything up to the next real `*\/` — silently deleting live rules from
+ * whatever the caller then asserts on. This is a one-pass tokenizer instead: it
+ * tracks quoted strings (with backslash escapes) and unquoted `url(` values, and
+ * only recognises a comment outside both.
+ */
 export function stripComments(css: string): string {
-  return css.replace(/\/\*[\s\S]*?\*\//g, "");
+  let out = "";
+  let i = 0;
+  while (i < css.length) {
+    const ch = css[i];
+    if (ch === "/" && css[i + 1] === "*") {
+      const end = css.indexOf("*/", i + 2);
+      i = end === -1 ? css.length : end + 2;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      out += ch;
+      i += 1;
+      while (i < css.length) {
+        out += css[i];
+        if (css[i] === "\\") {
+          out += css[i + 1] ?? "";
+          i += 2;
+          continue;
+        }
+        if (css[i] === quote) {
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+    // Unquoted url(…) — the one CSS token where `/` is ordinary text. A quoted
+    // url("…") is already covered by the string branch above.
+    if (
+      ch === "(" &&
+      out.slice(-3).toLowerCase() === "url" &&
+      !/[\w-]/.test(out.slice(-4, -3)) &&
+      css[i + 1] !== '"' &&
+      css[i + 1] !== "'"
+    ) {
+      const end = css.indexOf(")", i + 1);
+      const stop = end === -1 ? css.length : end + 1;
+      out += css.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
 }
 
 /** Comment-free, whitespace-collapsed — a shape-insensitive diff target. */

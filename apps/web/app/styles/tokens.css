@@ -143,7 +143,37 @@
   --width-app: 1120px;
   --width-prose: 720px;
   --width-form: 480px;
-  --gutter: var(--space-8);
+  /* THE BREAKPOINTS (PLAN.md M9, DESIGN-MODEL §5 "Layout + responsive model").
+     Three, in ONE unit — pixels — and nowhere else in this file:
+
+       --bp-sm   480px   two-up action rows, meta inline, 16px form fields
+       --bp-md   768px   list rows go 3-column, forms side-by-side, nav un-collapses
+       --bp-lg  1024px   nav spreads, transcript takes its 4-column form
+
+     They are NOT custom properties, because `@media (max-width: var(--x))` is
+     invalid and drops the whole block. The numbers therefore live literally in
+     each `@media` prelude, with `apps/web/lib/breakpoints.ts` as the JS-readable
+     source of truth and `test/breakpoints.test.ts` as the guard that no other
+     value ever appears. Conventions, both enforced by that guard:
+
+       - `@media (min-width: 768px)`     — at and above; the mobile-first form.
+       - `@media (max-width: 767.98px)`  — strictly below; the `.02px` shim keeps
+         the pair from both matching at a fractional 768px viewport width, and is
+         too small for any viewport to fall into.
+
+     Before M9 the same three boundaries were written seven ways — `40rem`,
+     `48rem` (768px INCLUSIVE, so it overlapped `min-width: 768px`), `59.99rem`,
+     `63.99rem`, `767.98px`, `768px`. `rem` breakpoints were dropped outright: a
+     reader who scales text moves a `rem` breakpoint without moving the device
+     width the layout was measured against. */
+
+  /* Fluid page gutter (DESIGN-MODEL §3 "Fluid gutter"). ONE expression instead
+     of a `:root` override inside a media query: 16px at 320px, ~19.5px at 390px,
+     and the full 32px from 640px up. `5vw` is the middle term, so the gutter
+     tracks the viewport instead of jumping 12px at a boundary. Every consumer
+     reads it through `max(var(--gutter), var(--safe-*))`, which still collapses
+     to the plain gutter wherever the safe-area inset is 0. */
+  --gutter: clamp(var(--space-4), 5vw, var(--space-8));
 
   /* The page container (design audit §3, PLAN.md PR 4). ONE max-width and ONE
      gutter, shared by the app-nav inner box and by `<main>`, so their left

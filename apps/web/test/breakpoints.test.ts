@@ -1,6 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   ALLOWED_MEDIA_WIDTHS,
   BREAKPOINTS,
@@ -9,6 +7,7 @@ import {
   straddles,
   up,
 } from "../lib/breakpoints";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * ONE set of breakpoints, in ONE unit (PLAN.md M9, DESIGN-MODEL §5).
@@ -18,13 +17,15 @@ import {
  * `min-width: 768px` at exactly 768px), `59.99rem` (959.84px), `63.99rem`
  * (1023.84px), `767.98px` and `768px`. `@media` cannot read a custom property,
  * so the numbers cannot be tokenised in CSS; instead `lib/breakpoints.ts` is
- * the source of truth and this guard fails if `globals.css` uses any width
- * value that is not one of its six canonical strings.
+ * the source of truth and this guard fails if the stylesheet uses any width
+ * value that is not one of its six canonical strings. (The sheet is read
+ * through `test/helpers/stylesheet.ts`, which resolves the `@import`s in
+ * `app/globals.css` — PLAN.md PR 14.)
  *
  * Non-width features (`pointer`, `prefers-color-scheme`,
  * `prefers-reduced-motion`) are unconstrained — they are not breakpoints.
  */
-const raw = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const raw = readGlobalsCss();
 const css = raw.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /** Every `@media` prelude in the stylesheet, comments stripped. */

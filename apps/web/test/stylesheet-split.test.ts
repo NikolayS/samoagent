@@ -11,7 +11,8 @@
  * This guard makes that impossible to land unnoticed. It concatenates the
  * imports in declared order and compares the result, minified, with
  * `__fixtures__/globals.pre-split.min.css` — a committed snapshot of the
- * pre-split sheet (commit a70cfa7, 2797 lines). Whitespace and comments are
+ * pre-split sheet (`73216f0:apps/web/app/globals.css`, 2830 lines — i.e. AFTER
+ * #305's canonical breakpoints landed on the base). Whitespace and comments are
  * normalised away; rule order is not. Swap two `@import` lines and this test
  * fails.
  *
@@ -80,5 +81,40 @@ describe("order-preserving split", () => {
 
   it("starts with the token registry, so every var() below resolves", () => {
     expect(globalsImportOrder()[0]).toBe("./styles/tokens.css");
+  });
+});
+
+/**
+ * The snapshot comparison is only as trustworthy as the minifier underneath it.
+ * A naive `replace(/\/\*[\s\S]*?\*\//g, "")` treats `/*` inside a string or an
+ * unquoted `url()` as the start of a comment and deletes everything up to the
+ * next `*​/` — which would silently drop live rules from BOTH sides of the
+ * comparison, and from every guard that reads `stripComments`/`minifyCss`.
+ */
+describe("stripComments only strips comments", () => {
+  it("removes a real comment", () => {
+    expect(minifyCss("a { color: red; /* note */ }")).toBe("a { color: red; }");
+  });
+
+  it("keeps a /* … */ that lives inside a quoted string", () => {
+    const css = `.a::before { content: "/* not a comment */"; }\n.b { color: red; }`;
+    expect(minifyCss(css)).toBe(`.a::before { content: "/* not a comment */"; } .b { color: red; }`);
+  });
+
+  it("keeps a /* … */ that lives inside an unquoted url()", () => {
+    const css = `.a { background: url(/img/a/*x*/b.png); }\n.b { color: red; }`;
+    expect(minifyCss(css)).toBe(`.a { background: url(/img/a/*x*/b.png); } .b { color: red; }`);
+  });
+
+  it("does not let an escaped quote end the string early", () => {
+    const css = `.a::after { content: "he said \\"/* hi */\\""; }\n.b { color: red; }`;
+    expect(minifyCss(css)).toContain(".b { color: red; }");
+    expect(minifyCss(css)).toContain("/* hi */");
+  });
+
+  it("still strips a comment that follows a string on the same line", () => {
+    expect(minifyCss(`.a { content: "x"; /* gone */ color: red; }`)).toBe(
+      `.a { content: "x"; color: red; }`,
+    );
   });
 });

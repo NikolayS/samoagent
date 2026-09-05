@@ -330,8 +330,8 @@
    first line. Every element that OWNS the gutter yields to the inset here.
 
    One grouped rule, and it sits after the @media blocks that restate these
-   paddings (the landing hero/footer at 59.99rem and 40rem, the app nav at
-   768px): each of those carries the same `var(--gutter)` inline and varies only
+   paddings (the landing hero at --bp-lg, the hero/footer below --bp-md, the
+   app nav at --bp-md): each of those carries the same `var(--gutter)` inline and varies only
    the BLOCK padding, so overriding the inline half in one place is equivalent
    at every width. `max()` collapses to plain `--gutter` wherever the inset is
    0 — i.e. everywhere except a notched phone held sideways. */
@@ -366,10 +366,6 @@
 .samograph-skip-link:focus {
   color: var(--ground);
   transform: translateY(0);
-}
-
-@media (max-width: 40rem) {
-  :root { --gutter: var(--space-5); }
 }
 
 /* Compact segmented theme control; each hit target remains 44px tall. */

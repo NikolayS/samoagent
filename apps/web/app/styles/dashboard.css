@@ -197,7 +197,7 @@
 .samograph-meeting-item[data-declined="true"] { opacity: 0.65; }
 .samograph-btn--sm { height: var(--control-h-sm); padding-inline: var(--space-3); font-size: var(--text-xs); }
 
-@media (max-width: 40rem) {
+@media (max-width: 767.98px) {
   .samograph-dash-hero-form { grid-template-columns: 1fr; }
   .samograph-dash-hero-form .samograph-btn { width: 100%; }
   .samograph-call-row,
