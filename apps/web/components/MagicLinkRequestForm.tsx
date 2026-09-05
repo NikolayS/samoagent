@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type FormEvent } from "react";
+import { Alert } from "./Alert.tsx";
 import type { AppApiClient } from "../lib/appApiClient.ts";
 
 export interface MagicLinkRequestFormProps {
@@ -84,7 +85,7 @@ export function MagicLinkRequestForm({ client }: MagicLinkRequestFormProps) {
         <h2>Check your email</h2>
         <div className="samograph-auth-sent-message">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5h18v14H3V5Zm2 2v.5l7 5 7-5V7H5Zm14 10V10l-7 5-7-5v7h14Z" /></svg>
-          <p role="status" className="samograph-alert samograph-alert--info">We sent a sign-in link to <span className="samograph-auth-email">{sentTo}</span>.</p>
+          <Alert>We sent a sign-in link to <span className="samograph-auth-email">{sentTo}</span>.</Alert>
         </div>
         <p>Didn&apos;t get it?</p>
         <div className="samograph-actions">
@@ -119,7 +120,7 @@ export function MagicLinkRequestForm({ client }: MagicLinkRequestFormProps) {
         autoComplete="email"
         placeholder="you@example.com"
       />
-      {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
       <button type="submit" className="samograph-btn samograph-btn--primary" disabled={phase === "sending"} aria-busy={phase === "sending"}>
         Send magic link
       </button>

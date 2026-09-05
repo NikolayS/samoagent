@@ -109,6 +109,11 @@ export interface FakeAppApiClientOptions {
    */
   failListCallsWith?: FailSpec & { status?: number };
   /**
+   * When set, `getCall` rejects with this typed error AFTER recording the
+   * request — simulates an owner read failure such as an RLS-hidden 404.
+   */
+  failGetCallWith?: FailSpec & { status?: number };
+  /**
    * When set, `logout` rejects with this typed error AFTER recording the request
    * — lets a test assert the button STILL redirects on a best-effort failure.
    */
@@ -302,6 +307,20 @@ export class FakeAppApiClient implements AppApiClient {
     // reflects the erasure (§5.14), mirroring the server's row delete.
     const idx = this.calls.findIndex((c) => c.id === callId);
     if (idx !== -1) this.calls.splice(idx, 1);
+  }
+
+  async getCall(callId: string): Promise<Call> {
+    this.requests.push({ path: `/calls/${callId}`, method: "GET", body: {} });
+    this.fail(this.options.failGetCallWith);
+    const call = this.calls.find((c) => c.id === callId);
+    if (call) return { ...call };
+    // Owner reads deliberately hide unknown and cross-tenant calls behind the
+    // SAME bodyless 403 — `denied()` in `apps/app-api/calls/http.ts`, the single
+    // response the tenancy gate renders when its RLS-scoped read finds no row.
+    // (404 belongs to the share route, for a call with no live token.) The fake
+    // said 404 here, so every component tested against it was exercised on a
+    // status production never sends for this route (#294 review).
+    throw new AppApiError("SAMO-AUTHZ-001", "Request failed.", false, 403);
   }
 
   async deleteAccount(): Promise<void> {

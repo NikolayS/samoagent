@@ -28,6 +28,20 @@ function rule(selector: string): string {
 
 const token = (name: string) => normalize(root.match(new RegExp(`${name}\\s*:\\s*([^;]+);`))?.[1] ?? "");
 
+/** The body of the (single) top-level `@media <query>` block, brace-balanced. */
+function mediaBlock(query: string): string {
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+  const at = css.search(new RegExp(`@media\\s*${escaped}`));
+  expect(at).toBeGreaterThan(-1);
+  const open = css.indexOf("{", at);
+  let depth = 0;
+  for (let i = open; i < css.length; i += 1) {
+    if (css[i] === "{") depth += 1;
+    else if (css[i] === "}" && --depth === 0) return css.slice(open + 1, i);
+  }
+  throw new Error(`unbalanced @media ${query}`);
+}
+
 describe("the control-height scale", () => {
   it("defines 44 / 36 / 28 in :root", () => {
     expect(token("--control-h")).toBe("44px");
@@ -109,6 +123,35 @@ describe("every control is on the scale", () => {
     );
     expect(panel).toMatch(/min-height\s*:\s*var\(--control-h\)/);
     expect(rule(".samograph-jump-live")).toMatch(/min-height\s*:\s*var\(--control-h\)/);
+  });
+});
+
+/**
+ * A fixed `height` and a wrapping label are incompatible (#279 review NB2).
+ * `.samograph-btn` pins the box to `--control-h` with `line-height: 1` but never
+ * said anything about `white-space`, so the initial value (`normal`) applied: a
+ * long `--sm` label in a narrow row — "Undo skip auto-record", "Download (no
+ * chat)" — wrapped to two lines inside a box that is one line tall and the
+ * second line painted OUTSIDE the border.
+ *
+ * The two coherent answers are "never wrap" and "wrap, and grow". We take both,
+ * split by pointer: a mouse-driven wide layout keeps the label on one line
+ * (`nowrap`, the row can scroll or the flex parent can shrink), while the coarse
+ * / narrow block — which already relaxes the box to `height: auto` for exactly
+ * this reason — lets the label wrap into a taller button.
+ */
+describe("a long label never escapes the button box (#279 NB2)", () => {
+  it("keeps the label on one line while the height is fixed", () => {
+    const btn = rule(".samograph-btn");
+    expect(btn).toMatch(/height\s*:\s*var\(--control-h\)/);
+    expect(btn).toMatch(/white-space\s*:\s*nowrap/);
+  });
+
+  it("lets it wrap where the box is already allowed to grow (coarse / narrow)", () => {
+    const coarse = mediaBlock("(pointer: coarse), (max-width: 767.98px)");
+    const btn = coarse.match(/(?:^|[};])\s*\.samograph-btn\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(normalize(btn)).toMatch(/height\s*:\s*auto/);
+    expect(normalize(btn)).toMatch(/white-space\s*:\s*normal/);
   });
 });
 

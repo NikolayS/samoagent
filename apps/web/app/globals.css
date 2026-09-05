@@ -31,7 +31,12 @@
   --ink-soft: #3a382f;
   --muted: #6b675c;
   --faint: #9c978a;
-  --line: #dfdbd1;
+  /* Lifted from the mockup's #dfdbd1 (1.24:1 on --ground, 1.31:1 on --surface —
+     a hairline nobody can see, the light-theme twin of the dark defect #293
+     fixed). #cbc7bd is the smallest lift clearing 1.5:1 on BOTH grounds
+     (1.51 / 1.60), keeps the mockup's warm r+4/g/b-10 cast, and stays lighter
+     than --line-strong (1.85:1) so the two-step hairline scale survives. */
+  --line: #cbc7bd;
   --line-strong: #b9b4a6;
 
   /* Theme-invariant transcript instrument */
@@ -164,6 +169,10 @@
   --control-h-xs: 28px;
   --radius-control: var(--radius-md);
   --field-max: 22rem;
+  /* Alert tone rail (DESIGN-MODEL §4 Alert / Banner). The tone lives in this
+     3px inline-start rule, never in the copy — coloured body text is exactly
+     what `test/alert-contrast.test.ts` was written to stop. */
+  --alert-rail: 3px;
   /* The smallest a tap target may be on a touch screen (WCAG 2.2 AA target
      size, iOS HIG, Material). Distinct from `--control-h`: that is how tall a
      control is drawn everywhere; this is the floor a *hit area* must clear on
@@ -263,7 +272,11 @@
 .samograph-landing-hero > p { color: var(--ink-soft); font-size: .85rem; }
 .samograph-hero-actions { display: flex; align-items: center; gap: 20px; }
 .samograph-hero-secondary { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted) !important; font-size: .75rem; }
-.samograph-instrument { min-width: min(780px, 100%); color: var(--panel-muted); background: var(--panel-ground); border: 1px solid var(--panel-line); font-size: var(--text-xs); }
+/* No `min-width` here: every `.samograph-instrument` in the app is also
+   `.samograph-percall`, whose (0,2,0) rule sets `min-width: 0`, so the
+   `min(780px, 100%)` this used to carry never applied to anything (#290
+   review). The real width contract lives on `.samograph-percall.samograph-instrument`. */
+.samograph-instrument { color: var(--panel-muted); background: var(--panel-ground); border: 1px solid var(--panel-line); font-size: var(--text-xs); }
 .samograph-instrument-head, .samograph-instrument-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 16px; background: var(--panel-surface); }.samograph-instrument-head { border-bottom: 1px solid var(--panel-line); }.samograph-instrument-head > div, .samograph-instrument-state, .samograph-instrument-foot > div { display: flex; align-items: center; gap: 14px; }.samograph-instrument i, .samograph-instrument-head i { color: var(--panel-line); font-style: normal; }.samograph-instrument strong { color: var(--panel-ink); font-weight: 500; }.samograph-instrument-state > span:last-child { font-variant-numeric: tabular-nums; }.samograph-instrument-state > span > b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-live); animation: samograph-refined-pulse 1.6s ease-in-out infinite; }
 .samograph-instrument-lines { list-style: none; margin: 0; padding: 18px 0 20px; }.samograph-instrument-lines li { display: grid; grid-template-columns: 56px 82px 66px minmax(480px, 1fr); gap: 14px; min-height: 33px; align-items: start; color: var(--panel-ink); font-size: .78rem; line-height: 1.5; }.samograph-line-number { height: 100%; padding-right: 14px; color: var(--panel-gutter); border-right: 1px solid var(--panel-line); text-align: right; font-variant-numeric: tabular-nums; }.samograph-instrument-lines time, .samograph-instrument-lines b { color: var(--panel-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
 .samograph-instrument-foot { border-top: 1px solid var(--panel-line); font-size: var(--text-xs); }.samograph-instrument-foot b { padding: 2px 8px; border: 1px solid var(--panel-line); }.samograph-instrument-foot i { margin: 0 3px; }
@@ -283,7 +296,11 @@
    56px gutter — audit finding 7, "two design languages in one product". */
 @media (min-width: 768px) { .samograph-site-nav { min-height: 64px; } }
 @media (max-width: 59.99rem) { .samograph-landing-hero { padding: 72px var(--gutter) 96px; } }
-/* Below 40rem, two decisions:
+/* Below 40rem, three decisions:
+   - The nav's 32px flex gap does not fit a 320px phone: the box is
+     320 - 2 x --gutter(20) = 280px and the wordmark (~153px) + CTA (~112px) +
+     32px gap is ~297px, so the CTA overhung the right edge (#290 review).
+     --space-3 (12px) lands the row at ~277px.
    - 350px of content buys two of these three: the wordmark (153px), the CTA
      (112px) and the 154px theme switcher. The name of the product and the way
      in win; theme follows the OS here and is still switchable inside the app.
@@ -291,7 +308,7 @@
      then dangle at the start of the wrapped row. Drop the glyphs and let a
      wider gap separate the links. Above 40rem all three fit on one line
      (400px of links in a >=576px content box), so the separators stay. */
-@media (max-width: 40rem) { .samograph-site-footer nav { column-gap: var(--space-4); }.samograph-site-footer nav i { display: none; }.samograph-brand { font-size: .82rem; }.samograph-nav-actions .samograph-theme-switcher { display: none; }.samograph-landing-hero { padding: 52px var(--gutter) 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px var(--gutter) 44px; } }
+@media (max-width: 40rem) { .samograph-site-nav { gap: var(--space-3); }.samograph-site-footer nav { column-gap: var(--space-4); }.samograph-site-footer nav i { display: none; }.samograph-brand { font-size: .82rem; }.samograph-nav-actions .samograph-theme-switcher { display: none; }.samograph-landing-hero { padding: 52px var(--gutter) 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px var(--gutter) 44px; } }
 @media (prefers-reduced-motion: reduce) { .samograph-instrument-state > span > b { animation: none; } }
 
 /* Dark by OS preference. The explicit `data-theme` blocks below have higher
@@ -327,7 +344,8 @@
   --ink-soft: #3a382f;
   --muted: #6b675c;
   --faint: #9c978a;
-  --line: #dfdbd1;
+  /* Lifted for contrast — see the base :root note above. */
+  --line: #cbc7bd;
   --line-strong: #b9b4a6;
   --warn: #8a5a00;
   --crit: #a63a3a;
@@ -395,14 +413,20 @@ h1 {
   line-height: var(--leading-tight);
 }
 
+/* A section title has to OUTRANK body copy. `h2` was `--text-md` (16px) over a
+   `--text-base` (14px) body — a 2px step, which is why the dashboard's four
+   peer sections read as one undifferentiated column (design audit; DESIGN-MODEL
+   §3 "Type scale"). 20 / 16 / 14 is the scale; the sizes come from the tokens so
+   the steps stay related. */
 h2 {
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: -.01em;
+  line-height: var(--leading-tight);
 }
 
 h3 {
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   font-weight: 600;
 }
 
@@ -561,6 +585,131 @@ button:hover {
 
 .samograph-actions > * {
   flex: 0 0 auto;
+}
+
+/* ----- Page header (DESIGN-MODEL §4 "Page header", PLAN.md desktop PR 5) -----
+   Every route grew its own heading block, so the H1 size, the space under it and
+   the place secondary text went were three different answers — and on
+   `/calls/[id]` the raw meeting URL was rendered INSIDE the H1. `PageHeader`
+   emits ONE shape (eyebrow / title / description / actions) and this is its one
+   set of rules. A page-specific class composes ON TOP of these (the call view
+   keeps its own tighter gap and mobile sizes, #283), so every declaration here
+   is the base an override can win over. */
+.samograph-page-header {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-8);
+}
+
+/* The text column is its own grid so the eyebrow/title/description rhythm is
+   independent of the gap between that column and the actions slot. */
+.samograph-page-header-text {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.samograph-page-header-eyebrow {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.samograph-page-header-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: var(--leading-tight);
+}
+
+.samograph-page-header-description {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.samograph-page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Mobile-first: the actions sit UNDER the title and only move beside it once
+   there is room (DESIGN-MODEL §5). The `--has-actions` modifier is set by the
+   component, so the two-column grid is never declared on a header that has a
+   single child to put in it. */
+@media (min-width: 768px) {
+  .samograph-page-header--has-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-4);
+  }
+}
+
+/* ----- Section rhythm (DESIGN-MODEL §4 "Card / Section", §5) ----------------
+   Structure from hairlines and whitespace, not nested boxes: a run of related
+   content is separated from the next by ONE 1px rule and `--space-6` of padding.
+   The gap between two things inside a section is always smaller than the gap
+   around the group they belong to. */
+.samograph-section {
+  padding-block: var(--space-6);
+  border-top: var(--border) solid var(--line);
+}
+
+/* The dashboard's other two peer sections are rendered by sibling components
+   (`AddToCallForm`, `UpcomingMeetings`); they join the shared rhythm here rather
+   than each carrying a private `margin-block`, which is what let four sections
+   at four spacings read as one block. */
+.samograph-dash-hero,
+.samograph-upcoming-meetings {
+  padding-block: var(--space-6);
+  border-top: var(--border) solid var(--line);
+}
+
+/* A rule immediately under the page header separates nothing — the header's own
+   `--space-8` already ended it. */
+.samograph-page-header + .samograph-section {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.samograph-page-header + .samograph-dash-hero {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* …and through a wrapper. On /settings the first section is the first child of
+   the <form> that follows the header, not a sibling of it, so the adjacent
+   rules above never matched and the page opened with a divider under its H1
+   (#295 review). At (0,3,0) this also outranks `.samograph-settings-section`'s
+   own heavier `border-top`, which is the declaration that drew that line. */
+.samograph-page-header + * > .samograph-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Title (+ optional description) of a section: the pair is one group, so it
+   takes the tight `--space-1` gap and the group is what carries the space down
+   to the section's content. */
+.samograph-section-header {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.samograph-section-title {
+  margin: 0;
+}
+
+.samograph-section-description {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 .samograph-app-nav {
@@ -844,6 +993,13 @@ button:hover {
   /* `.samograph-btn` is worn by <a> as often as by <button> (UpcomingMeetings
      renders four). A button is a box, not a link: no underline. */
   text-decoration: none;
+  /* The box above is pinned to ONE line (`height` + `line-height: 1`), so the
+     label must be pinned to one line too — otherwise a long `--sm` label in a
+     narrow row ("Undo skip auto-record", "Download (no chat)") wraps and the
+     second line paints outside the border (#279 review NB2). Where the box is
+     allowed to grow instead — the coarse/narrow block below — this is relaxed
+     back to `normal` so the label wraps into a taller button. */
+  white-space: nowrap;
   transition: color 140ms, background-color 140ms, border-color 140ms;
 }
 .samograph-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
@@ -979,11 +1135,35 @@ button:hover {
 .samograph-select:has(> select:disabled)::after { background: var(--faint); }
 input:where(:not([type="checkbox"], [type="radio"])), select, textarea { background: var(--surface); border-color: var(--control-border); }
 textarea { resize: vertical; font-family: var(--font-mono); }
-.samograph-alert { border: 1px solid currentColor; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
-.samograph-alert--error { color: var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
-.samograph-alert--warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
-.samograph-alert--success { color: var(--success-ink); background: color-mix(in srgb, var(--success-ink) 8%, var(--surface)); }
-.samograph-alert--info { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
+/* Alert / Banner (DESIGN-MODEL §4, PLAN desktop PR 8). One box, four tones, and
+   `components/Alert.tsx` is the only thing that writes these class names.
+   The old box drew `border: 1px solid currentColor` around tone-coloured copy,
+   so a warning was a wall of ochre text in an ochre ring. Now the tone is a 3px
+   inline-start rail plus a 8% tint, and the copy stays at `--ink` — one reading
+   colour in both themes. `display: flow-root` and NOT flex: the copy is a
+   sentence that routinely contains an `<a>` or a `<span>`, and a flex root
+   would promote each of those to a flex item and open a `gap` inside the
+   sentence ("link to <email> ." with 16px holes). Title and action get their
+   own block boxes instead. */
+.samograph-alert {
+  --alert-tone: var(--ink-soft);
+  display: flow-root;
+  border: 1px solid var(--line);
+  border-inline-start: var(--alert-rail) solid var(--alert-tone);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+}
+/* The title claims its own line, so the copy starts under it, not beside it. */
+.samograph-alert-title { display: block; font-weight: 600; color: var(--ink); }
+/* `width: fit-content` + `margin-inline-start: auto` parks the action block at
+   the far end of the box — the block-layout equivalent of `justify-self: end`,
+   with no flex context to leak into the sentence above it. */
+.samograph-alert-action { display: block; width: fit-content; margin-block-start: var(--space-3); margin-inline-start: auto; }
+.samograph-alert--error { --alert-tone: var(--crit); color: var(--ink); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
+.samograph-alert--warn { --alert-tone: var(--warn); color: var(--ink); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.samograph-alert--success { --alert-tone: var(--success-ink); color: var(--ink); background: color-mix(in srgb, var(--success-ink) 8%, var(--surface)); }
+.samograph-alert--info { --alert-tone: var(--ink-soft); color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
 .samograph-toggle { display: flex; align-items: flex-start; gap: var(--space-3); margin-block: var(--space-4); cursor: pointer; }
 .samograph-toggle input { margin-top: 0.2rem; }
 .samograph-toggle span { display: grid; gap: var(--space-1); }
@@ -1060,7 +1240,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-danger-zone-title { color: var(--crit); }
 .samograph-danger-confirm { display: grid; gap: var(--space-2); margin-block: var(--space-5); }
 .samograph-danger-delete { margin-top: var(--space-5); }
-.samograph-danger-error, .samograph-delete-error { color: var(--crit); }
 .samograph-confirm, .samograph-delete-confirm { border: 1px solid var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); border-radius: var(--radius-md); padding: var(--space-4); }
 /* ----- Touch targets (mobile audit M3) -------------------------------------
    A finger is not a cursor: 24 actions in this product measured under 44 CSS
@@ -1082,6 +1261,9 @@ textarea { resize: vertical; font-family: var(--font-mono); }
     height: auto;
     min-height: var(--tap-min);
     padding-block: var(--space-2);
+    /* The box grows here, so a long label wraps INTO it rather than being held
+       on one line that widens the row past the viewport (#279 review NB2). */
+    white-space: normal;
   }
 
   /* `.samograph-btn--sm { height: var(--control-h-sm) }` is declared later in
@@ -1137,10 +1319,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 /* ===== end Slice 2 ===== */
 
 /* ===== Slice 4 — Dashboard ===== */
-.samograph-dash-hero {
-  margin-block: var(--space-5);
-}
-
 .samograph-dash-hero-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1172,14 +1350,15 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   list-style: none;
 }
 
+/* A row's rule belongs to its TOP edge only. The last row used to close the
+   list with a `border-bottom` as well, which put a second hairline `--space-6`
+   above the next section's own `border-top` — two lines with a band of nothing
+   between them, and a doubled rule against the danger zone's 2px `--crit` edge
+   (#295 review). One rule between two things, always (DESIGN-MODEL §4,
+   "Hairlines, not boxes"): the section that follows draws it. */
 .samograph-call-item,
 .samograph-meeting-item {
   border-top: 1px solid var(--line);
-}
-
-.samograph-call-item:last-child,
-.samograph-meeting-item:last-child {
-  border-bottom: 1px solid var(--line);
 }
 
 .samograph-call-row,
@@ -1329,7 +1508,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   font-size: var(--text-sm);
 }
 
-.samograph-upcoming-meetings { margin-block: var(--space-6); }
 .samograph-meeting-title {
   overflow: hidden;
   font-weight: 650;
@@ -1433,12 +1611,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   background: var(--line);
 }
 
-/* Info-tone sign-in note (§5.16 SAMO-AUTH-006 — "you cancelled" is not a
-   failure, so it must not read like the red `[role="alert"]` copy). */
-.samograph-auth-note {
-  color: var(--muted);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .samograph-google-signin {
     transition: none;
@@ -1493,9 +1665,11 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   font-family: var(--font-mono);
 }
 
+/* The reading measure lives on the page's CONTENT column since #287
+   (`.samograph-page--prose > * { max-width: var(--content-max) }`), so the
+   per-section cap here was a second, silently redundant 720px box. What is left
+   is settings' own heavier divider; the padding comes from `.samograph-section`. */
 .samograph-settings-section {
-  max-width: var(--width-prose);
-  padding-block: var(--space-5);
   border-top: var(--border-strong) solid var(--line-strong);
 }
 
@@ -1843,14 +2017,12 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   border-color: var(--green);
 }
 
-/* Never-silent terminal card (SPEC §5.16). */
+/* Never-silent terminal card (SPEC §5.16). This is an `Alert tone="danger"`,
+   so the box — tint, `--line` border, tone rail, radius — comes from
+   `.samograph-alert`. Redeclaring any of it here would win on source order and
+   erase the rail, which is exactly what this rule used to do. Spacing only. */
 .samograph-stream-error {
   margin: 0.75rem 0;
-  padding: 0.9rem 1rem;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--crit) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--crit) 40%, var(--line));
-  border-radius: 10px;
 }
 
 .samograph-stream-error p {
@@ -2087,6 +2259,15 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   font-family: var(--font-body);
   font-size: var(--text-xl);
   line-height: var(--leading-tight);
+}
+
+/* The call view composes `PageHeader` (desktop PR 5) but keeps the compact
+   measurements #283 shipped: the back link, title and URL sit on `--space-1`,
+   not the `--space-2` a page header uses, and the block above the transcript
+   stays `--space-4` / `--space-3` deep. The wrapper rules above own the outer
+   box; this one reaches the component's inner text column. */
+.samograph-call-view-heading .samograph-page-header-text {
+  gap: var(--space-1);
 }
 
 .samograph-call-back {
@@ -2441,8 +2622,12 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   position: absolute;
   z-index: 3;
   right: 16px;
-  /* Above the panel's foot rail, and above the home indicator with it (M6). */
-  bottom: calc(78px + var(--safe-bottom));
+  /* Above the panel's foot rail. NOT safe-area maths: the pill is absolutely
+     positioned inside `.samograph-percall`, so this offset is measured from the
+     panel's padding box, not the viewport — adding `var(--safe-bottom)` here
+     was inert at best and wrong at worst (#292 review NB4). The home-indicator
+     inset lives on the sticky savebar, which really is pulled to the edge. */
+  bottom: 78px;
   min-height: var(--control-h);
   color: var(--panel-ground);
   background: var(--accent-live);

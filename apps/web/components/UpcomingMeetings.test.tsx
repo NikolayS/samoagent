@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { Dashboard } from "./Dashboard.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { createFakeAppApiClient } from "../lib/fakeAppApiClient.ts";
@@ -16,6 +16,19 @@ describe("Dashboard upcoming meetings", () => {
     expect(await view.findByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
     expect(client.requests).toContainEqual({ path: "/calendar/meetings/event%2F1", method: "PATCH", body: { excluded: true } });
     expect(view.queryByRole("button", { name: "Add samograph to Planning" })).toBeNull();
+  });
+
+  it("announces a standing broken-calendar notice politely and a transient failure assertively", async () => {
+    // NB-1 (PR 8 review). The broken-calendar line is a STANDING condition: it
+    // is present on every dashboard load until the user reconnects, so it must
+    // not fire an assertive live region each time. The optimistic-toggle
+    // failure above IS transient, and keeps `role="alert"`.
+    const broken = createFakeAppApiClient({ seedCalendarMeetings: { connectionState: "broken", autoJoin: true, lastSyncAt: null, meetings: [] } });
+    const view = render(<UpcomingMeetings client={broken} onAuthFailure={() => {}} />);
+    const notice = await view.findByText(/Google Calendar needs to be reconnected/);
+    expect(notice.hasAttribute("role")).toBe(false);
+    expect(notice.className).toContain("samograph-alert samograph-alert--warn");
+    expect(view.queryByRole("alert")).toBeNull();
   });
 
   it("rolls an optimistic exclusion toggle back when the request is rejected", async () => {
@@ -50,14 +63,34 @@ describe("Dashboard upcoming meetings", () => {
     const view = render(<UpcomingMeetings client={first} onAuthFailure={() => {}} />);
 
     fireEvent.click(await view.findByRole("button", { name: "Skip auto-record for Planning" }));
-    view.rerender(<UpcomingMeetings client={refreshed} onAuthFailure={() => {}} />);
-    await view.findByRole("button", { name: "Undo skip auto-record for Planning" });
-    view.rerender(<UpcomingMeetings client={stale} onAuthFailure={() => {}} />);
-    await waitFor(() => expect(stale.requests.some((request) => request.path === "/calendar/meetings?limit=20")).toBe(true));
-    await Promise.resolve();
-    resolveUpdate({ id: meeting.id, excluded: true });
+    // Every wait below is an explicit FLUSH, never a poll (#293 CI flake): the
+    // old shape asked `waitFor`/`findBy` to discover state that is already
+    // committed, so on a loaded CI box it sat on the 1s default and failed at
+    // 1006ms. `act(async () => {})` drains the microtask queue and React's work
+    // loop, after which every assertion is synchronous — this now fails
+    // INSTANTLY and loudly if the optimistic toggle regresses, rather than
+    // after a second. The flush is required even straight after `fireEvent`:
+    // whether that commits synchronously depends on the process-global
+    // `IS_REACT_ACT_ENVIRONMENT`, which any other file in a full-suite run can
+    // have left off — asserting without it passed alone and failed in CI.
+    await act(async () => {});
+    expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
 
-    await waitFor(() => expect(view.getByRole("button").getAttribute("aria-busy")).toBe("false"));
+    view.rerender(<UpcomingMeetings client={refreshed} onAuthFailure={() => {}} />);
+    await act(async () => {});
+    expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+
+    view.rerender(<UpcomingMeetings client={stale} onAuthFailure={() => {}} />);
+    await act(async () => {});
+    expect(stale.requests.some((request) => request.path === "/calendar/meetings?limit=20")).toBe(true);
+    // The stale snapshot says "not excluded"; the in-flight toggle must win.
+    expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+    expect(view.getByRole("button").getAttribute("aria-busy")).toBe("true");
+
+    await act(async () => {
+      resolveUpdate({ id: meeting.id, excluded: true });
+    });
+    expect(view.getByRole("button").getAttribute("aria-busy")).toBe("false");
     expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
   });
   it("shows one primary Connect CTA in the available-calendar empty state", async () => {

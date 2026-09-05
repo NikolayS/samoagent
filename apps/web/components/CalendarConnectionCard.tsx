@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert } from "./Alert.tsx";
 import { InlineConfirm } from "./InlineConfirm.tsx";
 import { PageSkeleton } from "./PageSkeleton.tsx";
 import { AppApiError, type AppApiClient, type CalendarStatus } from "../lib/appApiClient.ts";
@@ -91,7 +92,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     {connectError || message ? (() => {
       const failure = Boolean(connectError) || messageKind === "error";
       const copy = connectError ?? message;
-      return <p role={failure ? "alert" : "status"} className={`samograph-alert samograph-alert--${failure ? "error" : "success"}`}>{copy}</p>;
+      return <Alert tone={failure ? "danger" : "success"}>{copy}</Alert>;
     })() : null}
     {!status ? <PageSkeleton variant="page" /> : status.state === "not_connected" ? <>
       <p>Show upcoming meetings from your calendar.</p>

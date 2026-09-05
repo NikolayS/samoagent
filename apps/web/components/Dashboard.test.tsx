@@ -223,11 +223,13 @@ describe("Dashboard — M7 call row: title, meta, no query strings", () => {
     const html = container.innerHTML;
     expect(html).not.toContain("pwd=");
     expect(html).not.toContain("GmbJ6pA9rUojNjPj7iNnLAvbpcF2uU.1");
-    // Including the href into the per-call page, which used to carry ?url=<raw>.
+    // The per-call page loads the raw join URL from GET /calls/:id.
     const row = container.querySelector("a.samograph-call-row");
-    expect(row?.getAttribute("href")).toBe(
-      `/calls/c_pwd?url=${encodeURIComponent("https://us04web.zoom.us/j/75208520803")}`,
-    );
+    expect(row?.getAttribute("href")).toBe("/calls/c_pwd");
+    for (const anchor of container.querySelectorAll("a")) {
+      expect(anchor.getAttribute("href") ?? "").not.toContain("url=");
+      expect(anchor.getAttribute("href") ?? "").not.toContain("pwd=");
+    }
   });
 
   it("leads the row with a readable title and demotes the URL to the meta line", async () => {
@@ -348,16 +350,12 @@ describe("Dashboard — failed calls display their error reason (SPEC §5.16, St
     expect(queryByText(/Couldn't join.*zoom\.us\/j\/7/)).toBeNull();
   });
 
-  it("links each call to its per-call page carrying ?url= (COULD_NOT_JOIN reaches Try-again, Story 4)", async () => {
+  it("links each call to its encoded per-call path with no URL query channel", async () => {
     const client = createFakeAppApiClient({ seedCalls: FAILED });
     const { findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
     const anchor = (await findByText("https://meet.google.com/bad-code-xxx")).closest("a");
     expect(anchor).not.toBeNull();
-    // The per-call page (OwnerCallView) owns "Try again"; ?url= carries the
-    // original meeting URL so Try-again can pre-fill the dashboard input.
-    expect(anchor?.getAttribute("href")).toBe(
-      `/calls/call_9?url=${encodeURIComponent("https://meet.google.com/bad-code-xxx")}`,
-    );
+    expect(anchor?.getAttribute("href")).toBe("/calls/call_9");
   });
 });
 
@@ -365,16 +363,14 @@ describe("Dashboard — each call row is an obvious transcript link (affordance)
   it("renders the whole row as a link to the per-call page with a clear 'View transcript' CTA", async () => {
     const client = createFakeAppApiClient({
       seedCalls: [
-        { id: "call_e", meetingUrl: "https://zoom.us/j/e", provider: "zoom", status: "ENDED" },
+        { id: "call/e space", meetingUrl: "https://zoom.us/j/e", provider: "zoom", status: "ENDED" },
       ],
     });
     const { findByText } = render(<Dashboard client={client} redirect={noopRedirect} />);
     const row = (await findByText("https://zoom.us/j/e")).closest("a");
     expect(row).not.toBeNull();
     // Whole row is the link into the transcript page.
-    expect(row?.getAttribute("href")).toBe(
-      `/calls/call_e?url=${encodeURIComponent("https://zoom.us/j/e")}`,
-    );
+    expect(row?.getAttribute("href")).toBe("/calls/call%2Fe%20space");
     // Explicit, inviting affordance so a first-time user knows to tap it.
     expect(row?.textContent).toContain("View transcript");
     // Accessible: the link carries its own name.
@@ -398,9 +394,7 @@ describe("Dashboard — each call row is an obvious transcript link (affordance)
     expect(container.querySelector(".samograph-call-cta > .samograph-call-live-dot")).toBeNull();
     // The row still links into the per-call page.
     const row = (await findByText("https://zoom.us/j/live")).closest("a");
-    expect(row?.getAttribute("href")).toBe(
-      `/calls/call_live?url=${encodeURIComponent("https://zoom.us/j/live")}`,
-    );
+    expect(row?.getAttribute("href")).toBe("/calls/call_live");
   });
 
   it("a terminal-failure row keeps its reason and does NOT show a transcript invite", async () => {
@@ -542,13 +536,14 @@ describe("Dashboard — first-run empty & loading states (Sprint-3 polish)", () 
   });
 });
 
-describe("Dashboard — Story-4 URL pre-fill (SPEC §5.2, Story 4)", () => {
-  const URL = "https://meet.google.com/abc-defg-hij";
+describe("Dashboard — Story-4 retry call pre-fill (SPEC §5.2, Story 4)", () => {
+  const URL = "https://us04web.zoom.us/j/75208520803?pwd=s3cr3tPassw0rd";
+  const RETRY_CALL: Call = { id: "c1", meetingUrl: URL, provider: "zoom", status: "COULD_NOT_JOIN" };
 
-  it("pre-fills the paste input from initialUrl and creates NO call on load", async () => {
-    const client = createFakeAppApiClient();
+  it("pre-fills from the API-loaded call selected by retryCallId and creates NO call on load", async () => {
+    const client = createFakeAppApiClient({ seedCalls: [RETRY_CALL] });
     const { findByLabelText } = render(
-      <Dashboard client={client} redirect={noopRedirect} initialUrl={URL} />,
+      <Dashboard client={client} redirect={noopRedirect} retryCallId="c1" />,
     );
     const input = (await findByLabelText("Meeting link")) as HTMLInputElement;
     expect(input.value).toBe(URL);
@@ -559,22 +554,44 @@ describe("Dashboard — Story-4 URL pre-fill (SPEC §5.2, Story 4)", () => {
   });
 
   it("creates exactly one Call only on explicit re-submit", async () => {
-    const client = createFakeAppApiClient();
-    const { container, findByLabelText, findByText } = render(
-      <Dashboard client={client} redirect={noopRedirect} initialUrl={URL} />,
+    const client = createFakeAppApiClient({ seedCalls: [RETRY_CALL] });
+    const { container, findByLabelText } = render(
+      <Dashboard client={client} redirect={noopRedirect} retryCallId="c1" />,
     );
     await findByLabelText("Meeting link");
     const form = container.querySelector("form");
     if (!form) throw new Error("no form");
     fireEvent.submit(form);
-    await findByText(URL);
-    expect(
-      client.requests.filter((r) => r.path === "/calls" && r.method === "POST"),
-    ).toHaveLength(1);
+    await waitFor(() => {
+      expect(
+        client.requests.filter((r) => r.path === "/calls" && r.method === "POST"),
+      ).toHaveLength(1);
+    });
   });
 
-  it("leaves the input blank when no initialUrl is given", async () => {
-    const client = createFakeAppApiClient();
+  it("re-fills when the selected retry call changes, instead of trusting mount order", async () => {
+    // The prefill reaches an UNCONTROLLED `defaultValue`, which React reads only
+    // at mount. Today it happens to be right because the loading gate keeps
+    // `AddToCallForm` unmounted until `calls` has arrived — a load-order
+    // accident, not a stated contract (#294 review). `key={retryUrl}` states it:
+    // a different resolved URL is a different form instance. This test changes
+    // the resolved URL on an ALREADY-MOUNTED dashboard, which is exactly what a
+    // removed gate would produce, and it fails without the key.
+    const other = "https://meet.google.com/qpd-zbkg-jfo";
+    const client = createFakeAppApiClient({
+      seedCalls: [RETRY_CALL, { id: "c2", meetingUrl: other, provider: "google_meet", status: "COULD_NOT_JOIN" }],
+    });
+    const view = render(<Dashboard client={client} redirect={noopRedirect} retryCallId="c1" />);
+    const input = (await view.findByLabelText("Meeting link")) as HTMLInputElement;
+    expect(input.value).toBe(URL);
+
+    view.rerender(<Dashboard client={client} redirect={noopRedirect} retryCallId="c2" />);
+    const refilled = (await view.findByLabelText("Meeting link")) as HTMLInputElement;
+    expect(refilled.value).toBe(other);
+  });
+
+  it("leaves the input blank when no retryCallId is given", async () => {
+    const client = createFakeAppApiClient({ seedCalls: [RETRY_CALL] });
     const { findByLabelText } = render(
       <Dashboard client={client} redirect={noopRedirect} />,
     );

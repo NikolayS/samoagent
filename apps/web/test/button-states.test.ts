@@ -197,21 +197,39 @@ describe("disabled buttons are legible (PLAN PR 7)", () => {
   }
 });
 
-describe("dark hairlines (PLAN PR 12)", () => {
-  for (const against of ["--ground", "--surface"] as const) {
-    it(`--line reaches 1.5:1 against ${against} in dark mode`, () => {
-      expect(ratio("var(--line)", `var(${against})`, "dark")).toBeGreaterThanOrEqual(1.5);
+/**
+ * Hairlines, BOTH themes (PLAN PR 12 + its D7 follow-up).
+ *
+ * #293 lifted the dark `--line` and left the light one at the mockup's
+ * `#dfdbd1`, which measures 1.24:1 on `--ground` and 1.31:1 on `--surface` —
+ * the SAME defect the dark fix was for, one theme over. `#cbc7bd` is the
+ * smallest lift that clears 1.5:1 on both grounds while keeping the token's
+ * warm cast (the mockup's exact r+4 / g / b-10 offsets) and staying LIGHTER
+ * than `--line-strong`, so the two-step hairline scale survives:
+ *
+ *   #cbc7bd on --ground  #f4f2ed → 1.51:1   (was #dfdbd1 → 1.24:1)
+ *   #cbc7bd on --surface #faf9f6 → 1.60:1   (was #dfdbd1 → 1.31:1)
+ *   --line-strong #b9b4a6 on --ground → 1.85:1, still the stronger step.
+ */
+describe("hairlines are visible in both themes (PLAN PR 12, D7)", () => {
+  for (const theme of ["light", "dark"] as const) {
+    for (const against of ["--ground", "--surface"] as const) {
+      it(`--line reaches 1.5:1 against ${against} in ${theme} mode`, () => {
+        expect(ratio("var(--line)", `var(${against})`, theme)).toBeGreaterThanOrEqual(1.5);
+      });
+    }
+
+    it(`keeps --line-strong above --line in ${theme} mode so the two-step scale survives`, () => {
+      expect(ratio("var(--line-strong)", "var(--ground)", theme)).toBeGreaterThan(
+        ratio("var(--line)", "var(--ground)", theme),
+      );
     });
   }
 
-  it("keeps --line-strong above --line so the two-step hairline scale survives", () => {
-    expect(ratio("var(--line-strong)", "var(--ground)", "dark")).toBeGreaterThan(
-      ratio("var(--line)", "var(--ground)", "dark"),
-    );
-  });
-
-  it("leaves the light hairline alone", () => {
-    expect(themes.light["--line"]).toBe("#dfdbd1");
+  it("pins the exact lifted light hairline and its measured ratios", () => {
+    expect(themes.light["--line"]).toBe("#cbc7bd");
+    expect(ratio("var(--line)", "var(--ground)", "light")).toBe(1.51);
+    expect(ratio("var(--line)", "var(--surface)", "light")).toBe(1.6);
   });
 });
 

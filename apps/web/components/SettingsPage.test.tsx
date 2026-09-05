@@ -42,6 +42,26 @@ describe("SettingsPage — hosted per-tenant settings (§5.12)", () => {
       request.method === "PUT" && request.path === "/settings")).toBe(true));
   });
 
+  /**
+   * The CSS that suppresses the divider under the page header
+   * (`.samograph-page-header + * > .samograph-section:first-child`) can only
+   * match if the markup keeps this shape: the <form> is the header's next
+   * sibling and the first settings section is that form's first child
+   * (#295 review). Assert the shape, not the pixels.
+   */
+  it("puts the first section directly inside the element after the page header", async () => {
+    const client = createFakeAppApiClient();
+    const view = render(<SettingsPage client={client} redirect={() => {}} />);
+    await view.findByLabelText(/language/i);
+    const header = view.container.querySelector(".samograph-page-header")!;
+    expect(header.tagName).toBe("HEADER");
+    const next = header.nextElementSibling!;
+    expect(next.tagName).toBe("FORM");
+    const first = next.firstElementChild!;
+    expect(first.className).toBe("samograph-section samograph-settings-section");
+    expect(first.querySelector("h2")?.textContent).toBe("Transcription");
+  });
+
   it("enables save only when dirty and resets dirty after saving", async () => {
     const client = createFakeAppApiClient();
     const view = render(<SettingsPage client={client} redirect={() => {}} />);
