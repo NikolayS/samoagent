@@ -6,6 +6,8 @@ of PR 2). Each PR is 1–3 files and independently mergeable. Status as of 2026-
 
 Findings backing this plan: [`AUDIT-2026-09-04.md`](./AUDIT-2026-09-04.md).
 
+**Status:** the statuses below are updated per PR — check the PR itself for the current merge/review state if this doc lags.
+
 ---
 
 ## Desktop track — PR 1–14
@@ -13,7 +15,7 @@ Findings backing this plan: [`AUDIT-2026-09-04.md`](./AUDIT-2026-09-04.md).
 | # | Status | PR | Files | Why here |
 |---|---|---|---|---|
 | **1** | **merged (#278)** | `fix(web): real Select control — end-cap chevron, sized to content` | `globals.css`, `SettingsPage.tsx`, `SettingsPage.test.tsx` | The reported complaint. Adds `.samograph-select` wrapper + `appearance:none` + end-cap; introduces `--control-h`, `--radius-control`, `--field-max`. |
-| **2** | **in review (#279)** | `fix(web): one control height — 44/36/28` | `globals.css` (+ `AddToCallForm.tsx` if the grid needs it) | Retires the five inconsistent heights. Input, select and the hero button line up. Pure CSS + tokens. **Base height is 44px per the DESIGN-MODEL §2 deviation (WCAG target size), not the 36px the original audit proposed.** |
+| **2** | **merged (#279)** | `fix(web): one control height — 44/36/28` | `globals.css` (+ `AddToCallForm.tsx` if the grid needs it) | Retires the five inconsistent heights. Input, select and the hero button line up. Pure CSS + tokens. **Base height is 44px per the DESIGN-MODEL §2 deviation (WCAG target size), not the 36px the original audit proposed.** |
 | 3 | not started | `fix(web): stop Settings buttons stretching full-width` | `globals.css`, `CalendarConnectionCard.tsx` | Splits `.samograph-signin`'s grid from the calendar card; adds `.samograph-actions` around button pairs. |
 | 4 | not started | `fix(web): align page content with the app nav` | `globals.css`, `apps/web/app/settings/page.tsx` | `--prose`/`--form` constrain the inner column, not `<main>`. Large perceptual win, small diff. |
 | 5 | not started | `feat(web): PageHeader component` | `components/PageHeader.tsx` (new), `globals.css`, `OwnerCallView.tsx` | Title/description/back/actions. Moves the raw meeting URL out of the `/calls/[id]` H1. |
@@ -46,7 +48,7 @@ the conflict surface — PRs touching disjoint regions can run in parallel.
 
 | # | Status | PR | Files | globals.css region | Parallel with |
 |---|---|---|---|---|---|
-| **M1** | in progress | `fix(web): transcript reflows to two rows below 1024` | `globals.css` | instrument/transcript block only | M2–M9 |
+| **M1** | **in review (#280)** | `fix(web): transcript reflows to two rows below 1024` | `globals.css` | instrument/transcript block only | M2–M9 |
 | **M2** | in progress | `fix(web): real mobile nav — 56px shell, disclosure menu` | `globals.css`, `AppShell.tsx`, `AppShell.test.tsx` | app nav block | M1, M3–M9 |
 | **M3** | in progress | `fix(web): 44px touch targets + a 12px type floor` | `globals.css` | base rules + button block, new `@media` block | M1, M2, M5–M9 |
 | **M4** | in progress | `fix(web): collapse the call-view header on mobile` | `globals.css`, `OwnerCallView.tsx` | call view + panel head block | M2, M3, M5–M9 |
