@@ -171,4 +171,20 @@ describe("SettingsPage — hosted per-tenant settings (§5.12)", () => {
     render(<SettingsPage client={client} redirect={(p) => (to = p)} />);
     await waitFor(() => expect(to).toBe("/auth"));
   });
+  it("wraps every select in the designed .samograph-select control", async () => {
+    const client = createFakeAppApiClient();
+    const view = render(<SettingsPage client={client} redirect={() => {}} />);
+    await view.findByLabelText(/language/i);
+    const selects = [...view.container.querySelectorAll("select")];
+    expect(selects.length).toBe(3);
+    for (const select of selects) {
+      expect(select.parentElement?.className).toBe("samograph-select");
+      // The wrapper is the select's immediate parent so `.samograph-select >
+      // select` (and the ::after end-cap) actually apply.
+      expect(select.parentElement?.tagName).toBe("DIV");
+    }
+    // Still one field group per control, so labels/hints keep their rhythm.
+    expect(view.getByLabelText(/preset/i).closest(".samograph-field")).not.toBeNull();
+    expect(view.getByLabelText(/chime/i).closest(".samograph-field")).not.toBeNull();
+  });
 });

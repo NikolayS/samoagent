@@ -208,13 +208,15 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
         <h2 id={transcriptionHeadingId}>Transcription</h2>
         <div className="samograph-field">
           <label htmlFor={presetId}>Dictionary preset</label>
-          <select id={presetId} value={preset} onChange={(e) => { setPreset(e.target.value); updateDirty({ preset: e.target.value }); }}>
-            {presets.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+          <div className="samograph-select">
+            <select id={presetId} value={preset} onChange={(e) => { setPreset(e.target.value); updateDirty({ preset: e.target.value }); }}>
+              {presets.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
           <p className="samograph-field-hint">
             A shipped keyterm list (e.g. PostgresFM). Your custom terms below are added on top.
           </p>
@@ -236,13 +238,15 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
 
         <div className="samograph-field">
           <label htmlFor={languageId}>Language</label>
-          <select id={languageId} value={language} onChange={(e) => { setLanguage(e.target.value); updateDirty({ language: e.target.value }); }}>
-            {languages.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.label}
-              </option>
-            ))}
-          </select>
+          <div className="samograph-select">
+            <select id={languageId} value={language} onChange={(e) => { setLanguage(e.target.value); updateDirty({ language: e.target.value }); }}>
+              {languages.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         </section>
 
@@ -250,13 +254,15 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
         <h2 id={inCallHeadingId}>In-call</h2>
         <div className="samograph-field">
           <label htmlFor={chimeId}>Chat chime</label>
-          <select id={chimeId} value={chime} onChange={(e) => { setChime(e.target.value); updateDirty({ chime: e.target.value }); }}>
-            {chimes.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <div className="samograph-select">
+            <select id={chimeId} value={chime} onChange={(e) => { setChime(e.target.value); updateDirty({ chime: e.target.value }); }}>
+              {chimes.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         </section>
 
