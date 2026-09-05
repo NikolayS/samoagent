@@ -13,15 +13,21 @@
  */
 import { describe, it, expect, afterAll } from "bun:test";
 import { createHttpAppApiClient } from "./appApiClient.ts";
+import { AppApiError, isSessionInvalid } from "./apiError.ts";
 
 /** What the next `GET /settings` answers with (set per test). */
 let body: Record<string, unknown> = {};
+/** When set, the next `GET /settings` answers with this BODYLESS status instead. */
+let bodylessStatus: number | null = null;
 
 const server = Bun.serve({
   port: 0,
   fetch(req) {
     const url = new URL(req.url);
-    if (req.method === "GET" && url.pathname === "/settings") return Response.json(body);
+    if (req.method === "GET" && url.pathname === "/settings") {
+      if (bodylessStatus !== null) return new Response(null, { status: bodylessStatus });
+      return Response.json(body);
+    }
     return new Response("not found", { status: 404 });
   },
 });
@@ -86,5 +92,29 @@ describe("getSettings — the signin block over the wire (#223)", () => {
     };
     const snap = await client.getSettings();
     expect(snap.signin.identities).toEqual([{ provider: "google", connectedAt: null }]);
+  });
+});
+
+/**
+ * app-api answers an expired/missing session with a BODYLESS 401 (#114, #300) —
+ * no JSON at all. The decoder must not choke on the empty body: it must still
+ * produce an AppApiError carrying `status: 401` so the UI routes to /auth
+ * (the shape that motivated the apiError.ts fix in #297).
+ */
+describe("getSettings — a bodyless 401 over the wire (#300)", () => {
+  it("throws AppApiError with status 401 (not a JSON-parse TypeError)", async () => {
+    bodylessStatus = 401;
+    try {
+      await client.getSettings();
+      throw new Error("expected getSettings() to reject");
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppApiError);
+      const e = err as AppApiError;
+      expect(e.status).toBe(401);
+      expect(e.message).toBe("Request failed.");
+      expect(isSessionInvalid(e)).toBe(true); // → the UI redirects to /auth
+    } finally {
+      bodylessStatus = null;
+    }
   });
 });

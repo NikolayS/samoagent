@@ -98,7 +98,11 @@ describe("M5.2 — the wordmark and the nav CTA survive the mobile breakpoint", 
   });
 
   it("no longer hides the nav CTA below 40rem", () => {
-    expect(mobile()).not.toMatch(/\.samograph-button--compact[^{}]*\{[^}]*display\s*:\s*none/);
+    // PLAN PR 13 replaced `.samograph-button--compact` with the shared
+    // `.samograph-btn--sm`; the defect guarded here is unchanged — nothing in
+    // the mobile block may hide the landing nav's one action.
+    expect(mobile()).not.toMatch(/\.samograph-btn--sm[^{}]*\{[^}]*display\s*:\s*none/);
+    expect(mobile()).not.toMatch(/\.samograph-nav-actions\s+a[^{}]*\{[^}]*display\s*:\s*none/);
   });
 
   it("shrinks the brand instead of hiding it", () => {
@@ -142,7 +146,11 @@ describe("M5.3 — a 12px type floor across the landing block", () => {
   });
 
   for (const selector of [
-    ".samograph-button",
+    // `.samograph-button` was in this list until PLAN PR 13 retired it for the
+    // shared `.samograph-btn`, whose `--text-sm` (13px) clears the floor and is
+    // pinned by `test/control-height.test.ts` / `test/button-states.test.ts`.
+    // The block-wide sweep above still catches any sub-12px literal that lands
+    // on the landing's replacement CTA rules.
     ".samograph-instrument",
     ".samograph-instrument-foot",
     ".samograph-site-footer",

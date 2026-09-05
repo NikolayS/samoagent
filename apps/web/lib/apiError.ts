@@ -66,7 +66,7 @@ export async function throwTyped(res: Response, fallbackCode: string): Promise<n
     // to `null` rather than throwing, so without this guard the next line threw
     // a raw TypeError and the caller never saw an AppApiError at all — which is
     // exactly the `err instanceof AppApiError && err.status === 401` redirect
-    // every page depends on (#294 review).
+    // every page depends on (#294 review, #300).
     const raw: unknown = await res.json();
     parsed = raw !== null && typeof raw === "object" ? (raw as ApiErrorBody) : {};
   } catch {
