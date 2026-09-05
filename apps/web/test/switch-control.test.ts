@@ -113,12 +113,40 @@ describe('.samograph-toggle input[role="switch"]', () => {
     expect(focus).toMatch(/outline-offset\s*:\s*2px/);
   });
 
-  it("draws a disabled switch as disabled, not merely dim", () => {
+  /**
+   * Review finding (NON-BLOCKING, PR #303). The system's disabled recipe is
+   * `opacity: .45` + a disabled fill + a hairline (DESIGN-MODEL §6), but the
+   * opacity half cannot apply to a switch: it composites the track back toward
+   * the page ground while the knob (which IS the page ground) does not move, so
+   * light-theme track-vs-knob falls from 5.0:1 to 1.9:1 (#b6b4ac on #f4f2ed)
+   * and a disabled switch no longer says whether it is on. The other three
+   * signals carry the state instead.
+   */
+  it("draws a disabled switch as disabled without dimming away its state", () => {
     const off = rule('.samograph-toggle:has(input[role="switch"]:disabled)');
     expect(off).toMatch(/cursor\s*:\s*not-allowed/);
+    expect(off).toMatch(/color\s*:\s*var\(--muted\)/);
     const control = rule('.samograph-toggle input[role="switch"]:disabled');
-    expect(control).toMatch(/opacity\s*:\s*0?\.45/);
     expect(control).toMatch(/cursor\s*:\s*not-allowed/);
+    expect(control).toMatch(/box-shadow\s*:\s*inset 0 0 0 var\(--border\) var\(--btn-disabled-border\)/);
+    // The load-bearing negative: no opacity anywhere on the control.
+    expect(control).not.toMatch(/opacity/);
+  });
+
+  /**
+   * Review finding (NON-BLOCKING, PR #303). Forced-colours modes replace author
+   * colours, so a track whose ON/OFF difference lives in `background` collapses
+   * to one flat box. The border and the system-colour knob survive.
+   */
+  it("keeps the two states apart in forced-colours mode", () => {
+    const forced = css.match(/@media\s*\(forced-colors:\s*active\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    expect(forced).toMatch(/border\s*:\s*var\(--border\) solid ButtonText/);
+    expect(forced).toMatch(/::before\s*\{[^}]*background\s*:\s*ButtonText/);
+    expect(forced).toMatch(/:checked\s*\{[^}]*background\s*:\s*Highlight/);
+    expect(forced).toMatch(/:disabled\s*\{[^}]*border-color\s*:\s*GrayText/);
+    // A border on a 40x24 track must not eat the track: there is no blanket
+    // `* { box-sizing: border-box }` in this stylesheet.
+    expect(rule('.samograph-toggle input[role="switch"]')).toMatch(/box-sizing\s*:\s*border-box/);
   });
 
   it("stops the knob animating under prefers-reduced-motion", () => {

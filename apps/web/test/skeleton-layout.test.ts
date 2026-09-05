@@ -72,9 +72,9 @@ describe(".samograph-skeleton", () => {
     expect(bar).toMatch(/animation\s*:\s*samograph-skeleton-shimmer var\(--skeleton-dur\)/);
   });
 
-  it("keeps the three original bars varying in width (greenroom guard)", () => {
-    expect(css).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }');
-    expect(css).toContain('.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }');
+  it("keeps the three original bars varying in width, scoped to their variants", () => {
+    expect(css).toContain('.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(3), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }');
+    expect(css).toContain('.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(4), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }');
   });
 
   /**
@@ -157,11 +157,20 @@ describe(".samograph-skeleton", () => {
 
 describe("no page states a bare loading sentence any more", () => {
   const components = join(import.meta.dir, "../components");
-  for (const file of ["SettingsPage.tsx", "Dashboard.tsx", "CalendarConnectionCard.tsx"]) {
-    it(`${file} renders a skeleton, not a sentence`, () => {
+  // Each surface names ITSELF in the announcement (PR #303 review): the status
+  // region fires before anything is on screen, so "Loading" alone leaves a
+  // screen-reader user without the page they just landed on.
+  const expectedLabel: Record<string, string> = {
+    "SettingsPage.tsx": 'label="Loading settings"',
+    "Dashboard.tsx": 'label="Loading calls"',
+    "CalendarConnectionCard.tsx": 'label="Loading calendar"',
+  };
+  for (const [file, label] of Object.entries(expectedLabel)) {
+    it(`${file} renders a skeleton that says what is loading`, () => {
       const source = readFileSync(join(components, file), "utf8");
       expect(source).not.toMatch(/Loading (your |Google |upcoming )/);
       expect(source).toContain("PageSkeleton");
+      expect(source).toContain(label);
     });
   }
 });

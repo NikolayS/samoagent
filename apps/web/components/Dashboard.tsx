@@ -167,7 +167,7 @@ export function Dashboard({ client, redirect, retryCallId }: DashboardProps) {
 
   if (status === "loading") {
     // Design PR 10: the list that is coming, not a sentence about it.
-    return <PageSkeleton variant="row" count={3} />;
+    return <PageSkeleton variant="row" count={3} label="Loading calls" />;
   }
 
   if (status === "redirecting") {

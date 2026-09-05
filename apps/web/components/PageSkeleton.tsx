@@ -24,6 +24,13 @@ export interface PageSkeletonProps {
    * other variants, whose shape is fixed by the page they stand in for.
    */
   count?: number;
+  /**
+   * What is loading, in the user's words — "Loading settings", "Loading calls".
+   * A screen-reader user hears this the moment the route starts fetching, and
+   * a bare "Loading" on four different routes tells them nothing about which
+   * one they landed on. The ellipsis is added for the visible text.
+   */
+  label?: string;
 }
 
 function bar(kind: Bar, key?: string | number) {
@@ -78,16 +85,16 @@ function group(children: ReactNode, key: number) {
  * with a visually-hidden "Loading…"; every bar is `aria-hidden`, so a screen
  * reader hears one announcement instead of counting grey boxes.
  */
-export function PageSkeleton({ variant = "page", count = 3 }: PageSkeletonProps) {
+export function PageSkeleton({ variant = "page", count = 3, label = "Loading" }: PageSkeletonProps) {
   const rows = Math.max(1, count);
   return (
     <div
       role="status"
       aria-busy="true"
-      aria-label="Loading"
+      aria-label={label}
       className={`samograph-skeleton samograph-skeleton--${variant}`}
     >
-      <span className="samograph-visually-hidden">Loading…</span>
+      <span className="samograph-visually-hidden">{label}…</span>
       {variant === "panel" ? (
         <>
           {header()}

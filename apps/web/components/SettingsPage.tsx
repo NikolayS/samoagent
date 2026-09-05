@@ -192,7 +192,7 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
     // In-call, Account — Integrations arrives on a later probe).
     return (
       <div className="samograph-settings">
-        <PageSkeleton variant="panel" />
+        <PageSkeleton variant="panel" label="Loading settings" />
       </div>
     );
   }

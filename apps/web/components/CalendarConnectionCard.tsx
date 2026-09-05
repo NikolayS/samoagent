@@ -94,7 +94,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
       const copy = connectError ?? message;
       return <Alert tone={failure ? "danger" : "success"}>{copy}</Alert>;
     })() : null}
-    {!status ? <PageSkeleton variant="page" /> : status.state === "not_connected" ? <>
+    {!status ? <PageSkeleton variant="page" label="Loading calendar" /> : status.state === "not_connected" ? <>
       <p>Show upcoming meetings from your calendar.</p>
       <div className="samograph-actions">
         <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>

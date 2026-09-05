@@ -516,9 +516,11 @@ describe("Dashboard — first-run empty & loading states (Sprint-3 polish)", () 
     // Design PR 10: the announcement is unchanged in kind, but the pixels are
     // now the list that is coming (title + three call rows) rather than a
     // one-line sentence that the arriving list shoves down the page.
-    const status = getByRole("status", { name: "Loading" });
+    // The announcement names the page, not just the act (PR #303 review): a
+    // bare "Loading" on four routes tells a screen-reader user nothing.
+    const status = getByRole("status", { name: "Loading calls" });
     expect(status.getAttribute("aria-busy")).toBe("true");
-    expect(status.textContent).toBe("Loading…");
+    expect(status.textContent).toBe("Loading calls…");
     expect(status.className).toBe("samograph-skeleton samograph-skeleton--row");
     expect(status.querySelectorAll(".samograph-skeleton-bar--row").length).toBe(3);
   });

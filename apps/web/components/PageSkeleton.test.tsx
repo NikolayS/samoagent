@@ -109,6 +109,18 @@ describe("PageSkeleton", () => {
     expect(loading.textContent).toBe("Loading…");
   });
 
+  /**
+   * Review finding (NON-BLOCKING, PR #303). `role="status"` fires the moment
+   * the route starts fetching; "Loading" alone leaves a screen-reader user
+   * without the one thing they need — which page they just landed on.
+   */
+  it("announces what is loading, not just that something is", () => {
+    const { getByRole } = render(<PageSkeleton variant="panel" label="Loading settings" />);
+    const loading = getByRole("status", { name: "Loading settings" });
+    expect(loading.textContent).toBe("Loading settings…");
+    expect(loading.querySelector(".samograph-visually-hidden")?.textContent).toBe("Loading settings…");
+  });
+
   it("replaces literal paragraph Suspense fallbacks on app pages", () => {
     const app = join(import.meta.dir, "../app");
     for (const file of ["auth/page.tsx", "auth/callback/page.tsx", "dashboard/page.tsx", "calls/[id]/page.tsx"]) {

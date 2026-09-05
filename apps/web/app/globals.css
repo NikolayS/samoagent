@@ -1242,15 +1242,20 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   /* Overrides the 0.2rem nudge that aligns a small square box with the first
      line of the label — a 24px track next to a ~22px line needs none. */
   margin-top: 0;
+  /* The forced-colours block below gives the track a real border; without this
+     the border would come out of the 40x24 box (there is no blanket
+     `* { box-sizing }` in this sheet). */
+  box-sizing: border-box;
   width: var(--switch-w);
   height: var(--switch-h);
   border: 0;
   border-radius: var(--radius-pill);
   /* DEVIATION from DESIGN-MODEL §4, which names `--line-strong`: the OFF track
      and the knob are a state indicator (WCAG 2.2 SC 1.4.11, 3:1). `--ground`
-     on `--line-strong` is 1.2:1 in dark mode — the knob disappears. `--muted`
-     is the same neutral one step further from the ground and clears 5:1 in
-     both themes with a single declaration. */
+     on `--line-strong` is 1.9:1 in dark mode (#111110 on #45433d) — the knob
+     disappears. `--muted` is the same neutral one step further from the ground
+     and measures 5.0:1 light (#f4f2ed on #6b675c) and 5.6:1 dark (#111110 on
+     #918c80) with a single declaration. */
   background: var(--muted);
   cursor: pointer;
   transition: background var(--dur-base) var(--ease);
@@ -1273,10 +1278,38 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-toggle input[role="switch"]:checked { background: var(--ink); }
 .samograph-toggle input[role="switch"]:checked::before { transform: translateX(var(--switch-travel)); }
 .samograph-toggle input[role="switch"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-/* Disabled is a designed state, not a dimmer (DESIGN-MODEL §6): the cursor is
-   on the label too, because the label is the target. */
-.samograph-toggle input[role="switch"]:disabled { opacity: 0.45; cursor: not-allowed; }
-.samograph-toggle:has(input[role="switch"]:disabled) { cursor: not-allowed; }
+/* Disabled, WITHOUT the `opacity: .45` the rest of the system uses. Opacity
+   composites the track back toward the page ground: measured light-theme, the
+   OFF track goes #6b675c -> #b6b4ac against an unchanged #f4f2ed knob, i.e.
+   5.0:1 -> 1.9:1, and a disabled switch stops saying whether it is on. Since
+   the whole point of the control is that its two states are legible, the
+   colours keep their contrast and "you cannot change this" is carried by the
+   three other signals: the cursor, a hairline ring on the track, and the label
+   text stepping down to `--muted`. */
+.samograph-toggle input[role="switch"]:disabled {
+  cursor: not-allowed;
+  box-shadow: inset 0 0 0 var(--border) var(--btn-disabled-border);
+}
+.samograph-toggle:has(input[role="switch"]:disabled) {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+/* Forced-colours modes (Windows high contrast) replace author colours
+   wholesale, so a track whose state lives in `background` reads as one flat box
+   in both states. Give it a real border and paint the knob and the ON track in
+   system colours, which those modes keep. */
+@media (forced-colors: active) {
+  .samograph-toggle input[role="switch"] {
+    border: var(--border) solid ButtonText;
+    background: ButtonFace;
+  }
+  .samograph-toggle input[role="switch"]::before { background: ButtonText; }
+  .samograph-toggle input[role="switch"]:checked { background: Highlight; }
+  .samograph-toggle input[role="switch"]:checked::before { background: HighlightText; }
+  .samograph-toggle input[role="switch"]:disabled { border-color: GrayText; }
+  .samograph-toggle input[role="switch"]:disabled::before { background: GrayText; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .samograph-toggle input[role="switch"],
@@ -1845,11 +1878,17 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   animation: samograph-skeleton-shimmer var(--skeleton-dur) ease-in-out infinite alternate;
 }
 
-/* `--form` and `--page` are three anonymous lines; varying their widths is what
-   keeps them from reading as a table. The shaped variants get their variety
-   from real heights instead, and take their widths back below. */
-.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }
-.samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }
+/* `--form` and `--page` are three anonymous lines; the 70%/85% taper is what
+   keeps them from reading as a table. Scoped to those two variants ON PURPOSE:
+   the selector is (0,3,1) — two classes, the attribute, `:nth-of-type` AND the
+   `span` type — so written against the base class it out-specifies every
+   three-class modifier below and lands on whatever the shaped variants happen
+   to have in span slots 3 and 4. In `--row` that was the 245px upcoming slab
+   (rendered at 70%) and the first 30% section heading (rendered at 85%).
+   `apps/web/test/skeleton-width.test.tsx` replays the cascade and fails if this
+   ever loses its scope again. */
+.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(3), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }
+.samograph-skeleton--form > span[aria-hidden="true"]:nth-of-type(4), .samograph-skeleton--page > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }
 
 /* The named bars. Three classes deep (0,3,0) on purpose: both the base bar rule
    and the `:nth-of-type` widths above out-specify a lone modifier class, so a
