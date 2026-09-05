@@ -135,3 +135,26 @@ describe("PR13.2 — one type system", () => {
     expect(body(".samograph-brand")).toMatch(/font-size\s*:\s*var\(--text-md\)/);
   });
 });
+
+/**
+ * NB1 from the #301 review — the hero's secondary action is a touch TARGET, and
+ * a target has two axes.
+ *
+ * `.samograph-hero-secondary` carried `min-height: 44px` only. Its label is the
+ * six-character word "github", so the measured box at both 390 and 1024 was
+ * 35.7 x 44 (mono: 43.2 x 44) — short of the 44x44 DESIGN-MODEL §5 "Touch
+ * targets >= 44px" requires, and it sits immediately beside the primary CTA,
+ * where a mis-tap sends the visitor to the wrong destination.
+ */
+describe("PR13.3 — the hero secondary link is a 44x44 target", () => {
+  const secondary = body(".samograph-hero-secondary");
+
+  it("floors BOTH axes at 44px, not just the height", () => {
+    expect(secondary).toMatch(/min-height\s*:\s*44px/);
+    expect(secondary).toMatch(/min-width\s*:\s*44px/);
+  });
+
+  it("centres the label inside the widened box", () => {
+    expect(secondary).toMatch(/justify-content\s*:\s*center/);
+  });
+});

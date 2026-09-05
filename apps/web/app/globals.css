@@ -281,7 +281,13 @@
 .samograph-landing-hero h1 { max-width: 900px; font-size: 2.65rem; line-height: 1.14; font-weight: 700; letter-spacing: -.02em; }
 .samograph-landing-hero > p { color: var(--ink-soft); font-size: var(--text-base); }
 .samograph-hero-actions { display: flex; align-items: center; gap: 20px; }
-.samograph-hero-secondary { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted) !important; font-size: var(--text-xs); }
+/* The hero's secondary action is a 6-character word ("github"), so a bare
+   `min-height` left it a 44 x 36 target — tall enough, too narrow, and it sits
+   beside the primary CTA where a mis-tap goes to the wrong action. DESIGN-MODEL
+   §5 "Touch targets >= 44px" is a target, not a height: it needs both axes.
+   `min-width` + `justify-content: center` grows the hit area around the label
+   without moving the text off the CTA's baseline. */
+.samograph-hero-secondary { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: var(--muted) !important; font-size: var(--text-xs); }
 /* No `min-width` here: every `.samograph-instrument` in the app is also
    `.samograph-percall`, whose (0,2,0) rule sets `min-width: 0`, so the
    `min(780px, 100%)` this used to carry never applied to anything (#290
