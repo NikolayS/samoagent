@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { Dashboard } from "./Dashboard.tsx";
 import { UpcomingMeetings } from "./UpcomingMeetings.tsx";
 import { createFakeAppApiClient } from "../lib/fakeAppApiClient.ts";
@@ -50,14 +50,29 @@ describe("Dashboard upcoming meetings", () => {
     const view = render(<UpcomingMeetings client={first} onAuthFailure={() => {}} />);
 
     fireEvent.click(await view.findByRole("button", { name: "Skip auto-record for Planning" }));
-    view.rerender(<UpcomingMeetings client={refreshed} onAuthFailure={() => {}} />);
-    await view.findByRole("button", { name: "Undo skip auto-record for Planning" });
-    view.rerender(<UpcomingMeetings client={stale} onAuthFailure={() => {}} />);
-    await waitFor(() => expect(stale.requests.some((request) => request.path === "/calendar/meetings?limit=20")).toBe(true));
-    await Promise.resolve();
-    resolveUpdate({ id: meeting.id, excluded: true });
+    // Every wait below is an explicit FLUSH, never a poll (#293 CI flake): the
+    // old shape asked `waitFor`/`findBy` to discover state that is already
+    // committed, so on a loaded CI box it sat on the 1s default and failed at
+    // 1006ms. `act(async () => {})` drains the microtask queue and React's work
+    // loop, after which the assertion is synchronous — it now fails INSTANTLY
+    // and loudly if the optimistic toggle regresses, instead of after a second.
+    expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
 
-    await waitFor(() => expect(view.getByRole("button").getAttribute("aria-busy")).toBe("false"));
+    view.rerender(<UpcomingMeetings client={refreshed} onAuthFailure={() => {}} />);
+    await act(async () => {});
+    expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+
+    view.rerender(<UpcomingMeetings client={stale} onAuthFailure={() => {}} />);
+    await act(async () => {});
+    expect(stale.requests.some((request) => request.path === "/calendar/meetings?limit=20")).toBe(true);
+    // The stale snapshot says "not excluded"; the in-flight toggle must win.
+    expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
+    expect(view.getByRole("button").getAttribute("aria-busy")).toBe("true");
+
+    await act(async () => {
+      resolveUpdate({ id: meeting.id, excluded: true });
+    });
+    expect(view.getByRole("button").getAttribute("aria-busy")).toBe("false");
     expect(view.getByRole("button", { name: "Undo skip auto-record for Planning" })).toBeDefined();
   });
   it("shows one primary Connect CTA in the available-calendar empty state", async () => {

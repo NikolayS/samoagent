@@ -563,6 +563,27 @@ describe("Dashboard — Story-4 retry call pre-fill (SPEC §5.2, Story 4)", () =
     });
   });
 
+  it("re-fills when the selected retry call changes, instead of trusting mount order", async () => {
+    // The prefill reaches an UNCONTROLLED `defaultValue`, which React reads only
+    // at mount. Today it happens to be right because the loading gate keeps
+    // `AddToCallForm` unmounted until `calls` has arrived — a load-order
+    // accident, not a stated contract (#294 review). `key={retryUrl}` states it:
+    // a different resolved URL is a different form instance. This test changes
+    // the resolved URL on an ALREADY-MOUNTED dashboard, which is exactly what a
+    // removed gate would produce, and it fails without the key.
+    const other = "https://meet.google.com/qpd-zbkg-jfo";
+    const client = createFakeAppApiClient({
+      seedCalls: [RETRY_CALL, { id: "c2", meetingUrl: other, provider: "google_meet", status: "COULD_NOT_JOIN" }],
+    });
+    const view = render(<Dashboard client={client} redirect={noopRedirect} retryCallId="c1" />);
+    const input = (await view.findByLabelText("Meeting link")) as HTMLInputElement;
+    expect(input.value).toBe(URL);
+
+    view.rerender(<Dashboard client={client} redirect={noopRedirect} retryCallId="c2" />);
+    const refilled = (await view.findByLabelText("Meeting link")) as HTMLInputElement;
+    expect(refilled.value).toBe(other);
+  });
+
   it("leaves the input blank when no retryCallId is given", async () => {
     const client = createFakeAppApiClient({ seedCalls: [RETRY_CALL] });
     const { findByLabelText } = render(

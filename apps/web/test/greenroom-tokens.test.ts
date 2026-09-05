@@ -192,7 +192,13 @@ describe("Refined design tokens — globals.css contract (issue #241)", () => {
     const LIGHT = {
       ground: "#f4f2ed", surface: "#faf9f6", ink: "#14130f",
       "ink-soft": "#3a382f", muted: "#6b675c", faint: "#9c978a",
-      line: "#dfdbd1", "line-strong": "#b9b4a6",
+      // Deviation from the mockup, recorded: the mockup's `#dfdbd1` hairline
+      // measures 1.24:1 on `--ground` / 1.31:1 on `--surface` — invisible. The
+      // value below is the smallest lift clearing 1.5:1 on both (1.51 / 1.60)
+      // that keeps the mockup's warm r+4/g/b-10 cast and stays under
+      // `--line-strong`. See `button-states.test.ts` "hairlines are visible in
+      // both themes".
+      line: "#cbc7bd", "line-strong": "#b9b4a6",
     };
     const DARK = {
       ground: "#111110", surface: "#191918", ink: "#edeae2",

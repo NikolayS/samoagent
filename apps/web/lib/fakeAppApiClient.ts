@@ -315,8 +315,12 @@ export class FakeAppApiClient implements AppApiClient {
     const call = this.calls.find((c) => c.id === callId);
     if (call) return { ...call };
     // Owner reads deliberately hide unknown and cross-tenant calls behind the
-    // same bodyless 404, matching app-api's RLS-backed no-existence-leak path.
-    throw new AppApiError("SAMO-AUTHZ-001", "Request failed.", false, 404);
+    // SAME bodyless 403 — `denied()` in `apps/app-api/calls/http.ts`, the single
+    // response the tenancy gate renders when its RLS-scoped read finds no row.
+    // (404 belongs to the share route, for a call with no live token.) The fake
+    // said 404 here, so every component tested against it was exercised on a
+    // status production never sends for this route (#294 review).
+    throw new AppApiError("SAMO-AUTHZ-001", "Request failed.", false, 403);
   }
 
   async deleteAccount(): Promise<void> {

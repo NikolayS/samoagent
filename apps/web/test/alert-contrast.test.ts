@@ -87,6 +87,25 @@ describe("dark theme paths", () => {
     expect(mediaDark).toEqual(block(':root[data-theme="dark"]')));
 });
 
+/**
+ * Hairlines are not text, so 4.5:1 does not apply — but a 1px rule that does not
+ * reach ~1.5:1 against the surface it divides is invisible, which is what #293
+ * fixed in dark and this guard extends to light (`--line` was `#dfdbd1`, 1.24:1
+ * on `--ground`). Measured with the same math as the alerts above.
+ */
+const HAIRLINE_MIN = 1.5;
+
+describe("hairline visibility", () => {
+  for (const theme of ["light", "dark"] as const) {
+    for (const against of ["--ground", "--surface"] as const) {
+      it(`--line clears ${HAIRLINE_MIN}:1 against ${against} in ${theme} mode`, () => {
+        const value = contrast(color("var(--line)", themes[theme]), color(`var(${against})`, themes[theme]));
+        expect(Number(value.toFixed(2))).toBeGreaterThanOrEqual(HAIRLINE_MIN);
+      });
+    }
+  }
+});
+
 describe("alert contrast", () => {
   it("styles at least the four alert variants", () =>
     expect(variants.map((v) => v.name).sort()).toEqual(["error", "info", "success", "warn"]));

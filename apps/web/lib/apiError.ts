@@ -60,7 +60,15 @@ interface ApiErrorBody {
 export async function throwTyped(res: Response, fallbackCode: string): Promise<never> {
   let parsed: ApiErrorBody = {};
   try {
-    parsed = (await res.json()) as ApiErrorBody;
+    // A BODYLESS error response is the app-api norm, not an edge case: every
+    // 401 (`unauthenticated()`) and every tenancy-gate 403 (`denied()`) is
+    // `new Response(null, { status })`. Bun resolves `.json()` on an empty body
+    // to `null` rather than throwing, so without this guard the next line threw
+    // a raw TypeError and the caller never saw an AppApiError at all — which is
+    // exactly the `err instanceof AppApiError && err.status === 401` redirect
+    // every page depends on (#294 review).
+    const raw: unknown = await res.json();
+    parsed = raw !== null && typeof raw === "object" ? (raw as ApiErrorBody) : {};
   } catch {
     parsed = {};
   }
