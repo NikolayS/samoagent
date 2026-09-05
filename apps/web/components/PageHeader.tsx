@@ -32,8 +32,10 @@ export interface PageHeaderProps {
  * a bare `<PageHeader title="Settings" />` emits one `<h1>` and nothing else —
  * no empty boxes contributing grid gap.
  *
- * The `<header>` is labelled by its own title, so it is a *named* landmark in a
- * screen reader's landmark list rather than an anonymous "banner".
+ * The `<header>` is labelled by its own title. Inside `<main>` this element is
+ * generic, not a `banner` landmark, so the label is not a landmark name — it is
+ * an accessible name on the group, which is what lets a screen reader announce
+ * which page header it has entered when more than one region is on the page.
  */
 export function PageHeader({
   title,

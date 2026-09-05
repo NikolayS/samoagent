@@ -73,7 +73,7 @@ describe("PageHeader", () => {
     );
   });
 
-  it("labels the header with the title so it is a named landmark", () => {
+  it("gives the header an accessible name from its own title", () => {
     const { container } = render(<PageHeader title="Settings" />);
     const header = container.querySelector("header");
     const titleId = container.querySelector("h1")?.id;

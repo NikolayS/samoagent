@@ -627,6 +627,16 @@ button:hover {
   border-top: 0;
 }
 
+/* …and through a wrapper. On /settings the first section is the first child of
+   the <form> that follows the header, not a sibling of it, so the adjacent
+   rules above never matched and the page opened with a divider under its H1
+   (#295 review). At (0,3,0) this also outranks `.samograph-settings-section`'s
+   own heavier `border-top`, which is the declaration that drew that line. */
+.samograph-page-header + * > .samograph-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
 /* Title (+ optional description) of a section: the pair is one group, so it
    takes the tight `--space-1` gap and the group is what carries the space down
    to the section's content. */
@@ -1185,14 +1195,15 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   list-style: none;
 }
 
+/* A row's rule belongs to its TOP edge only. The last row used to close the
+   list with a `border-bottom` as well, which put a second hairline `--space-6`
+   above the next section's own `border-top` — two lines with a band of nothing
+   between them, and a doubled rule against the danger zone's 2px `--crit` edge
+   (#295 review). One rule between two things, always (DESIGN-MODEL §4,
+   "Hairlines, not boxes"): the section that follows draws it. */
 .samograph-call-item,
 .samograph-meeting-item {
   border-top: 1px solid var(--line);
-}
-
-.samograph-call-item:last-child,
-.samograph-meeting-item:last-child {
-  border-bottom: 1px solid var(--line);
 }
 
 .samograph-call-row,

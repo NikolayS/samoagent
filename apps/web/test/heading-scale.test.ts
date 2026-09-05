@@ -164,6 +164,30 @@ describe(".samograph-section — section rhythm (DESIGN-MODEL §4, §5)", () => 
     expect(first).toContain("padding-top: 0");
   });
 
+  it("suppresses that first rule through a wrapper too (Settings' <form>)", () => {
+    // On /settings the first section is not a SIBLING of the page header — it
+    // is the first child of the <form> that follows it — so the adjacent
+    // sibling rule above never matched and Settings opened with a divider
+    // immediately under its H1 (#295 review). The wrapper form of the rule is
+    // (0,3,0), so it also outranks `.samograph-settings-section`'s own
+    // `border-top`, which is what actually drew that line.
+    const wrapped = rule(".samograph-page-header + * > .samograph-section:first-child");
+    expect(wrapped).toContain("border-top: 0");
+    expect(wrapped).toContain("padding-top: 0");
+  });
+
+  it("draws exactly ONE hairline between two adjacent sections", () => {
+    // A list row's `border-top` separates rows; the LAST row also having a
+    // `border-bottom` put a second hairline 24px above the next section's own
+    // `border-top` (and above `.samograph-danger-zone`'s 2px --crit rule) —
+    // two lines where the design model has one (#295 review, DESIGN-MODEL §4
+    // "Hairlines, not boxes").
+    expect(rule(".samograph-call-item")).toContain("border-top: 1px solid var(--line)");
+    expect(rule(".samograph-call-item:last-child")).toBe("");
+    expect(rule(".samograph-meeting-item:last-child")).toBe("");
+    expect(css).not.toMatch(/\.samograph-(?:call|meeting)-item:last-child[^{]*\{[^}]*border-bottom/);
+  });
+
   it("groups a section title with its description on the tighter gap", () => {
     const header = rule(".samograph-section-header");
     expect(header).toContain("gap: var(--space-1)");
