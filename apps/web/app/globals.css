@@ -605,8 +605,9 @@ textarea { resize: vertical; font-family: var(--font-mono); }
    sentence around it, so they keep their layout and grow an invisible
    pseudo-element hit area instead. */
 @media (pointer: coarse), (max-width: 767.98px) {
-  /* `.samograph-btn` sets a fixed `height`, which beats a bare `min-height`;
-     release it to `auto` so the minimum can win. */
+  /* `min-height` clamps a fixed `height`, so the 44px floor holds on its own;
+     `height: auto` is what stops a label that wraps to two lines on a narrow
+     screen from overflowing a box pinned to one line of text. */
   .samograph-btn,
   .samograph-btn--sm {
     height: auto;
@@ -622,8 +623,9 @@ textarea { resize: vertical; font-family: var(--font-mono); }
     min-height: var(--tap-min);
   }
 
+  /* The label is the target, not the 13px checkbox inside it. Alignment stays
+     as designed (`flex-start`) — only the floor is added. */
   .samograph-toggle {
-    align-items: center;
     min-height: var(--tap-min);
   }
 

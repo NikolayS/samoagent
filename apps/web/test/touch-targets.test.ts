@@ -102,8 +102,9 @@ describe("touch targets — 44px on a coarse pointer", () => {
   });
 
   it("lifts every button variant to the tap minimum", () => {
-    // `.samograph-btn` sets `height: 36px` and `--sm` 28px; a bare `min-height`
-    // would lose to the fixed height, so `height: auto` must come with it.
+    // The buttons carry a fixed `height` (`--control-h` / `--control-h-sm`).
+    // `min-height` clamps it, so the floor holds; `height: auto` is what keeps
+    // a label that wraps to two lines at 390px inside its box.
     const btn = normalize(block.match(/\.samograph-btn[^{}]*\{([^}]*)\}/)?.[1] ?? "");
     expect(btn).toMatch(/min-height\s*:\s*var\(--tap-min\)/);
     expect(btn).toMatch(/height\s*:\s*auto/);
