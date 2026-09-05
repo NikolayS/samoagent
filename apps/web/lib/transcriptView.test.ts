@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import {
   formatTranscriptTimestamp,
+  splitTranscriptTimestamp,
   formatRenderLine,
   initialTranscriptState,
   transcriptReducer,
@@ -232,5 +233,20 @@ describe("transcriptReducer — chat lines carry kind end-to-end (#195)", () => 
     ]);
     expect(next.lines).toEqual([{ seq: 2, ts: TS, speaker: "Bob", text: "spoke" }]);
     expect("kind" in next.lines[0]).toBe(false);
+  });
+});
+
+describe("splitTranscriptTimestamp", () => {
+  it("splits a canonical timestamp into a date part (with its space) and a clock part", () => {
+    expect(splitTranscriptTimestamp("2026-08-27 18:08:28")).toEqual({
+      date: "2026-08-27 ",
+      clock: "18:08:28",
+    });
+  });
+
+  it("returns null for anything that is not canonical", () => {
+    expect(splitTranscriptTimestamp("2026-08-27T18:08:28.000Z")).toBeNull();
+    expect(splitTranscriptTimestamp("")).toBeNull();
+    expect(splitTranscriptTimestamp("later")).toBeNull();
   });
 });

@@ -280,6 +280,9 @@ export class FakeAppApiClient implements AppApiClient {
       meetingUrl: validation.url,
       provider: validation.provider,
       status: "PENDING",
+      // The server stamps `created_at` on insert; the fake mirrors it so a
+      // freshly-created row renders its relative time like a real one.
+      createdAt: new Date().toISOString(),
     };
     this.calls.unshift(call);
     return call;

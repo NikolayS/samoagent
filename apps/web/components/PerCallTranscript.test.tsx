@@ -142,6 +142,18 @@ describe("PerCallTranscript — live read-along (SPEC §2, §5.2, §5.4, §5.5, 
     expect(row?.querySelector(".samograph-line-utterance")?.textContent).toBe("columns");
   });
 
+  it("splits the timestamp into a droppable date part and a clock part", () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ ts: "2026-08-27T18:08:28.000Z", speaker: "Bob" })));
+    const time = container.querySelector(".samograph-line-time");
+    expect(time?.querySelector(".samograph-line-date")?.textContent).toBe("2026-08-27 ");
+    expect(time?.querySelector(".samograph-line-clock")?.textContent).toBe("18:08:28");
+    expect(time?.textContent).toBe("2026-08-27 18:08:28");
+  });
+
   it("renders an ISO wire timestamp in canonical UTC form", () => {
     const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
     const { container, getByText } = render(
