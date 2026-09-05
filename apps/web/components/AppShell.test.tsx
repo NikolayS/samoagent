@@ -126,14 +126,21 @@ describe("AppShell", () => {
     expect(document.activeElement).toBe(toggle);
   });
 
-  it("gives the public shell the same disclosure over its theme control", () => {
+  it("shows the public shell's theme control inline, with no disclosure", () => {
+    // The public variant renders no links, no account line and no Log out —
+    // so the disclosure would have disclosed a single theme switcher. A
+    // hamburger over one control is a menu that is not a menu (mobile audit
+    // M8, from the #284 review).
     const client = createFakeAppApiClient();
-    const { getByRole } = render(
+    const { getByRole, queryByRole } = render(
       <AppShell client={client} redirect={redirect} variant="public"><span>Public</span></AppShell>,
     );
-    const toggle = getByRole("button", { name: "Menu" });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    const menu = document.getElementById("app-nav-menu")!;
-    expect(menu.contains(getByRole("group", { name: "Theme" }))).toBe(true);
+    expect(queryByRole("button", { name: "Menu" })).toBeNull();
+    expect(document.getElementById("app-nav-menu")).toBeNull();
+    const theme = getByRole("group", { name: "Theme" });
+    const bar = document.querySelector(".samograph-app-nav-inner")!;
+    expect(bar.contains(theme)).toBe(true);
+    // Inline in the bar itself, not nested in a collapsible panel.
+    expect(theme.closest(".samograph-app-nav-right")!.parentElement).toBe(bar);
   });
 });
