@@ -60,7 +60,10 @@ interface ApiErrorBody {
 export async function throwTyped(res: Response, fallbackCode: string): Promise<never> {
   let parsed: ApiErrorBody = {};
   try {
-    parsed = (await res.json()) as ApiErrorBody;
+    // A BODYLESS response (app-api's 401/403 carry no body) parses to `null`
+    // under Bun rather than throwing — coalesce it, or every field read below
+    // would throw a TypeError instead of the typed AppApiError (#300).
+    parsed = ((await res.json()) ?? {}) as ApiErrorBody;
   } catch {
     parsed = {};
   }
