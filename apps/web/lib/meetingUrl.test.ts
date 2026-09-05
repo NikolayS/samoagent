@@ -78,3 +78,48 @@ describe("displayMeetingUrl", () => {
     expect(displayMeetingUrl("")).toBe("");
   });
 });
+
+/**
+ * #283 re-review NB1: three real join-link shapes fell through to the bare host
+ * ("zoom.us", "meet.google.com") instead of naming the room — Zoom's `/w/`
+ * webinar links, Zoom personal-meeting vanity links (`/my/<vanity>`), and Google
+ * Meet codes pasted in upper case (calendar invites and email clients do this).
+ */
+describe("meetingTitle — join-link shapes that used to fall back to the host", () => {
+  it("names a Zoom webinar link by its id", () => {
+    expect(meetingTitle("https://zoom.us/w/75208520803")).toBe("Zoom · 752 0852 0803");
+    expect(meetingTitle("https://us02web.zoom.us/w/1234567890?pwd=secret")).toBe(
+      "Zoom · 123 456 7890",
+    );
+  });
+
+  it("names a Zoom personal-meeting room by its vanity id", () => {
+    expect(meetingTitle("https://zoom.us/my/nikolay")).toBe("Zoom · nikolay");
+    expect(meetingTitle("https://us04web.zoom.us/my/samo.team?pwd=secret")).toBe(
+      "Zoom · samo.team",
+    );
+  });
+
+  it("names an upper-case Google Meet code, normalised to lower case", () => {
+    expect(meetingTitle("https://meet.google.com/QPD-ZBKG-JFO")).toBe(
+      "Google Meet · qpd-zbkg-jfo",
+    );
+    expect(meetingTitle("MEET.GOOGLE.COM/Qpd-Zbkg-Jfo")).toBe("Google Meet · qpd-zbkg-jfo");
+  });
+
+  it("still refuses to name a link whose path is not a room id", () => {
+    expect(meetingTitle("https://zoom.us/wc/join/75208520803")).toBe("zoom.us");
+    expect(meetingTitle("https://zoom.us/my/")).toBe("zoom.us");
+    expect(meetingTitle("https://meet.google.com/lookup/abcdefg")).toBe("meet.google.com");
+  });
+
+  it("still never echoes the password from any of these shapes", () => {
+    for (const url of [
+      "https://us02web.zoom.us/w/1234567890?pwd=GmbJ6pA9rUojNjPj7iNnLAvbpcF2uU.1",
+      "https://us04web.zoom.us/my/samo.team?pwd=GmbJ6pA9rUojNjPj7iNnLAvbpcF2uU.1",
+    ]) {
+      expect(meetingTitle(url)).not.toContain("GmbJ6pA9rUojNjPj7iNnLAvbpcF2uU.1");
+      expect(displayMeetingUrl(url)).not.toContain("GmbJ6pA9rUojNjPj7iNnLAvbpcF2uU.1");
+    }
+  });
+});

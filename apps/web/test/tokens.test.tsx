@@ -65,9 +65,13 @@ describe("Slice 1 reset and shell CSS", () => {
     });
   }
 
+  // PLAN.md PR 4 / DESIGN-MODEL §5: `<main>` keeps the shared page container
+  // (`--page-max`, itself `--width-app`) so it aligns with the nav; the form
+  // width moved off the page and onto the content column as `--content-max`.
   it("defines app and form page widths", () => {
-    expect(rule(/\.samograph-page(?![-\w])/)).toMatch(/max-width\s*:\s*var\(--width-app\)/);
-    expect(rule(/\.samograph-page--form(?![-\w])/)).toMatch(/max-width\s*:\s*var\(--width-form\)/);
+    expect(rule(/\.samograph-page(?![-\w])/)).toMatch(/max-width\s*:\s*var\(--page-max\)/);
+    expect(normalize(declaration(root, "--page-max") ?? "")).toBe("var(--width-app)");
+    expect(rule(/\.samograph-page--form(?![-\w])/)).toMatch(/--content-max\s*:\s*var\(--width-form\)/);
   });
   it("reduces the gutter under 40rem", () =>
     expect(clean).toMatch(/@media\s*\(max-width:\s*40rem\)\s*\{[\s\S]*?:root\s*\{[^}]*--gutter\s*:\s*var\(--space-5\)/));

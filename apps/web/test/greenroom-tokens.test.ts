@@ -386,9 +386,12 @@ describe("Slice 5 — Settings section rules and save bar", () => {
     });
   }
 
-  it("gives the settings route a --width-prose page so the section blocks can breathe", () => {
+  // PLAN.md PR 4: the reading width still comes from `--width-prose`, but it
+  // now caps the CONTENT column (`--content-max`) rather than `<main>`, which
+  // stays on the shared page container so it aligns with the nav.
+  it("gives the settings route a --width-prose content column so the section blocks can breathe", () => {
     const rule = flatBlockBody("\\.samograph-page--prose");
-    expect(rule).toContain("max-width: var(--width-prose);");
+    expect(rule).toContain("--content-max: var(--width-prose);");
     const route = readFileSync(join(import.meta.dir, "..", "app", "settings", "page.tsx"), "utf8");
     expect(route).toContain('pageClassName="samograph-page--prose"');
     expect(route).not.toContain('pageClassName="samograph-page--form"');

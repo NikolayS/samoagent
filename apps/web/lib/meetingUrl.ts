@@ -52,13 +52,20 @@ export function meetingTitle(url: string): string {
   const host = parsed.hostname.toLowerCase();
 
   if (host === "meet.google.com") {
-    const code = /^\/([a-z]{3}-[a-z]{4}-[a-z]{3})$/.exec(parsed.pathname)?.[1];
+    // Calendar invites and mail clients often paste the code upper-cased; the
+    // room it names is the same room, so normalise rather than fall back.
+    const path = parsed.pathname.toLowerCase();
+    const code = /^\/([a-z]{3}-[a-z]{4}-[a-z]{3})$/.exec(path)?.[1];
     if (code) return `Google Meet · ${code}`;
   }
 
   if (host === "zoom.us" || host.endsWith(".zoom.us")) {
-    const id = /^\/(?:j|s)\/(\d{9,11})$/.exec(parsed.pathname)?.[1];
+    // `/j/` join, `/s/` start, `/w/` webinar — all three carry the numeric id.
+    const id = /^\/(?:j|s|w)\/(\d{9,11})$/.exec(parsed.pathname)?.[1];
     if (id) return `Zoom · ${groupZoomId(id)}`;
+    // A personal meeting room is named by its vanity id instead of a number.
+    const vanity = /^\/my\/([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(parsed.pathname)?.[1];
+    if (vanity) return `Zoom · ${vanity}`;
   }
 
   return host;

@@ -86,6 +86,23 @@ describe("Settings Calendar connection", () => {
     expect(document.activeElement).not.toBe(document.body);
   });
 
+  // AUDIT-2026-09-04 §4 / PLAN.md PR 3: the pair used to be two stretched grid
+  // items of `.samograph-signin` (656px wide, stacked). They belong to ONE
+  // action row.
+  it("puts the Reconnect/Disconnect pair in a single action row", async () => {
+    const client = createFakeAppApiClient({
+      seedCalendarStatus: { provider: "google", state: "broken", connectedAt: "2026-08-20T18:30:00Z", lastSyncAt: null, lastSyncErrorAt: "2026-08-20T18:35:00Z" },
+    });
+    const view = render(<CalendarConnectionCard client={client} onAuthFailure={() => {}} />);
+
+    const reconnect = await view.findByRole("button", { name: "Reconnect" });
+    const disconnect = view.getByRole("button", { name: "Disconnect" });
+    expect(reconnect.parentElement?.className).toBe("samograph-actions");
+    expect(disconnect.parentElement).toBe(reconnect.parentElement);
+    expect(view.container.querySelector(".samograph-signin")).toBeNull();
+    view.unmount();
+  });
+
   it("clears a failed reconnect error when disconnect succeeds", async () => {
     const client = createFakeAppApiClient({
       seedCalendarStatus: { provider: "google", state: "broken", connectedAt: "2026-08-20T18:30:00Z", lastSyncAt: null, lastSyncErrorAt: "2026-08-20T18:35:00Z" },

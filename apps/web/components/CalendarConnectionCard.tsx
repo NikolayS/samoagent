@@ -85,7 +85,7 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     disconnectTrigger.current?.focus();
   }
 
-  return <div ref={card} tabIndex={-1} role={nested ? undefined : "region"} aria-label={nested ? undefined : "Google Calendar"} className="samograph-signin samograph-calendar-card">
+  return <div ref={card} tabIndex={-1} role={nested ? undefined : "region"} aria-label={nested ? undefined : "Google Calendar"} className="samograph-calendar-card">
     <h2>Google Calendar</h2>
     {connectError || message ? (() => {
       const failure = Boolean(connectError) || messageKind === "error";
@@ -94,16 +94,22 @@ export function CalendarConnectionCard({ client, onAuthFailure, locale, timeZone
     })() : null}
     {!status ? <p aria-busy="true">Loading Google Calendar…</p> : status.state === "not_connected" ? <>
       <p>Show upcoming meetings from your calendar.</p>
-      <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>
+      <div className="samograph-actions">
+        <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>{busy ? "Connecting…" : "Connect Google Calendar"}</button>
+      </div>
     </> : status.state === "broken" ? <>
       <p>Google Calendar needs to be reconnected.</p>
-      <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>Reconnect</button>{" "}
-      <button ref={disconnectTrigger} type="button" className="samograph-btn samograph-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>Disconnect</button>
+      <div className="samograph-actions">
+        <button type="button" className="samograph-btn samograph-btn--secondary" disabled={busy} aria-busy={connectBusy} onClick={() => void connect()}>Reconnect</button>
+        <button ref={disconnectTrigger} type="button" className="samograph-btn samograph-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>Disconnect</button>
+      </div>
     </> : <>
       <p><strong>Connected</strong></p>
       {status.lastSyncAt ? <p className="samograph-field-hint">Last synced {formatDateTime(status.lastSyncAt, { locale, timeZone })}</p> : null}
       <label className="samograph-toggle"><input type="checkbox" role="switch" checked={status.autoJoin === true} disabled={busy} onChange={() => void toggleAutoJoin()} /> <span><strong>Auto-record my meetings</strong><small className="samograph-field-hint">samograph joins every upcoming meeting with a video link a few minutes before it starts</small></span></label>
-      <button ref={disconnectTrigger} type="button" className="samograph-btn samograph-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>Disconnect</button>
+      <div className="samograph-actions">
+        <button ref={disconnectTrigger} type="button" className="samograph-btn samograph-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>Disconnect</button>
+      </div>
     </>}
     {confirming ? <InlineConfirm title="Disconnect Google Calendar?" confirmLabel="Disconnect" busy={disconnectBusy} onCancel={closeConfirm} onConfirm={() => void disconnect()}>Upcoming meetings will be removed.</InlineConfirm> : null}
   </div>;

@@ -30,16 +30,31 @@ const toPx = (value: number, unit: string) => (unit === "px" ? value : value * 1
  * Rules whose below-floor literal lives in a globals.css region owned by
  * another in-flight mobile-audit PR. Editing them here would collide, so M3
  * reports them in its PR body instead. Each entry MUST name the owning PR.
+ *
+ * An entry is a (selector, exact value) PAIR, not a selector (#281 review). A
+ * selector-only waiver waives the selector forever: drop a new `font-size:
+ * .6rem` into an allowlisted rule and the guard says nothing, because the
+ * selector — not the breach — was what got excused. Pinning the value means a
+ * waiver covers exactly the literal that was measured and nothing else.
+ *
+ * Entries also rot: once the owning PR lands the fix, the waiver outlives the
+ * breach and quietly re-opens the hole for whatever lands under that selector
+ * next — so a waiver that matches no measured literal fails the guard until it
+ * is deleted ("has no waiver left over for a literal that is already gone").
+ * The M1 transcript-row waiver was exactly that, once #280 landed.
  */
 const OWNED_ELSEWHERE = new Map<string, string>([
-  // The four landing selectors that stood here (`.samograph-button`,
-  // `.samograph-instrument`, `.samograph-instrument-foot`,
-  // `.samograph-site-footer`) were fixed by M5 and are now enforced by this
-  // guard like everything else. An entry is a temporary parking space for one
-  // in-flight PR, never a permanent exemption — delete it the moment that PR
-  // lands.
-  [".samograph-instrument-lines > li.samograph-transcript-row", "M1 — transcript (globals.css 1559–1585)"],
+  // Empty on purpose. `.samograph-button`, `.samograph-instrument`,
+  // `.samograph-instrument-foot` and `.samograph-site-footer` were fixed by M5
+  // (#290) and `.samograph-instrument-lines > li.samograph-transcript-row` by
+  // M1 (#280), so every one of those waivers is gone and all five selectors are
+  // enforced by this guard like everything else. An entry is a temporary
+  // parking space for one in-flight PR, never a permanent exemption — delete it
+  // the moment that PR lands, which the staleness case below now forces.
 ]);
+
+/** The allowlist key for one measured literal: selector AND exact value. */
+const waiverKey = (literal: Literal) => `${literal.selector} { font-size: ${literal.value} }`;
 
 type Literal = { selector: string; value: string; px: number };
 
@@ -60,10 +75,21 @@ function belowFloorLiterals(): Literal[] {
 describe("type floor — nothing renders below 12px", () => {
   it("has no raw font-size literal under 0.75rem outside another PR's region", () => {
     const offenders = belowFloorLiterals()
-      .filter((literal) => !OWNED_ELSEWHERE.has(literal.selector))
-      .map((literal) => `${literal.selector} { font-size: ${literal.value} } /* ${literal.px}px */`)
+      .filter((literal) => !OWNED_ELSEWHERE.has(waiverKey(literal)))
+      .map((literal) => `${waiverKey(literal)} /* ${literal.px}px */`)
       .sort();
     expect(offenders).toEqual([]);
+  });
+
+  it("has no waiver left over for a literal that is already gone", () => {
+    // A waiver that no longer matches anything in globals.css is a hole waiting
+    // for the next literal under that selector. Delete it when its PR lands.
+    const measured = new Set(belowFloorLiterals().map(waiverKey));
+    const stale = [...OWNED_ELSEWHERE.entries()]
+      .filter(([key]) => !measured.has(key))
+      .map(([key, owner]) => `${key} — waived for ${owner}, but no such literal exists`)
+      .sort();
+    expect(stale).toEqual([]);
   });
 
   it("keeps --text-xs as the 12px floor of the token scale", () => {

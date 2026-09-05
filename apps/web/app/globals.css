@@ -140,6 +140,14 @@
   --width-form: 480px;
   --gutter: var(--space-8);
 
+  /* The page container (design audit §3, PLAN.md PR 4). ONE max-width and ONE
+     gutter, shared by the app-nav inner box and by `<main>`, so their left
+     edges coincide at every viewport width. Reading width is a property of the
+     CONTENT column (`--content-max`), never of the page — capping `<main>`
+     itself made the two boxes centre independently and pushed the settings H1
+     200px away from the wordmark. */
+  --page-max: var(--width-app);
+
   /* Control geometry — the single answer to "how tall is a control?".
      `--radius-control` is the one radius for every interactive box, and
      `--field-max` caps short fields (selects, enums) so a four-character value
@@ -161,6 +169,30 @@
      control is drawn everywhere; this is the floor a *hit area* must clear on
      a coarse pointer, and it may be met by an invisible pseudo-element. */
   --tap-min: 44px;
+
+  /* Safe area (mobile audit M6). iOS reports the notch and the home indicator
+     ONLY when the document opts in with `viewport-fit=cover` — that half lives
+     in `app/layout.tsx`'s `export const viewport`; without it these all resolve
+     to 0 and nothing moves. The `0px` fallback is not decoration: a bare
+     `env()` a browser does not understand is invalid at computed-value time and
+     drops the WHOLE declaration (the #255 failure mode). Every safe-area read
+     in this stylesheet goes through these four tokens — grep for `--safe-` to
+     find them all. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  /* The sticky settings savebar's own height, derived from the control scale
+     rather than measured after the fact: one 44px control between two
+     `--space-3` rails plus the 2px top rule. `.samograph-settings` reserves
+     exactly this much at the end of the page, so the bar floats over reserved
+     emptiness instead of over the last select (audit `d01`). */
+  --savebar-h: calc(var(--control-h) + var(--space-3) * 2 + var(--border-strong));
+  /* Elevation is reserved for things that genuinely float (DESIGN-MODEL §3):
+     the savebar and the jump-to-live pill. Upward-only, since the bar's shadow
+     falls on the content it sits above. */
+  --elev-savebar: 0 -4px 16px color-mix(in srgb, var(--ink) 10%, transparent);
 
   /* Interaction */
   --focus-ring: var(--ink);
@@ -446,17 +478,52 @@ button:hover {
 }
 
 .samograph-page {
-  max-width: var(--width-app);
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: var(--space-8) var(--gutter) var(--space-16);
+  /* The trailing rail is the savebar's reserved ground (M6): never smaller than
+     a floating bar plus the home-indicator inset, so a sticky bar at the end of
+     a page always has somewhere to come to rest that is not on top of a
+     control. `--space-16` stays the floor for every other page. */
+  padding: var(--space-8) var(--gutter) max(var(--space-16), calc(var(--savebar-h) + var(--safe-bottom)));
 }
 
+/* `--form` / `--prose` narrow the CONTENT, not the page (DESIGN-MODEL §5,
+   "Alignment fix"): `<main>` keeps the shared page container so its left edge
+   tracks the nav, and the reading width lands on the content column. */
 .samograph-page--form {
-  max-width: var(--width-form);
+  --content-max: var(--width-form);
 }
 
 .samograph-page--prose {
-  max-width: var(--width-prose);
+  --content-max: var(--width-prose);
+}
+
+.samograph-page--prose > *,
+.samograph-page--form > * {
+  max-width: var(--content-max);
+}
+
+/* An action row (design audit §4, DESIGN-MODEL §4 Button — "width: never
+   stretches"). One or more controls on a line, each at its intrinsic width,
+   wrapping onto the next line instead of stretching or being clipped. It is
+   the wrapper that owns the layout, so a button pair can sit inside a grid
+   container without becoming two full-width grid items.
+
+   This is the ONE `.samograph-actions` rule — it also serves the two older
+   consumers (InlineConfirm, MagicLinkRequestForm), whose `--space-2` gap and
+   `--space-5` top margin it keeps unchanged. A second rule further down the
+   sheet would not extend this one; it would silently win declaration by
+   declaration on source order. */
+.samograph-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.samograph-actions > * {
+  flex: 0 0 auto;
 }
 
 .samograph-app-nav {
@@ -471,7 +538,8 @@ button:hover {
    by CSS, not duplicated. At >= 768px that panel is `display: contents`, which
    dissolves it back into the header row: the desktop layout is what it was. */
 .samograph-app-nav-inner {
-  max-width: var(--width-app);
+  /* Same container as `.samograph-page` — see `--page-max`. */
+  max-width: var(--page-max);
   min-height: 56px;
   margin: 0 auto;
   padding: 0 var(--gutter);
@@ -608,6 +676,25 @@ button:hover {
   .samograph-app-nav-menu[data-open] { display: contents; }
 
   .samograph-app-nav-right { margin-left: auto; }
+}
+
+/* Horizontal safe area (M6 review). `viewport-fit=cover` lets the page paint
+   under the notch, so in landscape on a notched phone the notch eats into the
+   gutter — the nav's leftmost link, the page's left rail, the landing hero's
+   first line. Every element that OWNS the gutter yields to the inset here.
+
+   One grouped rule, and it sits after the @media blocks that restate these
+   paddings (the landing hero/footer at 59.99rem and 40rem, the app nav at
+   768px): each of those carries the same `var(--gutter)` inline and varies only
+   the BLOCK padding, so overriding the inline half in one place is equivalent
+   at every width. `max()` collapses to plain `--gutter` wherever the inset is
+   0 — i.e. everywhere except a notched phone held sideways. */
+.samograph-page,
+.samograph-app-nav-inner,
+.samograph-site-nav,
+.samograph-landing-hero,
+.samograph-site-footer {
+  padding-inline: max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right));
 }
 
 /* The PUBLIC shell (/auth, /auth/callback, /c/<token>) has no menu to disclose:
@@ -849,7 +936,6 @@ button:hover {
 .samograph-select > select:disabled { color: var(--muted); background: var(--field-bg-disabled); cursor: not-allowed; }
 .samograph-select:has(> select:disabled)::before { background: var(--field-bg-disabled); }
 .samograph-select:has(> select:disabled)::after { background: var(--faint); }
-.samograph-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-5); }
 input:where(:not([type="checkbox"], [type="radio"])), select, textarea { background: var(--surface); border-color: var(--control-border); }
 textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-alert { border: 1px solid currentColor; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
@@ -1305,16 +1391,65 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   border-top: var(--border-strong) solid var(--line-strong);
 }
 
+/* Mobile audit M6. A sticky bottom bar is pulled UP to the viewport edge while
+   its resting place is still below the fold, so it floats over whatever content
+   happens to be at the bottom of the screen — at 1024 that was the bottom
+   border of the "Chat chime" select (`d01-settings-1024.jpg`). Two things make
+   that safe: nothing may be TRAPPED under the bar (the bar is the last child
+   here, and `.samograph-page` reserves at least the bar's own height of ground
+   beneath it, so scrolling to the end always clears every control), and the bar
+   must read as ABOVE the page rather than as another rule inside the form —
+   hence the upward shadow, the stacking context below, and the edge-to-edge
+   bleed on the widths where the column is the page (see the --bp-md block).
+
+   Deliberately NOT `padding-bottom` on this wrapper: the wrapper is the bar's
+   containing block, and a sticky box is never pushed DOWN past its flow
+   position, so padding here only raises where the bar comes to rest. Measured
+   at 1024x900: the bar ended 174px above the viewport bottom instead of 80px. */
 .samograph-savebar {
   position: sticky;
   bottom: 0;
+  z-index: 2;
+  /* Explicit box + explicit height: the page can only reserve the bar's
+     footprint if that footprint is a stated number (--savebar-h) rather than
+     the accidental sum of font metrics. */
+  box-sizing: border-box;
+  min-height: calc(var(--savebar-h) + var(--safe-bottom));
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
   padding-block: var(--space-3);
+  padding-bottom: calc(var(--space-3) + var(--safe-bottom));
   background: var(--surface);
   border-top: var(--border-strong) solid var(--line-strong);
+  box-shadow: var(--elev-savebar);
+}
+
+/* Any programmatic scroll — an anchor, `scrollIntoView`, the browser bringing a
+   focused control into view — must land the control ABOVE the bar, not under
+   it. */
+.samograph-settings .samograph-field {
+  scroll-margin-bottom: calc(var(--savebar-h) + var(--safe-bottom) + var(--space-3));
+}
+
+/* Where the bar may bleed, and where it may not (M6 review NB3). Since #241/#287
+   `<main>` is the full --page-max box and `.samograph-settings` is a --width-prose
+   column LEFT-aligned inside it, so cancelling the page gutter with negative
+   margins up there would push the bar 32px past the column's left edge and still
+   leave it hundreds of px short of the page's right edge — a slab aligned to
+   nothing. Above --bp-md the bar therefore spans its own column, exactly.
+
+   Below --bp-md the content box (<= 704px at 768) is narrower than the 720px cap,
+   so the column IS the page's content box and cancelling the page's inline
+   padding lands the bar precisely on the two screen edges. The expression mirrors
+   the page's own `max(--gutter, --safe-*)` term by term, so it cancels exactly in
+   landscape too and never adds a scrollable pixel. */
+@media (max-width: 767.98px) {
+  .samograph-savebar {
+    margin-inline: calc(-1 * max(var(--gutter), var(--safe-left))) calc(-1 * max(var(--gutter), var(--safe-right)));
+    padding-inline: max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right));
+  }
 }
 
 .samograph-savebar-status {
@@ -1364,7 +1499,11 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 
 .samograph-skeleton > span[aria-hidden="true"]:nth-of-type(3) { width: 70%; }
 .samograph-skeleton > span[aria-hidden="true"]:nth-of-type(4) { width: 85%; }
-.samograph-skeleton--form { max-width: var(--width-form); }
+/* Centred, because `<main>` no longer centres it: `--page-max` keeps the page
+   at the app width and the form column centres itself (see `--content-max`).
+   Without this the /auth placeholder sat at the page's left edge and the
+   loaded card jumped right when it arrived. */
+.samograph-skeleton--form { max-width: var(--width-form); margin-inline: auto; }
 .samograph-skeleton--page { max-width: var(--width-prose); }
 
 @keyframes samograph-skeleton-shimmer {
@@ -1575,6 +1714,24 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   color: var(--warn);
 }
 
+/* The warning's own <li> is NOT a transcript row: it has one child, not four
+   columns. Without this it matched only `.samograph-instrument-lines li`, whose
+   `56px 82px 66px minmax(480px, 1fr)` track list gives the list an intrinsic
+   minimum of ~684px — so a single warning made the whole transcript scroll
+   horizontally on a 390px phone (#280 review). One full-width cell instead, at
+   every width; the four-column grid of real rows is untouched. */
+.samograph-instrument-lines > li.samograph-warning-row {
+  display: block;
+  padding: 8px 16px;
+}
+
+/* Same as every other instrument row: no page-level tally counter, which would
+   otherwise print over the first characters of the warning. */
+.samograph-percall .samograph-warning-row::before,
+.samograph-percall .samograph-warning-row::after {
+  content: none;
+}
+
 /* =============================================================================
  * Owner / share controls & read-only share page
  * ========================================================================== */
@@ -1636,8 +1793,19 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   margin-bottom: 1rem;
 }
 
+/* The calendar card owns its stack instead of borrowing `.samograph-signin`'s
+   grid (design audit §4, PLAN.md PR 3): as a grid item every child — the
+   button pair included — was stretched to the 656px column width. */
 .samograph-calendar-card {
-  margin-block: 1.5rem;
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-6);
+}
+
+/* Inside the card the grid `gap` already spaces the rows, so the action row's
+   page-rhythm top margin would double it. */
+.samograph-calendar-card > .samograph-actions {
+  margin-top: 0;
 }
 
 /* =============================================================================
@@ -1806,7 +1974,12 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   color: color-mix(in srgb, var(--crit) 78%, white);
 }
 
-/* M4 — collapse the call-view header on a phone (mobile audit §1 C/D). The page
+/* M4:compact-call-header — the unique anchor for apps/web/test/call-header-css.test.ts.
+   Slice 3 holds more than one `@media (max-width: 48rem)` block, so the guard
+   locates THIS one by this marker, not by the media query text. Keep the marker
+   immediately above the block.
+
+   M4 — collapse the call-view header on a phone (mobile audit §1 C/D). The page
    heading shrinks, and the sticky panel head stays ONE row (call id + state chip
    + timer) instead of the 161px three-row stack. The `header.` qualifier raises
    specificity over the later same-width block, which stacks the
@@ -2056,7 +2229,8 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   position: absolute;
   z-index: 3;
   right: 16px;
-  bottom: 78px;
+  /* Above the panel's foot rail, and above the home indicator with it (M6). */
+  bottom: calc(78px + var(--safe-bottom));
   min-height: var(--control-h);
   color: var(--panel-ground);
   background: var(--accent-live);
