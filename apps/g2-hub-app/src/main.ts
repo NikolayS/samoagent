@@ -4,7 +4,7 @@ import {
   TextContainerUpgrade,
   waitForEvenAppBridge,
 } from "@evenrealities/even_hub_sdk";
-import { G2Controller, gestureFromEventType } from "./controller.ts";
+import { G2Controller, gestureFromEventType, terminalCloseMessage } from "./controller.ts";
 
 const DEVICE_TOKEN_KEY = "samograph_device_token";
 const relay = (import.meta.env.VITE_SAMOGRAPH_G2_RELAY ?? "https://samograph.samo.team")
@@ -90,7 +90,9 @@ async function connect(): Promise<void> {
       });
     }
   };
-  socket.onclose = () => {
+  socket.onclose = (event) => {
+    const terminal = terminalCloseMessage(event.code);
+    if (terminal) { void display(terminal); return; }
     setTimeout(connect, retryMs);
     retryMs = Math.min(30_000, retryMs * 2);
   };

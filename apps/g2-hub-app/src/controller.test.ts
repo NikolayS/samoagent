@@ -1,8 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { G2Controller, gestureFromEventType } from "./controller.ts";
+import { G2Controller, gestureFromEventType, terminalCloseMessage } from "./controller.ts";
 import { makeWhisper } from "../../../packages/shared/whisper/index.ts";
 
 describe("G2Controller", () => {
+  it("turns replacement and unpair closes into terminal instructions", () => {
+    expect(terminalCloseMessage(4409)).toBe("Replaced by another device. Reopen to take over.");
+    expect(terminalCloseMessage(4401)).toBe("Unpaired. Reopen the app to get a new code.");
+    expect(terminalCloseMessage(1006)).toBeNull();
+  });
   it("maps SDK event ordinals to the correct gestures", () => {
     // @evenrealities/even_hub_sdk@0.0.14 OsEventTypeList values.
     enum SdkEventType {

@@ -71,6 +71,7 @@ export function makeWhisper(input: WhisperInput, atMs: number): Whisper {
 
 /** Default queue depth: a wearer cannot read a backlog deeper than this. */
 export const DEFAULT_WHISPER_QUEUE_DEPTH = 8;
+export const DEFAULT_WHISPER_QUEUE_HARD_MAX = 32;
 
 export interface WhisperQueueOptions {
   /**
@@ -79,6 +80,7 @@ export interface WhisperQueueOptions {
    */
   now: () => number;
   maxDepth?: number;
+  hardMax?: number;
 }
 
 /**
@@ -109,7 +111,8 @@ function expiresAt(w: Whisper): number | null {
  *   not wait behind a backlog. Everything else appends.
  * - **Depth.** Over `maxDepth` the queue sheds the oldest `low` first, then the
  *   oldest `normal`. A `high` whisper is NEVER dropped — a queue saturated with
- *   `high` deliberately exceeds `maxDepth` rather than lose one.
+ *   `high` is never dropped below `hardMax`. Once `hardMax` is exceeded, the
+ *   oldest whisper is dropped regardless of priority, so memory stays bounded.
  * - **TTL.** A whisper with a ttl is gone once `now >= at + ttlMs` (the ttl is
  *   the window it stays useful, so the boundary instant is already too late).
  *   Expiry is applied lazily on every read/write, never on a timer.
@@ -117,11 +120,13 @@ function expiresAt(w: Whisper): number | null {
 export class WhisperQueue {
   private readonly nowMs: () => number;
   private readonly maxDepth: number;
+  readonly hardMax: number;
   private items: Whisper[] = [];
 
   constructor(options: WhisperQueueOptions) {
     this.nowMs = options.now;
     this.maxDepth = options.maxDepth ?? DEFAULT_WHISPER_QUEUE_DEPTH;
+    this.hardMax = options.hardMax ?? DEFAULT_WHISPER_QUEUE_HARD_MAX;
   }
 
   /** Drop every whisper whose TTL has elapsed; returns them in queue order. */
@@ -153,7 +158,7 @@ export class WhisperQueue {
       mode: preempts ? "replace" : "enqueue",
       accepted: w,
       expired,
-      dropped: this.enforceDepth(),
+      dropped: this.enforceDepthAndHardMax(),
     };
   }
 
@@ -185,13 +190,20 @@ export class WhisperQueue {
    * oldest `normal`. Stops early when only `high` whispers remain: they are
    * never dropped, so the queue is allowed to run over depth instead.
    */
-  private enforceDepth(): Whisper[] {
+  private enforceDepthAndHardMax(): Whisper[] {
     const dropped: Whisper[] = [];
     while (this.items.length > this.maxDepth) {
       const index =
         this.oldestIndexOf("low") ?? this.oldestIndexOf("normal") ?? null;
       if (index === null) break;
       dropped.push(...this.items.splice(index, 1));
+    }
+    while (this.items.length > this.hardMax) {
+      let oldest = 0;
+      for (let i = 1; i < this.items.length; i += 1) {
+        if (Date.parse(this.items[i]!.at) < Date.parse(this.items[oldest]!.at)) oldest = i;
+      }
+      dropped.push(...this.items.splice(oldest, 1));
     }
     return dropped;
   }

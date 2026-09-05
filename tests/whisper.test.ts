@@ -125,6 +125,16 @@ describe("WhisperQueue ordering and preemption", () => {
 });
 
 describe("WhisperQueue max-depth drop policy", () => {
+  it("hard-bounds an all-high queue by dropping its oldest whisper", () => {
+    const c = testClock(0);
+    const q = new WhisperQueue({ now: c.now, maxDepth: 2, hardMax: 3 });
+    const values = [0, 1, 2, 3].map((at) => w(`h${at}`, "high", at));
+    values.slice(0, 3).forEach((value) => q.push(value));
+    const result = q.push(values[3]!);
+    expect(result.dropped).toEqual([values[0]]);
+    expect(q.list()).toEqual([values[3], values[2], values[1]]);
+  });
+
   it("drops the oldest low-priority whisper first when over depth", () => {
     const c = testClock(0);
     const q = new WhisperQueue({ now: c.now, maxDepth: 3 });

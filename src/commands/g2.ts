@@ -165,8 +165,7 @@ export async function cmdG2Listen(
   const relay = deps.relay ?? g2Relay();
   const url =
     relay.replace(/^http/, "ws") +
-    `/g2/rooms/${encodeURIComponent(config.room_id)}/agent` +
-    `?token=${encodeURIComponent(config.room_token)}`;
+    `/g2/rooms/${encodeURIComponent(config.room_id)}/agent`;
   const controller = deps.signal ? null : new AbortController();
   const signal = deps.signal ?? controller!.signal;
   const stop = () => controller?.abort();
@@ -178,7 +177,9 @@ export async function cmdG2Listen(
   let delay = 1_000;
   try {
     while (!signal.aborted) {
-      await listenOnce(url, signal, deps);
+      const terminalCode = await listenOnce(url, config.room_token, signal, deps);
+      if (terminalCode === 4401) fail("G2 agent was unpaired.");
+      if (terminalCode === 4409) fail("G2 agent was replaced by another listener.");
       if (signal.aborted) break;
       await (deps.wait ?? wait)(delay);
       delay = Math.min(30_000, delay * 2);
@@ -188,19 +189,20 @@ export async function cmdG2Listen(
   }
 }
 
-async function listenOnce(url: string, signal: AbortSignal, deps: G2Deps): Promise<void> {
+async function listenOnce(url: string, roomToken: string, signal: AbortSignal, deps: G2Deps): Promise<number> {
   const Socket = deps.WebSocket ?? WebSocket;
   return new Promise((resolve) => {
     let socket: WebSocket;
     try {
       socket = new Socket(url);
     } catch (error) {
-      process.stderr.write(`Error: relay unreachable at ${url}: ${cause(error)}\n`);
-      resolve();
+      process.stderr.write(`Error: relay unreachable at ${new URL(url).origin}: ${cause(error)}\n`);
+      resolve(1006);
       return;
     }
     const abort = () => socket.close();
     signal.addEventListener("abort", abort, { once: true });
+    socket.onopen = () => socket.send(JSON.stringify({ type: "auth", token: roomToken }));
     socket.onmessage = (event) => {
       try {
         const message = JSON.parse(String(event.data));
@@ -212,11 +214,11 @@ async function listenOnce(url: string, signal: AbortSignal, deps: G2Deps): Promi
       } catch {}
     };
     socket.onerror = () => {
-      process.stderr.write(`Error: relay unreachable at ${url}: WebSocket error\n`);
+      process.stderr.write(`Error: relay unreachable at ${new URL(url).origin}: WebSocket error\n`);
     };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       signal.removeEventListener("abort", abort);
-      resolve();
+      resolve(event.code);
     };
   });
 }

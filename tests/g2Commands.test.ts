@@ -51,19 +51,21 @@ describe("G2 commands", () => {
     class FakeWebSocket {
       onopen?: () => void;
       onmessage?: (event: { data: string }) => void;
-      onclose?: () => void;
+      onclose?: (event: { code: number }) => void;
       onerror?: () => void;
+      sent: string[] = [];
 
       constructor(public url: string) {
         queueMicrotask(() => {
           this.onopen?.();
           this.onmessage?.({ data: JSON.stringify({ type: "cue", cue: "confirm" }) });
           abort.abort();
-          this.onclose?.();
+          this.onclose?.({ code: 1000 } as any);
         });
       }
 
       close() {}
+      send(value: string) { this.sent.push(value); }
     }
     await cmdG2Listen(
       { command: "g2-listen" },
@@ -162,16 +164,18 @@ describe("G2 commands", () => {
     const abort = new AbortController();
     let connections = 0;
     class FakeWebSocket {
-      onclose?: () => void;
+      onclose?: (event: { code: number }) => void;
       onerror?: () => void;
       onmessage?: () => void;
+      onopen?: () => void;
 
       constructor() {
         connections += 1;
-        queueMicrotask(() => this.onclose?.());
+        queueMicrotask(() => { this.onopen?.(); this.onclose?.({ code: 1006 } as any); });
       }
 
       close() {}
+      send() {}
     }
     await cmdG2Listen(
       { command: "g2-listen" },
@@ -188,5 +192,24 @@ describe("G2 commands", () => {
     );
     expect(connections).toBe(7);
     expect(delays).toEqual([1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000]);
+  });
+
+  it("g2-listen authenticates in its first frame and treats 4401/4409 as fatal", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "g2-")); const file = join(dir, "g2.json");
+    writeFileSync(file, JSON.stringify({ room_id: "room", room_token: "secret-token" }));
+    for (const [code, message] of [[4401, "Error: G2 agent was unpaired.\n"], [4409, "Error: G2 agent was replaced by another listener.\n"]] as const) {
+      const opened: string[] = []; const sent: string[] = [];
+      class FakeWebSocket {
+        onopen?: () => void; onclose?: (event: { code: number }) => void; onmessage?: () => void; onerror?: () => void;
+        constructor(url: string) { opened.push(url); queueMicrotask(() => { this.onopen?.(); this.onclose?.({ code }); }); }
+        send(value: string) { sent.push(value); } close() {}
+      }
+      const error = await captureStderr(async () => {
+        await expect(cmdG2Listen({ command: "g2-listen" }, { file, WebSocket: FakeWebSocket as any, requireSession: () => {}, signal: new AbortController().signal })).rejects.toThrow();
+      });
+      expect(opened).toEqual(["wss://samograph.samo.team/g2/rooms/room/agent"]);
+      expect(sent).toEqual([JSON.stringify({ type: "auth", token: "secret-token" })]);
+      expect(error).toBe(message);
+    }
   });
 });

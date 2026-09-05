@@ -167,7 +167,7 @@ So an agent already running `samograph watch` receives whispers and the wearer's
 
 Open the Even Hub app first: it displays the six-digit code that the wearer types into `g2-pair`. Credentials are stored mode 0600 in `~/.samograph/g2.json` (override with `SAMOGRAPH_G2_FILE`); the relay defaults to `https://samograph.samo.team` (override with `SAMOGRAPH_G2_RELAY`). Run `g2-listen` during the call to append glass gestures through the existing `SAMOGRAPH-CUE` transcript path, and `g2-unpair` to delete the relay room and local credentials.
 
-Whispers carry a priority (`low|normal|high`) and optional `--ttl SECONDS`. The relay and long-lived phone app each apply `WhisperQueue`: depth 8, urgent messages first and never dropped, low priority shed first, and lazy TTL expiry. The relay is intentionally in-memory for v1, so a service restart makes the app display a new pairing code.
+Whispers carry a priority (`low|normal|high`) and optional `--ttl SECONDS`. The relay and long-lived phone app each apply `WhisperQueue`: preferred depth 8, urgent messages first, low priority shed first, lazy TTL expiry, and a hard bound of 32 where the oldest message is dropped regardless of priority. A full offline relay queue rejects new whispers with HTTP 429. The relay is intentionally in-memory for v1, so a service restart makes the app display a new pairing code.
 
 ## Google Doc Notes
 

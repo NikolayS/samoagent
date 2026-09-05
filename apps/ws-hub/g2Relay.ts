@@ -32,6 +32,8 @@ export interface G2RelayOptions {
   now?: () => number;
   randomCode?: () => string;
   randomToken?: () => string;
+  setTimeout?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clearTimeout?: (timer: ReturnType<typeof setTimeout>) => void;
 }
 
 const MAX_FRAME = 8 * 1024;
@@ -40,6 +42,8 @@ const ROOM_TTL = 86_400_000;
 const CLAIM_WINDOW = 60_000;
 const MAX_FAILED_CLAIMS = 10;
 const MAX_CLAIMS = 30;
+const MAX_CLAIM_IPS = 10_000;
+const AGENT_AUTH_TIMEOUT = 5_000;
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const token = () =>
@@ -66,9 +70,12 @@ export class G2Relay {
   private bySocket = new Map<G2Socket, string>();
   private rooms = new Map<string, Room>();
   private claims = new Map<string, { start: number; count: number; failures: number }>();
+  private pendingAgents = new Map<G2Socket, { id: string; timer: ReturnType<typeof setTimeout> }>();
   private now: () => number;
   private code: () => string;
   private randomToken: () => string;
+  private setTimer: NonNullable<G2RelayOptions["setTimeout"]>;
+  private clearTimer: NonNullable<G2RelayOptions["clearTimeout"]>;
 
   constructor(options: G2RelayOptions = {}) {
     this.now = options.now ?? Date.now;
@@ -80,6 +87,8 @@ export class G2Relay {
           "0",
         ));
     this.randomToken = options.randomToken ?? token;
+    this.setTimer = options.setTimeout ?? setTimeout;
+    this.clearTimer = options.clearTimeout ?? clearTimeout;
   }
 
   /** Register a phone socket and send it a fresh short-lived pairing code. */
@@ -108,13 +117,27 @@ export class G2Relay {
     }
   }
 
-  /** Authenticate and attach a cue-listening agent socket to a room. */
-  openAgent(socket: G2Socket, id: string, supplied: string): void {
-    const room = this.room(id);
-    if (!room || !equal(room.token, supplied)) {
+  /** Await an agent's first-frame auth before binding it to any room. */
+  openAgent(socket: G2Socket, id: string): void {
+    const timer = this.setTimer(() => {
+      if (!this.pendingAgents.delete(socket)) return;
       socket.close(4401, "unauthorized");
-      return;
-    }
+    }, AGENT_AUTH_TIMEOUT);
+    this.pendingAgents.set(socket, { id, timer });
+  }
+
+  /** Authenticate an agent's first frame and only then attach it to the room. */
+  messageAgent(socket: G2Socket, raw: string | ArrayBufferView): void {
+    const pending = this.pendingAgents.get(socket);
+    if (!pending) return;
+    this.pendingAgents.delete(socket);
+    this.clearTimer(pending.timer);
+    const text = typeof raw === "string" ? raw : Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength).toString("utf8");
+    let message: unknown;
+    try { message = JSON.parse(text); } catch { message = null; }
+    const supplied = typeof message === "object" && message !== null && (message as any).type === "auth" && typeof (message as any).token === "string" ? (message as any).token : "";
+    const room = this.room(pending.id);
+    if (!room || !equal(room.token, supplied)) { socket.close(4401, "unauthorized"); return; }
     room.agent?.close(4409, "replaced");
     room.agent = socket;
     room.touchedAt = this.now();
@@ -122,6 +145,9 @@ export class G2Relay {
 
   /** Detach a disconnected cue-listening agent socket. */
   closeAgent(socket: G2Socket): void {
+    const pending = this.pendingAgents.get(socket);
+    if (pending) this.clearTimer(pending.timer);
+    this.pendingAgents.delete(socket);
     for (const room of this.rooms.values()) {
       if (room.agent === socket) room.agent = undefined;
     }
@@ -218,6 +244,7 @@ export class G2Relay {
         room.app.send(JSON.stringify({ type: "whisper", ...whisper }));
         return json({ queued: false });
       }
+      if (room.queue.size() >= room.queue.hardMax) return json({ error: "queue full" }, 429);
       room.queue.push(whisper);
       return json({ queued: true }, 202);
     }
@@ -280,8 +307,12 @@ export class G2Relay {
   }
 
   private sweep(): void {
+    const now = this.now();
     for (const [id, room] of this.rooms) {
-      if (this.now() - room.touchedAt >= ROOM_TTL) this.rooms.delete(id);
+      if (now - room.touchedAt >= ROOM_TTL) this.rooms.delete(id);
+    }
+    for (const [ip, entry] of this.claims) {
+      if (now - entry.start >= CLAIM_WINDOW) this.claims.delete(ip);
     }
   }
 
@@ -289,6 +320,14 @@ export class G2Relay {
     const now = this.now();
     let entry = this.claims.get(ip);
     if (!entry || now - entry.start >= CLAIM_WINDOW) {
+      if (!entry && this.claims.size >= MAX_CLAIM_IPS) {
+        let oldestIp: string | undefined;
+        let oldestStart = Infinity;
+        for (const [candidate, value] of this.claims) {
+          if (value.start < oldestStart) { oldestStart = value.start; oldestIp = candidate; }
+        }
+        if (oldestIp !== undefined) this.claims.delete(oldestIp);
+      }
       entry = { start: now, count: 0, failures: 0 };
       this.claims.set(ip, entry);
     }
@@ -296,6 +335,9 @@ export class G2Relay {
     entry.count += 1;
     return { allowed, recordFailure: () => void (entry!.failures += 1) };
   }
+
+  /** Number of live claim windows; exposed for deterministic bound tests. */
+  claimWindowCount(): number { return this.claims.size; }
 }
 
 async function safeBody(request: Request): Promise<any> {

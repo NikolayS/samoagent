@@ -15,6 +15,12 @@ const cues: Record<Gesture, CueSemantic> = {
   SCROLL_TOP: "more",
 };
 
+export function terminalCloseMessage(code: number): string | null {
+  if (code === 4409) return "Replaced by another device. Reopen to take over.";
+  if (code === 4401) return "Unpaired. Reopen the app to get a new code.";
+  return null;
+}
+
 /** Convert an SDK `OsEventTypeList` value into a controller gesture. */
 export function gestureFromEventType(eventType: number): Gesture | null {
   switch (eventType) {
