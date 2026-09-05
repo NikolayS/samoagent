@@ -88,4 +88,52 @@ describe("AppShell", () => {
     fireEvent.keyDown(document, { key: "?", shiftKey: true });
     expect(publicView.queryByRole("dialog", { name: /keyboard shortcuts/i })).toBeNull();
   });
+
+  it("collapses the nav behind a menu disclosure that owns the shell menu", () => {
+    const client = createFakeAppApiClient();
+    const { getByRole } = render(<AppShell client={client} redirect={redirect}><p>App</p></AppShell>);
+    const toggle = getByRole("button", { name: "Menu" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-controls")).toBe("app-nav-menu");
+    const menu = document.getElementById("app-nav-menu");
+    expect(menu).not.toBeNull();
+    expect(menu!.getAttribute("data-open")).toBe("false");
+    // The links, the account line and the theme control live in exactly one
+    // place in the DOM — the menu — so nothing is duplicated for mobile.
+    expect(menu!.contains(getByRole("link", { name: "Dashboard" }))).toBe(true);
+    expect(menu!.contains(getByRole("group", { name: "Theme" }))).toBe(true);
+    expect(menu!.contains(getByRole("button", { name: "Log out" }))).toBe(true);
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(menu!.getAttribute("data-open")).toBe("true");
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(menu!.getAttribute("data-open")).toBe("false");
+  });
+
+  it("closes the menu with Escape and returns focus to the disclosure", () => {
+    const client = createFakeAppApiClient();
+    const { getByRole } = render(<AppShell client={client} redirect={redirect}><p>App</p></AppShell>);
+    const toggle = getByRole("button", { name: "Menu" });
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.getElementById("app-nav-menu")!.getAttribute("data-open")).toBe("false");
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("gives the public shell the same disclosure over its theme control", () => {
+    const client = createFakeAppApiClient();
+    const { getByRole } = render(
+      <AppShell client={client} redirect={redirect} variant="public"><span>Public</span></AppShell>,
+    );
+    const toggle = getByRole("button", { name: "Menu" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    const menu = document.getElementById("app-nav-menu")!;
+    expect(menu.contains(getByRole("group", { name: "Theme" }))).toBe(true);
+  });
 });
