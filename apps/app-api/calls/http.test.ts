@@ -93,6 +93,16 @@ describe("POST /calls — authentication (§5.1)", () => {
   });
 });
 
+describe("GET /calls/:id — authentication (§5.6)", () => {
+  it("returns a bodyless 401 with no session cookie, never touching DB or the orchestrator", async () => {
+    const { handler, jobs } = makeHandler();
+    const res = await handler(new Request("http://app-api.local/calls/some-id", { method: "GET" }));
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("");
+    expect(jobs).toEqual([]);
+  });
+});
+
 describe("POST /calls — URL validation (§5.2, §5.16)", () => {
   it("rejects a non-meeting URL with a typed 400 SAMO-CALL-URL and creates no call", async () => {
     const { handler, jobs } = makeHandler();
