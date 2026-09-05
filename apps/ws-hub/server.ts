@@ -33,13 +33,17 @@ import {
 import { createTranscriptHandler, createTranscriptTextHandler } from "./transcript-http.ts";
 import { SESSION_COOKIE_NAME } from "../app-api/auth/session.ts";
 import { stopServerBounded } from "../../packages/shared/serverLifecycle.ts";
+import { G2Relay, isG2Path, type G2Socket } from "./g2Relay.ts";
 
 /** What an upgraded socket carries until {@link WebSocketHandler.open} wires it. */
 interface StreamSocketData {
+  kind?: "stream";
   prepared: Extract<PrepareStreamResult, { ok: true }>;
   conn?: StreamConnection;
   recheck?: ReturnType<typeof setInterval>;
 }
+interface G2SocketData { kind: "g2-app" | "g2-agent"; roomId?: string; token?: string }
+type WsSocketData = StreamSocketData | G2SocketData;
 
 export interface WsHubServerDeps {
   /** Privileged connection able to `SET LOCAL ROLE samograph_app`. */
@@ -70,7 +74,7 @@ export interface WsHubServerDeps {
 }
 
 export interface WsHubServerHandle {
-  server: Server<StreamSocketData>;
+  server: Server<StreamSocketData | G2SocketData>;
   hub: Hub;
   port: number;
   url: string;
@@ -93,6 +97,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
   // unbounded full-transcript reads while the WS surface is capped (§5.7). One
   // instance shared by both handlers; default so the surface is never uncapped.
   const restCaps = deps.restCaps ?? new RequestRateCaps();
+  const g2 = new G2Relay();
 
   const transcriptHandler = createTranscriptHandler({
     sql: deps.sql,
@@ -110,7 +115,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
     clockMs: authDeps.clockMs,
   });
 
-  const server = Bun.serve<StreamSocketData>({
+  const server = Bun.serve<StreamSocketData | G2SocketData>({
     port: deps.port ?? 0,
     hostname: deps.hostname,
     // Long silences are normal on a live call; hold the socket at Bun's max
@@ -121,6 +126,10 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
     async fetch(req, srv): Promise<Response | undefined> {
       const url = new URL(req.url);
       if (url.pathname === "/health") return new Response("ok", { status: 200 });
+      if (url.pathname === "/g2/ws") { const upgraded = srv.upgrade(req, { data: { kind: "g2-app" } }); return upgraded ? undefined : new Response("expected a websocket upgrade", { status: 426 }); }
+      const agent = /^\/g2\/rooms\/([^/]+)\/agent$/.exec(url.pathname);
+      if (agent) { const upgraded = srv.upgrade(req, { data: { kind: "g2-agent", roomId: agent[1], token: url.searchParams.get("token") ?? "" } }); return upgraded ? undefined : new Response("expected a websocket upgrade", { status: 426 }); }
+      if (isG2Path(url.pathname)) return g2.fetch(req, req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown");
       // The `.txt` download must be matched BEFORE the JSON `/transcript` route.
       if (TRANSCRIPT_TXT_PATH.test(url.pathname)) return transcriptTextHandler(req);
       if (TRANSCRIPT_PATH.test(url.pathname)) return transcriptHandler(req);
@@ -141,7 +150,10 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
     },
 
     websocket: {
-      async open(ws: ServerWebSocket<StreamSocketData>) {
+      async open(ws: ServerWebSocket<WsSocketData>) {
+        if (ws.data.kind === "g2-app") { g2.openApp(ws as unknown as G2Socket); return; }
+        if (ws.data.kind === "g2-agent") { g2.openAgent(ws as unknown as G2Socket, ws.data.roomId!, ws.data.token!); return; }
+        const streamData = ws.data as StreamSocketData;
         const socket: StreamSocket = {
           send: (data) => {
             try {
@@ -159,7 +171,7 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
           },
         };
         try {
-          const conn = await openStream(socket, ws.data.prepared, {
+          const conn = await openStream(socket, streamData.prepared, {
             sql: deps.sql,
             hub,
             authDeps,
@@ -168,12 +180,12 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
             readCaps,
             clockMs: authDeps.clockMs,
           });
-          ws.data.conn = conn;
+          streamData.conn = conn;
           // Per-connection revoke recheck (no cache): closes the socket ≤ 1 s after
           // a revoke (§6.2 #4). The close handler clears this timer.
           const timer = setInterval(() => void conn.recheck(), recheckMs);
           (timer as unknown as { unref?: () => void }).unref?.();
-          ws.data.recheck = timer;
+          streamData.recheck = timer;
         } catch {
           // openStream already closed the connection (freed the slot + unsubscribed).
           try {
@@ -184,8 +196,10 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
         }
       },
 
-      message(ws: ServerWebSocket<StreamSocketData>, _message) {
-        const conn = ws.data.conn;
+      message(ws: ServerWebSocket<WsSocketData>, _message) {
+        if (ws.data.kind === "g2-app") { g2.messageApp(ws as unknown as G2Socket, _message as string | ArrayBufferView); return; }
+        if (ws.data.kind === "g2-agent") return;
+        const conn = (ws.data as StreamSocketData).conn;
         if (!conn) return;
         // Account every client→server command against the share command-rate cap
         // (§5.7); over-cap → a SAMO-RATE-001 frame and the command is ignored. v1
@@ -208,9 +222,12 @@ export function startWsHubServer(deps: WsHubServerDeps): WsHubServerHandle {
         }
       },
 
-      close(ws: ServerWebSocket<StreamSocketData>) {
-        if (ws.data.recheck) clearInterval(ws.data.recheck);
-        ws.data.conn?.close();
+      close(ws: ServerWebSocket<WsSocketData>) {
+        if (ws.data.kind === "g2-app") { g2.closeApp(ws as unknown as G2Socket); return; }
+        if (ws.data.kind === "g2-agent") { g2.closeAgent(ws as unknown as G2Socket); return; }
+        const data = ws.data as StreamSocketData;
+        if (data.recheck) clearInterval(data.recheck);
+        data.conn?.close();
       },
     },
   });

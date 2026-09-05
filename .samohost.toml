@@ -109,6 +109,11 @@ execStart = "/usr/local/bin/bun apps/ws-hub/dev-live-server.ts"
 # ---- routes (Caddy first-match order; matches prod /etc/caddy/sites.d/00-main-samograph.caddy) ----
 
 [[routes]]
+name        = "g2"
+matchPath   = "/g2*"
+to          = "ws-hub"
+
+[[routes]]
 name        = "stream"
 matchRegexp = "^/calls/[^/]+/stream$"
 to          = "ws-hub"
