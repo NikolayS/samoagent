@@ -1,0 +1,16 @@
+/* =============================================================================
+ * Motion
+ * ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .samograph-call-row,
+  .samograph-call-cta-arrow {
+    transition: none;
+  }
+  .samograph-call-live-dot,
+  .samograph-status[data-status-kind="live"] .samograph-status-label::before,
+  .samograph-transcript > li.samograph-line-partial::after {
+    animation: none;
+  }
+}
+

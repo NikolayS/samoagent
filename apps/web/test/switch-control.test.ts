@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Design PR 9 (docs/design/PLAN.md, desktop track #9 — "real switch for
@@ -17,7 +18,7 @@ import { join } from "node:path";
  * markup keeps its implicit `<label>` association (the whole label stays the
  * hit target) and nothing has to remember to add a class next to `role`.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 const root = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

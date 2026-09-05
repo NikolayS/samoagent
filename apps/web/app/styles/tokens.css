@@ -1,0 +1,257 @@
+/* =============================================================================
+ * Refined — samograph.dev design tokens (issue #241)
+ *
+ * ONE source of truth for the palette. Every color in a style rule below is
+ * delivered through `var(--token)`; raw hex literals appear ONLY in the token
+ * registries (`:root` and the `data-theme` / `prefers-color-scheme` overrides).
+ * A future visual change touches this file, not scattered literals.
+ *
+ * The page palette is neutral and the transcript instrument remains dark in
+ * both themes. Signal magenta is reserved for one streaming caret element.
+ * Full light AND dark support uses BOTH mechanisms: the OS preference
+ *    (`@media prefers-color-scheme`) AND an explicit, higher-specificity
+ *    `:root[data-theme="…"]` override so a user toggle always wins.
+ *
+ * Accessibility:
+ *  - `--ink` and `--muted` on `--ground` clear WCAG AA in both themes. Status is
+ *    never color-only: the chip carries a text label, the warning line a
+ *    `role="note"`, the live dot sits beside the word "Live".
+ *  - Filled controls pair `--green-deep`/`--pink` with `--on-green`/`--on-pink`.
+ *  - Motion (live pulse, streaming caret) is disabled under
+ *    `prefers-reduced-motion: reduce`.
+ * ========================================================================== */
+
+:root {
+  color-scheme: light dark;
+
+  /* Page */
+  --ground: #f4f2ed;
+  --surface: #faf9f6;
+  --ink: #14130f;
+  --ink-soft: #3a382f;
+  --muted: #6b675c;
+  --faint: #9c978a;
+  /* Lifted from the mockup's #dfdbd1 (1.24:1 on --ground, 1.31:1 on --surface —
+     a hairline nobody can see, the light-theme twin of the dark defect #293
+     fixed). #cbc7bd is the smallest lift clearing 1.5:1 on BOTH grounds
+     (1.51 / 1.60), keeps the mockup's warm r+4/g/b-10 cast, and stays lighter
+     than --line-strong (1.85:1) so the two-step hairline scale survives. */
+  --line: #cbc7bd;
+  --line-strong: #b9b4a6;
+
+  /* Theme-invariant transcript instrument */
+  --panel-ground: #0c0c0b;
+  --panel-surface: #141413;
+  --panel-strip: #1c1b18;
+  --panel-ink: #e2dfd7;
+  --panel-muted: #837f76;
+  --panel-line: #24231f;
+  --panel-gutter: #4a4842;
+  --accent-live: #4ed18a;
+  --signal: #ff4fb0;
+
+  /* Buttons ON the instrument panel (DESIGN-MODEL §4 Button, `--on-panel`).
+     The panel is theme-invariant, so these inks must be too: a page-relative
+     ink lands at 1.57:1 on `--panel-surface` in the light theme. `--crit` is
+     the one hue with no invariant panel counterpart, so it gets a literal —
+     the only new hex, and it lives in the registry like every other. */
+  --on-panel-ink: var(--panel-ink);
+  --on-panel-muted: var(--panel-muted);
+  --on-panel-border: var(--panel-gutter);
+  --on-panel-crit: #ff8f8f;
+  --on-panel-disabled-bg: var(--panel-strip);
+  --on-panel-disabled-fg: var(--panel-muted);
+  --on-panel-disabled-border: var(--panel-gutter);
+
+  /* Compatibility aliases for pre-redesign components. */
+  --green: var(--accent-live);
+  --green-deep: var(--ink-soft);
+  --green-soft: var(--surface);
+  --pink: var(--signal);
+  --pink-soft: var(--panel-strip);
+
+  /* Semantic status */
+  --good: var(--accent-live);
+  --warn: #8a5a00;
+  --crit: #a63a3a;
+  /* Success COPY ink. `--accent-live` mint is an instrument colour and fails
+     WCAG AA as body text on the light surface, so alert text uses this. */
+  --success-ink: #1d6b47;
+
+  /* Foregrounds for filled accents */
+  --on-green: var(--panel-ground);
+  --on-pink: var(--panel-ground);
+
+  /* Per-kind status-chip tokens (callStatusView.ts `StatusKind`). These
+     reference the hue tokens above, so they re-resolve automatically per theme. */
+  --state-pending: var(--muted);
+  --state-joining: var(--ink-soft);
+  --state-live: var(--accent-live);
+  --state-ended: var(--muted);
+  --state-error: var(--crit);
+
+  /* "Continue with Google" chrome (issue #209) — GOOGLE'S approved colour sets,
+     NOT Greenroom hues. They are tokens so that light/dark switches through the
+     same machinery as everything else and no raw hex escapes into a rule; the
+     VALUES are fixed by Google's branding guidelines and are a condition of using
+     the mark. Retuning them to taste is a branding violation, not a design
+     change — `test/greenroom-tokens.test.ts` asserts them literally. (The mark's
+     own four brand hexes are NOT here: they must never be theme-swapped, so they
+     live as literals in GoogleSignInButton.tsx. See that file's comment.)
+     Light set: white surface, #747775 border, #1f1f1f label. */
+  --google-btn-bg: #ffffff;
+  --google-btn-border: #747775;
+  --google-btn-ink: #1f1f1f;
+
+  /* Type */
+  --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-body: var(--font-sans);
+  --font-display: var(--font-sans);
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+  --leading-tight: 1.2;
+  --leading-normal: 1.55;
+  --leading-prose: 1.7;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 56px;
+  --space-16: 80px;
+
+  /* Shape and layout */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-strong: 2px;
+  --width-app: 1120px;
+  --width-prose: 720px;
+  --width-form: 480px;
+  --gutter: var(--space-8);
+
+  /* The page container (design audit §3, PLAN.md PR 4). ONE max-width and ONE
+     gutter, shared by the app-nav inner box and by `<main>`, so their left
+     edges coincide at every viewport width. Reading width is a property of the
+     CONTENT column (`--content-max`), never of the page — capping `<main>`
+     itself made the two boxes centre independently and pushed the settings H1
+     200px away from the wordmark. */
+  --page-max: var(--width-app);
+
+  /* Control geometry — the single answer to "how tall is a control?".
+     `--radius-control` is the one radius for every interactive box, and
+     `--field-max` caps short fields (selects, enums) so a four-character value
+     stops spanning the whole column.
+
+     The scale has three steps and nothing else: 44 is the default (forms,
+     primary actions, the theme switcher, in-panel buttons), 36 is the dense
+     step for actions inside a list row, 28 is reserved for inline actions
+     inside a line of text. A control is sized by ONE recipe — border-box, an
+     explicit height, zero block padding and a capped line-height — so its
+     height is exact rather than the accidental sum of font metrics. */
+  --control-h: 44px;
+  --control-h-sm: 36px;
+  --control-h-xs: 28px;
+  --radius-control: var(--radius-md);
+  --field-max: 22rem;
+  /* Alert tone rail (DESIGN-MODEL §4 Alert / Banner). The tone lives in this
+     3px inline-start rule, never in the copy — coloured body text is exactly
+     what `test/alert-contrast.test.ts` was written to stop. */
+  --alert-rail: 3px;
+  /* The smallest a tap target may be on a touch screen (WCAG 2.2 AA target
+     size, iOS HIG, Material). Distinct from `--control-h`: that is how tall a
+     control is drawn everywhere; this is the floor a *hit area* must clear on
+     a coarse pointer, and it may be met by an invisible pseudo-element. */
+  --tap-min: 44px;
+
+  /* Safe area (mobile audit M6). iOS reports the notch and the home indicator
+     ONLY when the document opts in with `viewport-fit=cover` — that half lives
+     in `app/layout.tsx`'s `export const viewport`; without it these all resolve
+     to 0 and nothing moves. The `0px` fallback is not decoration: a bare
+     `env()` a browser does not understand is invalid at computed-value time and
+     drops the WHOLE declaration (the #255 failure mode). Every safe-area read
+     in this stylesheet goes through these four tokens — grep for `--safe-` to
+     find them all. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  /* The sticky settings savebar's own height, derived from the control scale
+     rather than measured after the fact: one 44px control between two
+     `--space-3` rails plus the 2px top rule. `.samograph-settings` reserves
+     exactly this much at the end of the page, so the bar floats over reserved
+     emptiness instead of over the last select (audit `d01`). */
+  --savebar-h: calc(var(--control-h) + var(--space-3) * 2 + var(--border-strong));
+  /* Elevation is reserved for things that genuinely float (DESIGN-MODEL §3):
+     the savebar and the jump-to-live pill. Upward-only, since the bar's shadow
+     falls on the content it sits above. */
+  --elev-savebar: 0 -4px 16px color-mix(in srgb, var(--ink) 10%, transparent);
+
+  /* Interaction */
+  --focus-ring: var(--ink);
+  --hover-surface: color-mix(in srgb, var(--ink) 5%, var(--surface));
+  --control-border: var(--line-strong);
+  --field-bg-disabled: color-mix(in srgb, var(--muted) 8%, var(--surface));
+
+  /* Disabled buttons (design PR 7). A designed state, not a dimmer: a real
+     fill, a real hairline and a real label ink, each of which can be MEASURED
+     (apps/web/test/button-states.test.ts). Every token here is var()-chained to
+     a theme token, so the dark registries below re-resolve them for free. */
+  --btn-disabled-bg: var(--field-bg-disabled);
+  --btn-disabled-fg: var(--muted);
+  --btn-disabled-border: var(--line-strong);
+
+  /* Motion (DESIGN-MODEL §3). The switch knob is the first state change in the
+     app that animates, so it introduces the shared pair; anything that
+     animates next uses these rather than inventing a third curve. */
+  --dur-base: 180ms;
+  --ease: cubic-bezier(.2, 0, 0, 1);
+
+  /* Switch (design PR 9, DESIGN-MODEL §4 "Checkbox / Toggle"). `role="switch"`
+     announced a switch and drew a 13px UA checkbox. These five numbers are one
+     geometry: pad + knob + travel + pad = width, and pad*2 + knob = height, so
+     changing the track means changing exactly one of them and the rest follow.
+     The hit area is NOT this box — the whole `<label>` is, and it takes
+     `--tap-min` on a coarse pointer (see the touch-target block below). */
+  --switch-w: 40px;
+  --switch-h: 24px;
+  --switch-knob: 18px;
+  --switch-pad: 3px;
+  --switch-travel: 16px;
+
+  /* Skeletons (design PR 10, DESIGN-MODEL §4 "Skeleton"). One grey, one
+     rhythm, one shimmer for all four variants. The four heights are the things
+     a skeleton stands in for — a line of body text, an `<h1>`, an `<h2>`, a
+     control, a call row — so a placeholder can be built to the height of the
+     content that is coming instead of jumping when it arrives. */
+  --skeleton-bg: color-mix(in srgb, var(--muted) 15%, transparent);
+  --skeleton-radius: var(--radius-md);
+  --skeleton-gap: var(--space-3);
+  --skeleton-dur: 1.4s;
+  --skeleton-bar-h: 16px;
+  --skeleton-title-h: 34px;
+  --skeleton-head-h: 25px;
+  --skeleton-control-h: var(--control-h);
+  --skeleton-area-h: 157px;
+  --skeleton-row-h: 71px;
+  --skeleton-para-h: 43px;
+  --skeleton-hero-h: 134px;
+  --skeleton-block-h: 245px;
+}
+

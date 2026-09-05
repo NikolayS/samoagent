@@ -26,7 +26,7 @@ Findings backing this plan: [`AUDIT-2026-09-04.md`](./AUDIT-2026-09-04.md).
 | **11** | **merged (#285)** | `feat(web): dashboard row — meeting title, meta column, closer CTA` | `globals.css`, `Dashboard.tsx` | Three-column row; URL demoted to the secondary line. Delivered by the mobile-track M7 PR (#285) — no separate desktop PR needed. |
 | **12** | **merged (#293 + #297)** | `fix(web): dark-mode hairlines and instrument button variant` | `globals.css` | Dark-mode hairline lift + `--on-panel` instrument buttons landed inside #293; the matching light-mode hairline fix (`--line` contrast) landed in #297 (staged on `feat/web-design-v2`, not yet on `main`). |
 | **13** | **merged (#301, on `feat/web-design-v2`)** | `fix(web): converge the landing on the app's control geometry` | `globals.css`, `Landing.tsx`, `components/__fixtures__/landing.baseline.html` | Merges `.samograph-button` into `.samograph-btn`. Updates the baseline fixture. Staged on `feat/web-design-v2`, not yet on `main`. |
-| 14 | **not started (deliberately last)** | `chore(web): split globals.css into layers` | `globals.css` → `styles/{tokens,base,components,pages}.css` | Only after 1–13 land — re-organising first would make every prior diff unreviewable. |
+| 14 | **in review** | `refactor(web): split globals.css by concern` | `globals.css` (now an import manifest) → `app/styles/*.css` (17 concern files), `test/helpers/stylesheet.ts`, `test/stylesheet-split.test.ts` | Only after 1–13 land — re-organising first would make every prior diff unreviewable. Pure move: no rule, declaration or value changed; the import list preserves the original source order (= the cascade). |
 
 **Cross-cutting notes**
 - PRs 1–4, 6–7 and 12 are CSS-only and should not move a single test (tests query by role/label,
@@ -36,7 +36,10 @@ Findings backing this plan: [`AUDIT-2026-09-04.md`](./AUDIT-2026-09-04.md).
 - `apps/web/test/greenroom-tokens.test.ts` pins the `--google-btn-*` values literally — do not
   touch them in any PR.
 - `test/no-dead-css.test.ts` and `test/css-tokens-defined.test.ts` both read `globals.css` by
-  path — this is why PR 14 (splitting the stylesheet) must come last.
+  path — this is why PR 14 (splitting the stylesheet) must come last. **Since PR 14 every CSS
+  guard reads the sheet through `test/helpers/stylesheet.ts` (`readGlobalsCss()`), which resolves
+  the `@import`s in `app/globals.css` and returns the concatenated sheet — never `readFileSync`
+  a stylesheet by path in a new guard.**
 
 ---
 

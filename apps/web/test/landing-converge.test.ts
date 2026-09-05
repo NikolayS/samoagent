@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Desktop PR 13 — "converge the landing on the app's design language"
@@ -23,8 +24,7 @@ import { join } from "node:path";
  * `.samograph-instrument` must now declare the family itself instead of
  * inheriting it from `.samograph-landing`.
  */
-const cssPath = join(import.meta.dir, "../app/globals.css");
-const raw = readFileSync(cssPath, "utf8");
+const raw = readGlobalsCss();
 const css = raw.replace(/\/\*[\s\S]*?\*\//g, "");
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

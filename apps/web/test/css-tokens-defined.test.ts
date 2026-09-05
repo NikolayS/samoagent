@@ -1,11 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 // A `var(--x)` with no definition and no fallback is invalid at computed-value
 // time, which drops the WHOLE declaration — silently. That is how the prod
 // serif bug happened (#255), so the stylesheet is guarded against a repeat.
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
 // Injected at runtime by next/font onto <html>; always referenced WITH a fallback.
 const RUNTIME = new Set(["--font-inter", "--font-jetbrains"]);

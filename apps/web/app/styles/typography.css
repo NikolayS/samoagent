@@ -1,0 +1,37 @@
+h1, h2, h3 {
+  font-family: var(--font-display);
+  color: var(--ink);
+}
+
+h1 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: var(--leading-tight);
+}
+
+/* A section title has to OUTRANK body copy. `h2` was `--text-md` (16px) over a
+   `--text-base` (14px) body — a 2px step, which is why the dashboard's four
+   peer sections read as one undifferentiated column (design audit; DESIGN-MODEL
+   §3 "Type scale"). 20 / 16 / 14 is the scale; the sizes come from the tokens so
+   the steps stay related. */
+h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  line-height: var(--leading-tight);
+}
+
+h3 {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+a {
+  color: var(--green-deep);
+}
+
+a:hover {
+  color: var(--green);
+}
+

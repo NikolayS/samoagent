@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const css = readGlobalsCss();
 const heading = "/* ===== Slice 3 — Transcript instrument (calls/[id], c/[token]) ===== */";
 
 describe("Slice 3 transcript instrument CSS", () => {

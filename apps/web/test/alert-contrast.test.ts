@@ -1,13 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 // Alert copy is body text, so it must clear WCAG AA (4.5:1) against the tint it
 // sits on — in BOTH themes. `--accent-live` mint fails this on the light
 // surface, which is why DESIGN.md keeps it inside the instrument panel.
 const MIN_CONTRAST = 4.5;
 
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 
 function block(selector: string): Record<string, string> {
   const body = css.match(new RegExp(`${selector.replace(/[[\]"^$.*+?()\\|{}]/g, "\\$&")}\\s*\\{([^}]*)\\}`))?.[1] ?? "";

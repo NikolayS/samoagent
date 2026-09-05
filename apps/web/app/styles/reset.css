@@ -1,0 +1,26 @@
+/* =============================================================================
+ * Base elements
+ * ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  font-family: var(--font-body);
+  background: var(--ground);
+  color: var(--ink);
+}
+
+main,
+section {
+  max-width: none;
+  margin: 0;
+}
+

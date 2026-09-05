@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * M4 — the call-view header must stop eating the top of a phone screen.
@@ -9,7 +8,7 @@ import { join } from "node:path";
  * panel header collapses to ONE row (state + id) below 768px instead of the
  * three-row, 161px stack the mobile audit measured.
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
+const css = readGlobalsCss();
 const slice3 = css.slice(css.indexOf("/* ===== Slice 3 — Transcript instrument"));
 /**
  * Slice 3 contains TWO `@media (max-width: 48rem)` blocks — this one and the

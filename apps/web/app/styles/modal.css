@@ -1,0 +1,30 @@
+/* ===== Slice 6 — Modal + shortcuts ===== */
+.samograph-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+.samograph-modal-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--panel-ground) 60%, transparent); }
+.samograph-modal-panel {
+  position: relative; z-index: 1; width: min(100%, 480px);
+  max-height: calc(100vh - (2 * var(--space-4))); overflow: auto;
+  padding: var(--space-5); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--control-border); border-radius: var(--radius-md);
+}
+.samograph-share-modal, .samograph-share-active { display: grid; gap: var(--space-4); }
+.samograph-modal-header, .samograph-share-header, .samograph-share-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.samograph-modal-header h2, .samograph-share-header h2, .samograph-share-blurb, .samograph-share-rotated { margin: 0; }
+.samograph-share-blurb, .samograph-share-rotated { color: var(--muted); font-size: var(--text-sm); }
+.samograph-share-url { overflow-wrap: anywhere; font-family: var(--font-mono); }
+.samograph-shortcut-list { display: grid; gap: var(--space-2); margin: var(--space-4) 0 0; }
+.samograph-shortcut-list > div { display: grid; grid-template-columns: 7rem 1fr; gap: var(--space-2); align-items: center; }
+.samograph-shortcut-list dt, .samograph-shortcut-list dd { margin: 0; }
+.samograph-shortcut-list kbd {
+  padding: var(--space-1) var(--space-2); font-family: var(--font-mono); font-size: var(--text-xs);
+  background: var(--ground); border: 1px solid var(--control-border); border-radius: var(--radius-md);
+}
+/* ===== end Slice 6 ===== */
+

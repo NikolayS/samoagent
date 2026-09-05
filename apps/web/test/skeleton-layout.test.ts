@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Design PR 10 (docs/design/PLAN.md, desktop track #10 — "skeletons everywhere a
@@ -20,7 +21,7 @@ import { join } from "node:path";
  *      settings sections they stand in for (the measured ≤8px claim in the PR
  *      body rests on these heights).
  */
-const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const css = readGlobalsCss().replace(/\/\*[\s\S]*?\*\//g, "");
 const root = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 

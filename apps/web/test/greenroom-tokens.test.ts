@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readGlobalsCss } from "./helpers/stylesheet";
 
 /**
  * Refined design-token contract (issue #241).
@@ -14,7 +15,7 @@ import { join } from "node:path";
  * DOM-free: it reads the CSS as text and asserts its structure — no renderer.
  */
 
-const CSS = readFileSync(join(import.meta.dir, "..", "app", "globals.css"), "utf8");
+const CSS = readGlobalsCss();
 // Comments may legitimately mention hex values / token names in prose; strip
 // them so neither the token-presence nor the no-raw-hex scan trips on prose.
 const CSS_NO_COMMENTS = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
