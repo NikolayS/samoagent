@@ -165,6 +165,37 @@ describe("G2Relay", () => {
     expect(timers[1]?.cleared).toBe(true);
   });
 
+  it("rejects an oversized auth frame without authenticating the pending agent", async () => {
+    const tokens = ["room", "secret", "device"];
+    const relay = new G2Relay({
+      randomCode: () => "444444",
+      randomToken: () => tokens.shift()!,
+    });
+    const app = socket();
+    relay.openApp(app);
+    await relay.fetch(
+      new Request("http://x/g2/pair", {
+        method: "POST",
+        body: JSON.stringify({ code: "444444" }),
+      }),
+    );
+
+    const agent = socket();
+    relay.openAgent(agent, "room");
+    const emptyAuth = JSON.stringify({ type: "auth", token: "secret", padding: "" });
+    const oversizedAuth = JSON.stringify({
+      type: "auth",
+      token: "secret",
+      padding: "x".repeat(8_193 - Buffer.byteLength(emptyAuth, "utf8")),
+    });
+    expect(Buffer.byteLength(oversizedAuth, "utf8")).toBe(8_193);
+
+    relay.messageAgent(agent, oversizedAuth);
+    expect(agent.closed).toEqual([[4400, "frame too large"]]);
+    relay.messageApp(app, JSON.stringify({ type: "cue", cue: "confirm" }));
+    expect(agent.sent).toEqual([]);
+  });
+
   it("sweeps expired per-IP claim windows", async () => {
     let now = 0;
     const relay = new G2Relay({ now: () => now });

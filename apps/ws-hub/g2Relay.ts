@@ -132,12 +132,29 @@ export class G2Relay {
     if (!pending) return;
     this.pendingAgents.delete(socket);
     this.clearTimer(pending.timer);
-    const text = typeof raw === "string" ? raw : Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength).toString("utf8");
+    const text = this.decodeFrame(raw);
+    if (text === null) {
+      socket.close(4400, "frame too large");
+      return;
+    }
     let message: unknown;
-    try { message = JSON.parse(text); } catch { message = null; }
-    const supplied = typeof message === "object" && message !== null && (message as any).type === "auth" && typeof (message as any).token === "string" ? (message as any).token : "";
+    try {
+      message = JSON.parse(text);
+    } catch {
+      message = null;
+    }
+    const supplied =
+      typeof message === "object" &&
+      message !== null &&
+      (message as any).type === "auth" &&
+      typeof (message as any).token === "string"
+        ? (message as any).token
+        : "";
     const room = this.room(pending.id);
-    if (!room || !equal(room.token, supplied)) { socket.close(4401, "unauthorized"); return; }
+    if (!room || !equal(room.token, supplied)) {
+      socket.close(4401, "unauthorized");
+      return;
+    }
     room.agent?.close(4409, "replaced");
     room.agent = socket;
     room.touchedAt = this.now();
@@ -155,11 +172,8 @@ export class G2Relay {
 
   /** Handle resume and cue protocol messages sent by the phone app. */
   messageApp(socket: G2Socket, raw: string | ArrayBufferView): void {
-    const text =
-      typeof raw === "string"
-        ? raw
-        : Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength).toString("utf8");
-    if (new TextEncoder().encode(text).byteLength > MAX_FRAME) {
+    const text = this.decodeFrame(raw);
+    if (text === null) {
       socket.close(4400, "frame too large");
       return;
     }
@@ -200,6 +214,15 @@ export class G2Relay {
       const cue = normalizeCueSemantic(message.cue);
       if (cue) room.agent?.send(JSON.stringify({ type: "cue", cue }));
     }
+  }
+
+  private decodeFrame(raw: string | ArrayBufferView): string | null {
+    const byteLength =
+      typeof raw === "string" ? Buffer.byteLength(raw, "utf8") : raw.byteLength;
+    if (byteLength > MAX_FRAME) return null;
+    return typeof raw === "string"
+      ? raw
+      : Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength).toString("utf8");
   }
 
   /** Serve pairing, whisper, health, and room deletion HTTP requests. */
