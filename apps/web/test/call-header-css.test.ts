@@ -11,10 +11,18 @@ import { join } from "node:path";
  */
 const css = readFileSync(join(import.meta.dir, "../app/globals.css"), "utf8");
 const slice3 = css.slice(css.indexOf("/* ===== Slice 3 — Transcript instrument"));
-// The compact-header mobile rules live inside the Slice 3 region, before the
-// transcript-row blocks other engineers own.
+/**
+ * Slice 3 contains TWO `@media (max-width: 48rem)` blocks — this one and the
+ * later head/foot column stack — so `indexOf("@media (max-width: 48rem)")` is
+ * ambiguous: reorder the file and the guard silently reads the wrong block
+ * (#283 re-review NB2). Anchor on a marker comment that names this block, and
+ * take the media query that immediately follows it.
+ */
+const MARKER = "/* M4:compact-call-header";
 const mobile = (() => {
-  const start = slice3.indexOf("@media (max-width: 48rem)");
+  const marker = slice3.indexOf(MARKER);
+  if (marker < 0) return "";
+  const start = slice3.indexOf("@media (max-width: 48rem)", marker);
   if (start < 0) return "";
   // Nested-free block: read to the matching closing brace.
   let depth = 0;
@@ -40,6 +48,10 @@ describe("M4 call-view header CSS", () => {
 
   it("has a mobile block on the 48rem boundary inside Slice 3", () => {
     expect(mobile).not.toBe("");
+  });
+
+  it("is anchored on a marker that appears exactly once in globals.css", () => {
+    expect(css.split(MARKER).length - 1).toBe(1);
   });
 
   it("shrinks the page H1 and its bottom margin on mobile", () => {

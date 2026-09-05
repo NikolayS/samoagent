@@ -1321,6 +1321,24 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   color: var(--warn);
 }
 
+/* The warning's own <li> is NOT a transcript row: it has one child, not four
+   columns. Without this it matched only `.samograph-instrument-lines li`, whose
+   `56px 82px 66px minmax(480px, 1fr)` track list gives the list an intrinsic
+   minimum of ~684px — so a single warning made the whole transcript scroll
+   horizontally on a 390px phone (#280 review). One full-width cell instead, at
+   every width; the four-column grid of real rows is untouched. */
+.samograph-instrument-lines > li.samograph-warning-row {
+  display: block;
+  padding: 8px 16px;
+}
+
+/* Same as every other instrument row: no page-level tally counter, which would
+   otherwise print over the first characters of the warning. */
+.samograph-percall .samograph-warning-row::before,
+.samograph-percall .samograph-warning-row::after {
+  content: none;
+}
+
 /* =============================================================================
  * Owner / share controls & read-only share page
  * ========================================================================== */
@@ -1552,7 +1570,12 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   color: color-mix(in srgb, var(--crit) 78%, white);
 }
 
-/* M4 — collapse the call-view header on a phone (mobile audit §1 C/D). The page
+/* M4:compact-call-header — the unique anchor for apps/web/test/call-header-css.test.ts.
+   Slice 3 holds more than one `@media (max-width: 48rem)` block, so the guard
+   locates THIS one by this marker, not by the media query text. Keep the marker
+   immediately above the block.
+
+   M4 — collapse the call-view header on a phone (mobile audit §1 C/D). The page
    heading shrinks, and the sticky panel head stays ONE row (call id + state chip
    + timer) instead of the 161px three-row stack. The `header.` qualifier raises
    specificity over the later same-width block, which stacks the

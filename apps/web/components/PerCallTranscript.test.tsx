@@ -638,3 +638,40 @@ describe("PerCallTranscript — failed calls display the persisted error reason 
     );
   });
 });
+
+describe("transcript row markup — reflow follow-ups (#280 review)", () => {
+  it("marks the SAMOGRAPH-WARNING <li> as a full-width warning row, not a bare grid cell", async () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() =>
+      client.emitLine(
+        line({ seq: 1, speaker: "SAMOGRAPH-WARNING", text: "tunnel unreachable (ERR_NGROK_727)" }),
+      ),
+    );
+    await waitFor(() => {
+      expect(container.querySelector("li.samograph-warning-row")).not.toBeNull();
+    });
+    const row = container.querySelector("li.samograph-warning-row") as HTMLLIElement;
+    // Exactly this class — NOT the four-column `samograph-transcript-row` grid.
+    expect(row.getAttribute("class")).toBe("samograph-warning-row");
+    expect(row.querySelector("[role='note']")?.textContent).toBe(
+      `[${TS}] SAMOGRAPH-WARNING: tunnel unreachable (ERR_NGROK_727)`,
+    );
+  });
+
+  it("renders the machine-readable dateTime the TranscriptTime doc comment promises", async () => {
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ seq: 1, ts: TS, text: "hello" })));
+    await waitFor(() => {
+      expect(container.querySelector("time.samograph-line-time")).not.toBeNull();
+    });
+    const time = container.querySelector("time.samograph-line-time") as HTMLTimeElement;
+    expect(time.getAttribute("dateTime") ?? time.getAttribute("datetime")).toBe(TS);
+    expect(time.getAttribute("title")).toBe(TS);
+  });
+});
