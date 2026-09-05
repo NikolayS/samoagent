@@ -674,4 +674,24 @@ describe("transcript row markup — reflow follow-ups (#280 review)", () => {
     expect(time.getAttribute("dateTime") ?? time.getAttribute("datetime")).toBe(TS);
     expect(time.getAttribute("title")).toBe(TS);
   });
+
+  it("omits dateTime entirely when the ts is not a timestamp we could parse (#288 NB)", async () => {
+    // `formatTranscriptTimestamp` is total: an unparsable ts is returned
+    // verbatim. Feeding that back into `dateTime` publishes a machine-readable
+    // attribute that is not machine-readable — worse than none, because a
+    // consumer (or a screen reader in datetime mode) trusts it. The human
+    // `title` still carries the raw value.
+    const client = createFakeTranscriptStreamClient({ callDetail: detail({ status: "IN_CALL" }) });
+    const { container } = render(
+      <PerCallTranscript streamClient={client} auth={{ kind: "session" }} callId="call_1" />,
+    );
+    act(() => client.emitLine(line({ seq: 1, ts: "not a timestamp", text: "hello" })));
+    await waitFor(() => {
+      expect(container.querySelector("time.samograph-line-time")).not.toBeNull();
+    });
+    const time = container.querySelector("time.samograph-line-time") as HTMLTimeElement;
+    expect(time.getAttribute("dateTime") ?? time.getAttribute("datetime")).toBeNull();
+    expect(time.getAttribute("title")).toBe("not a timestamp");
+    expect(time.textContent).toBe("not a timestamp");
+  });
 });

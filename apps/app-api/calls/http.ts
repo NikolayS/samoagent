@@ -547,6 +547,17 @@ export function createCallsHandler(
     const match = url.pathname.match(/^\/calls\/([^/]+)$/);
     if (req.method === "GET" && match) {
       const callId = decodeURIComponent(match[1]);
+      // Authentication BEFORE authorization (#300), matching `GET /calls` and the
+      // share routes: no valid session AND no share credential → bodyless 401, so
+      // an expired session sends the web client to /auth instead of degrading to a
+      // 403. A deleted-tenant owner cookie → 401 clear-cookie (#114). A request
+      // that DOES carry a share credential falls through to the gate unchanged, so
+      // a bad/expired token still 403s — and a valid session on a cross-tenant or
+      // unknown id still 403s bodyless below (no existence leak).
+      const session = await resolveOwnerSession(cookie);
+      if (session.kind !== "ok" && !hasShareCredential(req, url)) {
+        return session.kind === "stale" ? sessionInvalidResponse() : unauthenticated();
+      }
       const shareToken = readShareCredential(req, url);
       const result = await sql.begin(async (tx) => {
         await tx.unsafe("SET LOCAL ROLE samograph_app");

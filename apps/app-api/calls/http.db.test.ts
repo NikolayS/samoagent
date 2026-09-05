@@ -325,13 +325,6 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
     expect(body.calls.find((c) => c.id === callA)?.status_reason).toBeNull();
   });
 
-  it("GET /calls/:id: no session → 403 bodyless (gate DENY)", async () => {
-    const { handler } = makeHandler();
-    const res = await handler(req("GET", `/calls/${callA}`));
-    expect(res.status).toBe(403);
-    expect(await res.text()).toBe("");
-  });
-
   // ── Cross-tenant isolation, RLS-enforced (§5.6 / §5.10 / #41 reviewer flag) ──
   it("GET /calls/:id: tenant B cannot read tenant A's call → 403 bodyless", async () => {
     const { handler } = makeHandler();
@@ -381,6 +374,13 @@ d("/calls HTTP adapter (DB-backed, §5.2 / §5.6 / §5.10)", () => {
   it("GET /calls: no session → 401 bodyless", async () => {
     const { handler } = makeHandler();
     const res = await handler(req("GET", "/calls"));
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("");
+  });
+
+  it("GET /calls/:id: no session → 401 bodyless", async () => {
+    const { handler } = makeHandler();
+    const res = await handler(req("GET", `/calls/${callA}`));
     expect(res.status).toBe(401);
     expect(await res.text()).toBe("");
   });

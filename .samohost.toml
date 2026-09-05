@@ -1,12 +1,31 @@
 # samohost app manifest for samograph.dev — schema: NikolayS/samohost src/manifest/toml.ts.
 #
 # NOTE: this file is INERT until an operator runs, ON THE CONTROL PLANE:
-#   samohost app register samograph --from-toml .samohost.toml --force
+#   samohost app register <vm> --from-toml .samohost.toml
+# (There is NO `--force` flag — an earlier version of this comment invented one.
+#  Register is state-only: it records the manifest and does NOT deploy.)
 # That is the one command that flips deploys to the 3-tier model:
 #   v* release tag  -> production   (samograph.samo.team)
 #   merge to main   -> main preview  (samograph-main.samo.cat)
-#   dev-branch push -> branch preview (samograph-<branch>.samo.cat), each a DBLab clone
+#   open PR         -> PR preview   (samograph-<branch>.samo.cat), each a DBLab clone
 # (Requires the samohost release-tag feature — NikolayS/samohost#132 / PR #133.)
+#
+# RELEASE TAG GRAMMAR (samohost src/commands/app.ts:1212) — `releaseTagPattern = "v*"`
+# plus `releaseTagFormat = "date"` means only tags matching
+#
+#     ^v(\d{4})(\d{2})(\d{2})\.([1-9]\d*)$        e.g. v20260904.1
+#
+# are deploy candidates. Old npm tags (v0.x) never match and are ignored by the
+# deploy channel. A candidate ships only when it is STRICTLY NEWER than the last
+# deployed tag, its SHA is an ancestor of `main`, and `releaseCiWorkflow` is GREEN
+# on that exact SHA. Cut tags with `.github/workflows/release.yml`; the operator
+# checklist is `docs/runbooks/deploy-release.md`.
+#
+# GAP: samohost has NO standing main-preview auto-refresh yet (NikolayS/samohost#150).
+# Previews are created per OPEN PR (not per branch push) by `trigger run --pr-previews`
+# on a 5-minute timer. The `branch = "main"` env below must be created once by hand
+# (`samohost env create <vm> samograph --branch main --db dblab`) and will not
+# auto-refresh on new `main` commits until #150 lands.
 #
 # NO secrets belong here (public repo). DB URLs + tokens stay in envFile on the host,
 # which samohost never reads or writes.
