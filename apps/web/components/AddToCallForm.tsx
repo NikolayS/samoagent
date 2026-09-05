@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { Alert } from "./Alert.tsx";
 import { AppApiError, type AppApiClient, type Call } from "../lib/appApiClient.ts";
 import { isSessionInvalid, SESSION_INVALID_MESSAGE } from "../lib/apiError.ts";
 import { validateMeetingUrl } from "../lib/validateMeetingUrl.ts";
@@ -101,7 +102,7 @@ export function AddToCallForm({ client, initialUrl = "", onCreated, autoFocus = 
             Add to call
           </button>
         </div>
-        {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+        {error ? <Alert tone="danger">{error}</Alert> : null}
       </form>
       {call ? (
         <p>

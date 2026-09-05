@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { Alert } from "./Alert.tsx";
 import {
   formatRenderLine,
   formatTranscriptTimestamp,
@@ -389,9 +390,9 @@ export function PerCallTranscript({
       <DegradedBanner degraded={state.degraded} />
 
       {fatalError || statusMessageMovedToCard ? (
-        <div role="alert" className="samograph-stream-error samograph-alert samograph-alert--error">
+        <Alert tone="danger" as="div" className="samograph-stream-error">
           <p>{fatalError ? streamErrorCopy(fatalError.code, fatalError.message) : view.message}</p>
-        </div>
+        </Alert>
       ) : (
         <ol
           ref={transcriptRef}

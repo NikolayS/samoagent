@@ -207,13 +207,27 @@ Two forms, one class family:
 
 ### Alert / Banner — `.samograph-alert`
 ```
-layout    grid-template-columns: 20px 1fr; gap var(--space-3);
+layout    display: flow-root — NOT flex/grid: alert copy is a sentence that
+          routinely contains an <a>/<span>, and a flex root promotes each of
+          those to a flex item, opening gaps inside the sentence.
           padding var(--space-3) var(--space-4); border-radius var(--radius-control)
-tone      border-left: 3px solid <tone>; border: 1px solid --line; background: 6% tint of <tone>
-          text: var(--ink) — NOT the tone colour. The tone lives in the rail + icon.
-icon      a 16px glyph in the leading column, per tone
-sizes     --inline  single-line, --text-xs, no icon — for the savebar status
+tone      border-inline-start: var(--alert-rail, 3px) solid <tone>;
+          border: 1px solid --line; background: 8% tint of <tone>
+          text: var(--ink) — NOT the tone colour. The tone lives in the rail.
+icon      none. The rail carries the tone; a leading glyph column costs width at
+          390px for no added meaning.
+tones     info | success | warning | danger  (CSS variants: --info --success
+          --warn --error, pinned literally by test/alert-contrast.test.ts)
+live      the tone picks the live region — status for info/success, alert for
+          warning/danger — and `live="polite" | "assertive" | "off"` overrides
+          it. A STANDING condition (re-rendered on every load) must not announce
+          assertively; only transient events may.
+slots     optional `title` (own line, 600) and `action` (block, right-parked)
 ```
+Implemented by `components/Alert.tsx` (desktop PR 8) — the only place that writes
+these class names. A call-site `className` is for geometry only: it ties with
+`.samograph-alert` at (0,1,0) and wins on source order, so setting
+`color`/`background`/`border*` there erases the rail (guarded).
 
 ### Card / Section
 Two containers, and only two:

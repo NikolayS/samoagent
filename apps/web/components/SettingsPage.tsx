@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { Alert } from "./Alert.tsx";
 import { CalendarConnectionCard } from "./CalendarConnectionCard.tsx";
+import { PageHeader } from "./PageHeader.tsx";
 import {
   AppApiError,
   type AppApiClient,
@@ -202,10 +204,13 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
 
   return (
     <div className="samograph-settings">
-      <h1>Settings</h1>
+      <PageHeader
+        title="Settings"
+        description="How samograph transcribes your calls, behaves in the meeting, and connects to your account."
+      />
       <form id={formId} onSubmit={onSubmit}>
-        <section role="region" aria-labelledby={transcriptionHeadingId} className="samograph-settings-section">
-        <h2 id={transcriptionHeadingId}>Transcription</h2>
+        <section role="region" aria-labelledby={transcriptionHeadingId} className="samograph-section samograph-settings-section">
+        <div className="samograph-section-header"><h2 id={transcriptionHeadingId} className="samograph-section-title">Transcription</h2></div>
         <div className="samograph-field">
           <label htmlFor={presetId}>Dictionary preset</label>
           <div className="samograph-select">
@@ -250,8 +255,8 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
         </div>
         </section>
 
-        <section role="region" aria-labelledby={inCallHeadingId} className="samograph-settings-section">
-        <h2 id={inCallHeadingId}>In-call</h2>
+        <section role="region" aria-labelledby={inCallHeadingId} className="samograph-section samograph-settings-section">
+        <div className="samograph-section-header"><h2 id={inCallHeadingId} className="samograph-section-title">In-call</h2></div>
         <div className="samograph-field">
           <label htmlFor={chimeId}>Chat chime</label>
           <div className="samograph-select">
@@ -266,16 +271,16 @@ export function SettingsPage({ client, redirect }: SettingsPageProps) {
         </div>
         </section>
 
-        {error ? <p role="alert" className="samograph-alert samograph-alert--error">{error}</p> : null}
+        {error ? <Alert tone="danger">{error}</Alert> : null}
       </form>
 
       {/* OUTSIDE the form on purpose — it has no inputs and must never be
           submitted or saved (S5-1 item 8). */}
-      {signin ? <section role="region" aria-labelledby={accountHeadingId} className="samograph-settings-section"><h2 id={accountHeadingId}>Account</h2><SignInBlock signin={signin} googleAvailable={googleAvailable === true} /></section> : null}
-      {calendarAvailable ? <section role="region" aria-labelledby={integrationsHeadingId} className="samograph-settings-section"><h2 id={integrationsHeadingId}>Integrations</h2><CalendarConnectionCard client={client} onAuthFailure={calendarAuthFailure} nested /></section> : null}
+      {signin ? <section role="region" aria-labelledby={accountHeadingId} className="samograph-section samograph-settings-section"><div className="samograph-section-header"><h2 id={accountHeadingId} className="samograph-section-title">Account</h2></div><SignInBlock signin={signin} googleAvailable={googleAvailable === true} /></section> : null}
+      {calendarAvailable ? <section role="region" aria-labelledby={integrationsHeadingId} className="samograph-section samograph-settings-section"><div className="samograph-section-header"><h2 id={integrationsHeadingId} className="samograph-section-title">Integrations</h2></div><CalendarConnectionCard client={client} onAuthFailure={calendarAuthFailure} nested /></section> : null}
       <div className="samograph-savebar">
         <div className="samograph-savebar-status">
-          {dirty ? "Unsaved changes" : saved ? <span role="status" className="samograph-alert samograph-alert--success">Settings saved.</span> : null}
+          {dirty ? "Unsaved changes" : saved ? <Alert tone="success" as="span">Settings saved.</Alert> : null}
         </div>
         <button form={formId} type="submit" className="samograph-btn samograph-btn--primary" disabled={!dirty || phase === "saving"} aria-busy={phase === "saving"}>
           Save settings
