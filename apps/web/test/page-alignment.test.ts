@@ -59,11 +59,33 @@ describe("one page container for the nav and the page", () => {
 });
 
 describe("action rows keep buttons at their intrinsic width", () => {
+  // `.samograph-actions` predates this PR (InlineConfirm, MagicLinkRequestForm).
+  // A second rule elsewhere in the sheet does not "extend" the first — it wins
+  // or loses on source order, declaration by declaration, and a guard that
+  // reads only the FIRST match cannot see the difference. So: exactly one rule,
+  // and the assertions below are the whole of it.
+  it("declares .samograph-actions exactly once", () => {
+    // Anchored on the start of a selector (`}` / `;` / start of file) so a
+    // scoped override like `.samograph-calendar-card > .samograph-actions`
+    // does not count as a second base rule.
+    expect([...css.matchAll(/(?:^|[};])\s*\.samograph-actions\s*\{/g)]).toHaveLength(1);
+  });
+
   it("lays .samograph-actions out as a wrapping flex row", () => {
     const actions = rule(".samograph-actions");
     expect(actions).toContain("display: flex");
     expect(actions).toContain("flex-wrap: wrap");
-    expect(actions).toMatch(/gap:\s*var\(--space-\d+\)/);
+    // The gap and the top margin the pre-existing consumers already had —
+    // consolidating the rule must not move InlineConfirm or the magic-link form.
+    expect(actions).toContain("gap: var(--space-2)");
+    expect(actions).toContain("margin-top: var(--space-5)");
+  });
+
+  // …and the top margin is page rhythm, not part of an action row: inside the
+  // calendar card the grid `gap` already owns the spacing, so it is dropped
+  // rather than added to.
+  it("drops the row's top margin inside the calendar card's grid", () => {
+    expect(rule(".samograph-calendar-card > .samograph-actions")).toContain("margin-top: 0");
   });
 
   it("stops action-row children from stretching", () => {
@@ -75,5 +97,20 @@ describe("action rows keep buttons at their intrinsic width", () => {
     const card = readFileSync(join(import.meta.dir, "../components/CalendarConnectionCard.tsx"), "utf8");
     expect(card).not.toContain("samograph-signin");
     expect(card).toContain("samograph-actions");
+  });
+});
+
+/**
+ * `<main>` no longer re-centres itself for `--form`, so anything that used to
+ * be centred BY the page has to centre itself. The `/auth` Suspense fallback
+ * (`.samograph-skeleton--form`) capped its width but never centred, so the
+ * placeholder sat at the page's left edge and the loaded card jumped ~270px
+ * right at 1024px.
+ */
+describe("the form skeleton sits where the form it replaces sits", () => {
+  it("centres .samograph-skeleton--form in the page", () => {
+    const skeleton = rule(".samograph-skeleton--form");
+    expect(skeleton).toContain("max-width: var(--width-form)");
+    expect(skeleton).toContain("margin-inline: auto");
   });
 });
