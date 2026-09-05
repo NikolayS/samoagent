@@ -21,6 +21,7 @@ import {
   type TranscriptStreamEvent,
 } from "../lib/transcriptStreamClient.ts";
 import { DegradedBanner, WarningLine } from "./DegradedBanner.tsx";
+import { displayMeetingUrl } from "../lib/meetingUrl.ts";
 
 /**
  * §5.16 user-facing copy for the typed stream failures the read-only page can
@@ -328,6 +329,10 @@ export function PerCallTranscript({
   // An explicit prop wins; otherwise the reason fetched from /calls/:id applies.
   const view = statusView(state.status, { recallReason: recallReason ?? fetchedReason });
   const hasLines = state.lines.length > 0 || state.partial !== null;
+  // The header shows the meeting link at every width, so it is the query-stripped
+  // form: a Zoom `?pwd=` is a join secret and must never be rendered ("" when the
+  // URL cannot be parsed, which renders nothing at all).
+  const shownMeetingUrl = meetingUrl ? displayMeetingUrl(meetingUrl) : "";
   const emptyCopy = view.kind === "pending"
     ? "Waiting for the bot to join…"
     : view.kind === "joining"
@@ -366,8 +371,8 @@ export function PerCallTranscript({
       <header className="samograph-status samograph-instrument-head" data-status-kind={view.kind}>
         <div className="samograph-instrument-meta">
           {auth.kind === "session" ? <strong>call / {callId.slice(0, 8)}</strong> : <strong>shared transcript</strong>}
-          {auth.kind === "session" && meetingUrl ? <><i aria-hidden="true">|</i><span>{meetingUrl}</span></> : null}
-          {auth.kind === "session" ? <><i aria-hidden="true">|</i><span>dictionary: account default</span></> : null}
+          {auth.kind === "session" && shownMeetingUrl ? <><i aria-hidden="true">|</i><span className="samograph-instrument-url">{shownMeetingUrl}</span></> : null}
+          {auth.kind === "session" ? <><i aria-hidden="true">|</i><span className="samograph-instrument-dictionary">dictionary: account default</span></> : null}
         </div>
         <div className="samograph-instrument-state">
           <span className="samograph-status-label">{view.label}</span>

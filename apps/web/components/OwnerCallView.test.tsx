@@ -41,11 +41,115 @@ function renderOwner(
 }
 
 describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", () => {
-  it("renders exactly one h1 and a Dashboard back link", () => {
+  it("renders exactly one h1 — the readable meeting name, not the raw URL", () => {
     const { getAllByRole, getByRole } = renderOwner();
     expect(getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(getAllByRole("heading", { level: 1 })[0]?.textContent).toBe(MEETING_URL);
+    expect(getAllByRole("heading", { level: 1 })[0]?.textContent).toBe("Google Meet \u00b7 abc-defg-hij");
     expect(getByRole("link", { name: /dashboard/i }).getAttribute("href")).toBe("/dashboard");
+  });
+
+  it("demotes the meeting URL to a small secondary line that opens the meeting", () => {
+    const { container } = renderOwner();
+    const link = container.querySelector("a.samograph-call-view-url");
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toBe(MEETING_URL);
+    expect(link?.getAttribute("href")).toBe(MEETING_URL);
+    expect(link?.getAttribute("rel")).toBe("noreferrer noopener");
+  });
+
+  it("never shows a Zoom join password anywhere in the page or panel header", () => {
+    const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const { container } = render(
+      <OwnerCallView
+        streamClient={stream}
+        shareClient={createFakeShareApiClient()}
+        appClient={createFakeAppApiClient()}
+        callId="call_1"
+        meetingUrl="https://zoom.us/j/1234567890?pwd=s3cr3tPassw0rd"
+        redirect={() => {}}
+      />,
+    );
+    const heading = container.querySelector(".samograph-call-view-heading");
+    expect(heading?.querySelector("h1")?.textContent).toBe("Zoom \u00b7 123 456 7890");
+    expect(heading?.textContent).not.toContain("s3cr3tPassw0rd");
+    expect(heading?.querySelector("a.samograph-call-view-url")?.textContent).toBe(
+      "https://zoom.us/j/1234567890",
+    );
+    // The panel header shows the URL too — at EVERY width (it is only hidden
+    // below 768px by CSS), so it must be query-stripped in the markup itself.
+    expect(container.querySelector(".samograph-instrument-url")?.textContent).toBe(
+      "https://zoom.us/j/1234567890",
+    );
+    // No visible text and no tooltip anywhere leaks the password.
+    expect(container.textContent).not.toContain("pwd=");
+    for (const el of container.querySelectorAll("[title]")) {
+      expect(el.getAttribute("title")).not.toContain("pwd=");
+    }
+  });
+
+  it("keeps the RAW join URL as the header link href so the link still joins", () => {
+    const raw = "https://zoom.us/j/1234567890?pwd=s3cr3tPassw0rd";
+    const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const { container } = render(
+      <OwnerCallView
+        streamClient={stream}
+        shareClient={createFakeShareApiClient()}
+        appClient={createFakeAppApiClient()}
+        callId="call_1"
+        meetingUrl={raw}
+        redirect={() => {}}
+      />,
+    );
+    const link = container.querySelector("a.samograph-call-view-url");
+    // Deliberate: the href is the real join link (stripping it would break
+    // click-to-join for a password-protected Zoom room). Only what is RENDERED
+    // — link text and tooltips — is query-stripped.
+    expect(link?.getAttribute("href")).toBe(raw);
+    expect(link?.textContent).toBe("https://zoom.us/j/1234567890");
+    expect(link?.getAttribute("title")).toBe("https://zoom.us/j/1234567890");
+  });
+
+  it("falls back to the call id when no meeting URL is known", () => {
+    const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const { container } = render(
+      <OwnerCallView
+        streamClient={stream}
+        shareClient={createFakeShareApiClient()}
+        appClient={createFakeAppApiClient()}
+        callId="call_abcdefgh"
+        meetingUrl=""
+        redirect={() => {}}
+      />,
+    );
+    expect(container.querySelector("h1")?.textContent).toBe("Call call_abc");
+    expect(container.querySelector("a.samograph-call-view-url")).toBeNull();
+  });
+
+  it("keeps the call-id fallback when the URL yields no usable title", () => {
+    const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const { container } = render(
+      <OwnerCallView
+        streamClient={stream}
+        shareClient={createFakeShareApiClient()}
+        appClient={createFakeAppApiClient()}
+        callId="call_abcdefgh"
+        meetingUrl="not a url"
+        redirect={() => {}}
+      />,
+    );
+    // `meetingTitle` returns the constant "Meeting" and `displayMeetingUrl` ""
+    // for an unparseable input — neither is a heading, so the id wins.
+    expect(container.querySelector("h1")?.textContent).toBe("Call call_abc");
+    expect(container.querySelector("a.samograph-call-view-url")).toBeNull();
+    expect(container.querySelector(".samograph-instrument-url")).toBeNull();
+  });
+
+  it("classes the panel-header URL and dictionary so mobile can drop them", () => {
+    const { container } = renderOwner();
+    expect(container.querySelector(".samograph-instrument-url")?.textContent).toBe(MEETING_URL);
+    expect(container.querySelector(".samograph-instrument-dictionary")?.textContent).toBe(
+      "dictionary: account default",
+    );
   });
 
   it("renders the transcript as the shared instrument panel", () => {

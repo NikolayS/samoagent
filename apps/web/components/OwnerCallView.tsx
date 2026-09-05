@@ -6,6 +6,8 @@ import { ShareModal } from "./ShareModal.tsx";
 import type { TranscriptStreamClient } from "../lib/transcriptStreamClient.ts";
 import type { ShareApiClient } from "../lib/shareApiClient.ts";
 import type { AppApiClient } from "../lib/appApiClient.ts";
+import { displayMeetingUrl, meetingTitle } from "../lib/meetingUrl.ts";
+import { safeExternalUrl } from "../lib/safeExternalUrl.ts";
 
 export interface OwnerCallViewProps {
   streamClient: TranscriptStreamClient;
@@ -45,6 +47,16 @@ export function OwnerCallView({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // `meetingTitle` yields the constant "Meeting" and `displayMeetingUrl` "" for
+  // an input they cannot parse (they never echo raw text, so a secret cannot
+  // slip through). Neither is a usable heading — the call id still wins.
+  const derivedTitle = meetingTitle(meetingUrl);
+  const title =
+    derivedTitle === "" || derivedTitle === "Meeting"
+      ? `Call ${callId.slice(0, 8)}`
+      : derivedTitle;
+  const shownUrl = displayMeetingUrl(meetingUrl);
+
   async function confirmDelete() {
     setDeleting(true);
     setDeleteError(null);
@@ -63,7 +75,25 @@ export function OwnerCallView({
     <section className="samograph-call-view">
       <div className="samograph-call-view-heading">
         <a href="/dashboard" className="samograph-call-back">← Dashboard</a>
-        <h1>{meetingUrl || `Call ${callId.slice(0, 8)}`}</h1>
+        {/* The H1 is the meeting NAME, not the raw join link: a 28px URL wrapped
+            over two lines and pushed the transcript below the fold on a phone
+            (mobile audit §1 D). The link below is demoted to a small line whose
+            visible TEXT and tooltip are query-stripped — a Zoom `?pwd=` is a
+            join secret and must never be on screen. Its `href` is deliberately
+            the RAW url: the link has to actually join the meeting, and a
+            password-protected Zoom room needs the query to do that. */}
+        <h1>{title}</h1>
+        {shownUrl ? (
+          <a
+            className="samograph-call-view-url"
+            href={safeExternalUrl(meetingUrl) ?? undefined}
+            target="_blank"
+            rel="noreferrer noopener"
+            title={shownUrl}
+          >
+            {shownUrl}
+          </a>
+        ) : null}
       </div>
       <PerCallTranscript
         streamClient={streamClient}
