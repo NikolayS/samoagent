@@ -98,6 +98,36 @@ describe("Alert (DESIGN-MODEL §4 Alert / Banner, PLAN PR 8)", () => {
     );
   });
 
+  it("decouples the live region from the tone via `live`", () => {
+    // NB-1: a STANDING condition ("Calendar needs reconnecting", rendered on
+    // every dashboard load) must not interrupt a screen reader the way a
+    // transient failure does — but it is still a warning, and still wants the
+    // warning rail. Tone and announcement are therefore separate knobs.
+    const off = render(<Alert tone="warning" live="off">Standing condition.</Alert>);
+    expect(off.container.firstElementChild!.hasAttribute("role")).toBe(false);
+    expect(off.container.firstElementChild!.className).toContain("samograph-alert--warn");
+    off.unmount();
+
+    const polite = render(<Alert tone="danger" live="polite">Standing failure.</Alert>);
+    expect(polite.getByRole("status").className).toContain("samograph-alert--error");
+    polite.unmount();
+
+    const assertive = render(<Alert tone="info" live="assertive">Urgent note.</Alert>);
+    expect(assertive.getByRole("alert").className).toContain("samograph-alert--info");
+  });
+
+  it("skips the title element when the title is empty or blank", () => {
+    for (const title of ["", "   "]) {
+      const { getByRole, unmount } = render(
+        <Alert tone="danger" title={title}>Body.</Alert>,
+      );
+      const root = getByRole("alert");
+      expect(root.querySelector(".samograph-alert-title")).toBeNull();
+      expect(root.textContent).toBe("Body.");
+      unmount();
+    }
+  });
+
   it("renders as a <p> by default and honours the `as` element", () => {
     const { getByRole, unmount } = render(<Alert tone="danger">Boom.</Alert>);
     expect(getByRole("alert").tagName).toBe("P");

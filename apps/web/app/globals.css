@@ -1483,12 +1483,6 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   background: var(--line);
 }
 
-/* Info-tone sign-in note (§5.16 SAMO-AUTH-006 — "you cancelled" is not a
-   failure, so it must not read like the red `[role="alert"]` copy). */
-.samograph-auth-note {
-  color: var(--muted);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .samograph-google-signin {
     transition: none;
@@ -1791,14 +1785,12 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   border-color: var(--green);
 }
 
-/* Never-silent terminal card (SPEC §5.16). */
+/* Never-silent terminal card (SPEC §5.16). This is an `Alert tone="danger"`,
+   so the box — tint, `--line` border, tone rail, radius — comes from
+   `.samograph-alert`. Redeclaring any of it here would win on source order and
+   erase the rail, which is exactly what this rule used to do. Spacing only. */
 .samograph-stream-error {
   margin: 0.75rem 0;
-  padding: 0.9rem 1rem;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--crit) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--crit) 40%, var(--line));
-  border-radius: 10px;
 }
 
 .samograph-stream-error p {

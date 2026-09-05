@@ -72,8 +72,10 @@ export function AuthLanding({ client, redirect, errorCode }: AuthLandingProps) {
       <h1>Sign in to samograph</h1>
       {errorCode !== undefined ? (
         isAuthInfoCode(errorCode) ? (
-          // "You cancelled" is a normal outcome, not a failure (§5.16 S5-1).
-          <Alert className="samograph-auth-note">{authErrorMessage(errorCode)}</Alert>
+          // "You cancelled" is a normal outcome, not a failure (§5.16 S5-1), so
+          // it gets the info tone: a neutral rail and polite `role="status"`,
+          // not the red rail and the assertive interruption below.
+          <Alert>{authErrorMessage(errorCode)}</Alert>
         ) : (
           <Alert tone="danger">{authErrorMessage(errorCode)}</Alert>
         )

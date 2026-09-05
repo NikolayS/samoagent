@@ -65,18 +65,18 @@ describe("alert tone rail (DESIGN-MODEL §4 Alert / Banner)", () => {
   });
 });
 
-describe("Alert adoption (PLAN PR 8)", () => {
-  const files: string[] = [];
-  const visit = (dir: string) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) visit(path);
-      else if (entry.name.endsWith(".tsx") && !entry.name.endsWith(".test.tsx")) files.push(path);
-    }
-  };
-  visit(join(web, "components"));
-  visit(join(web, "app"));
+const files: string[] = [];
+const visit = (dir: string) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) visit(path);
+    else if (entry.name.endsWith(".tsx") && !entry.name.endsWith(".test.tsx")) files.push(path);
+  }
+};
+visit(join(web, "components"));
+visit(join(web, "app"));
 
+describe("Alert adoption (PLAN PR 8)", () => {
   it("has no hand-written samograph-alert className left outside Alert.tsx", () => {
     const offenders = files
       .filter((file) => !file.endsWith("/Alert.tsx"))
@@ -84,5 +84,45 @@ describe("Alert adoption (PLAN PR 8)", () => {
       .map((file) => file.slice(web.length + 1))
       .sort();
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * NB-2 / NB-3 (PR 8 review). `Alert` accepts a `className` so a call site can
+ * add page-specific geometry — but a class listed in a `class` attribute has NO
+ * effect on precedence: two single-class rules tie at (0,1,0) and SOURCE ORDER
+ * decides. Every one of these classes is declared *after* the alert block, so
+ * any `color` / `background` / `border*` it sets silently erases the tone rail
+ * or the ink copy. `.samograph-stream-error` was erasing the rail; a deleted
+ * `.samograph-auth-note { color: var(--muted) }` was dropping dark-mode copy to
+ * 4.29:1. The call-site class may set spacing; the Alert owns the box.
+ */
+describe("Alert call-site className overrides (PR 8 review NB-2/NB-3)", () => {
+  const OWNED_BY_ALERT = ["color", "background", "background-color", "border", "border-radius"];
+
+  const classes = new Set<string>();
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const [, value] of source.matchAll(/<Alert[^>]*?\sclassName=["']([^"']+)["']/gs)) {
+      for (const token of value.split(/\s+/)) if (token) classes.add(token);
+    }
+  }
+
+  it("finds the call sites that pass a className", () => {
+    expect([...classes].sort()).toEqual(["samograph-stream-error"]);
+  });
+
+  for (const name of [...classes].sort()) {
+    it(`.${name} leaves the box to the Alert`, () => {
+      const rule = css.match(new RegExp(`(?:^|\\})\\s*\\.${name}\\s*\\{([^}]*)\\}`, "m"))?.[1] ?? "";
+      const claimed = OWNED_BY_ALERT.filter((property) =>
+        new RegExp(`(?:^|;)\\s*${property}\\s*:`).test(rule),
+      );
+      expect(claimed).toEqual([]);
+    });
+  }
+
+  it("no longer ships the muted sign-in-note colour override", () => {
+    expect(/\.samograph-auth-note\s*\{/.test(css)).toBe(false);
   });
 });
