@@ -1,71 +1,77 @@
 /**
- * Readable presentation of a meeting URL. Pure, dependency-free, DOM-free.
+ * Display-safe presentation of a meeting URL (mobile audit M7 / `d02`).
  *
- * Two jobs, both about the same problem: a raw join link is not a title, and it
- * can carry a secret. `meetingTitle` names the meeting ("Google Meet ·
- * qpd-zbkg-jfo"); `displayMeetingUrl` shows the link with its query string and
- * fragment removed, so a Zoom `?pwd=` join password is NEVER rendered.
+ * A Zoom join link carries the meeting password in its query string
+ * (`?pwd=…`). Rendering the raw URL — as the dashboard used to — puts a join
+ * secret on screen, in the DOM, in an `aria-label` and in every screenshot of
+ * the page. Every surface that shows a meeting URL goes through these two pure
+ * helpers instead:
  *
- * Used by the call view header (M4) and the dashboard call rows (M7).
+ *  - {@link meetingTitle} — a readable row/heading title (provider + room id).
+ *  - {@link displayMeetingUrl} — scheme + host + path, query AND fragment
+ *    stripped, credentials dropped.
+ *
+ * Neither ever returns the query string, so neither can leak `pwd`. Both are
+ * total: an input they cannot parse yields a constant, never an echo of the
+ * input (echoing is exactly how a secret would slip through).
+ *
+ * Pure, dependency-free, DOM-free.
  */
 
-const NBSP_SEPARATOR = " · ";
-
-/** Zoom's own grouping: 9 → 3-3-3, 10 → 3-3-4, 11 → 3-4-4. */
-function groupZoomId(digits: string): string {
-  if (digits.length === 9) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-  if (digits.length === 10) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-  if (digits.length === 11) return `${digits.slice(0, 3)} ${digits.slice(3, 7)} ${digits.slice(7)}`;
-  return digits;
-}
-
+/** `new URL`, retried with an `https://` prefix for a scheme-less paste. */
 function parse(input: string): URL | null {
   const trimmed = input.trim();
   if (trimmed === "") return null;
-  try {
-    return new URL(trimmed);
-  } catch {
-    return null;
+  for (const candidate of [trimmed, `https://${trimmed}`]) {
+    try {
+      const url = new URL(candidate);
+      if (url.protocol === "https:" || url.protocol === "http:") return url;
+    } catch {
+      // try the next candidate
+    }
   }
+  return null;
+}
+
+/** Zoom writes an 11-digit id as `752 0852 0803`, a 10-digit one as `123 456 7890`. */
+function groupZoomId(id: string): string {
+  if (id.length === 11) return `${id.slice(0, 3)} ${id.slice(3, 7)} ${id.slice(7)}`;
+  if (id.length === 10) return `${id.slice(0, 3)} ${id.slice(3, 6)} ${id.slice(6)}`;
+  if (id.length === 9) return `${id.slice(0, 3)} ${id.slice(3, 6)} ${id.slice(6)}`;
+  return id;
 }
 
 /**
- * A short, human title for a meeting URL:
- *   `https://meet.google.com/qpd-zbkg-jfo`     → `Google Meet · qpd-zbkg-jfo`
- *   `https://zoom.us/j/1234567890?pwd=secret`  → `Zoom · 123 456 7890`
- * Unknown provider → the hostname. Unparseable → the trimmed input. Empty → "".
+ * A short, human-readable name for a meeting link — `"Google Meet · qpd-zbkg-jfo"`,
+ * `"Zoom · 752 0852 0803"` — falling back to the bare host for a link whose room
+ * id we cannot identify, and to `"Meeting"` when the input is not a URL at all.
  */
 export function meetingTitle(url: string): string {
   const parsed = parse(url);
-  if (parsed === null) return url.trim();
-
+  if (!parsed) return "Meeting";
   const host = parsed.hostname.toLowerCase();
-  // Path segments only — the query string is where join secrets live.
-  const segments = parsed.pathname.split("/").filter((part) => part !== "");
 
   if (host === "meet.google.com") {
-    const code = segments[0];
-    return code ? `Google Meet${NBSP_SEPARATOR}${code}` : "Google Meet";
+    const code = /^\/([a-z]{3}-[a-z]{4}-[a-z]{3})$/.exec(parsed.pathname)?.[1];
+    if (code) return `Google Meet · ${code}`;
   }
 
   if (host === "zoom.us" || host.endsWith(".zoom.us")) {
-    // /j/<id>, /w/<id>, /s/<id> — the numeric meeting id; /my/<vanity> — a personal room.
-    const last = segments[segments.length - 1];
-    if (last === undefined) return "Zoom";
-    if (/^\d+$/.test(last)) return `Zoom${NBSP_SEPARATOR}${groupZoomId(last)}`;
-    return `Zoom${NBSP_SEPARATOR}${last}`;
+    const id = /^\/(?:j|s)\/(\d{9,11})$/.exec(parsed.pathname)?.[1];
+    if (id) return `Zoom · ${groupZoomId(id)}`;
   }
 
   return host;
 }
 
 /**
- * The URL as it is safe to display: scheme + host (+ port) + path, with the
- * query string and fragment stripped. Unparseable → the trimmed input.
+ * The URL as it may be shown to a human: scheme + host + path only. The query
+ * string (Zoom's `?pwd=`), the fragment and any embedded credentials are
+ * dropped. Returns `""` for an input that is not a URL — callers render nothing
+ * rather than echo raw text that might itself contain a secret.
  */
 export function displayMeetingUrl(url: string): string {
   const parsed = parse(url);
-  if (parsed === null) return url.trim();
-  const path = parsed.pathname === "/" ? "" : parsed.pathname;
-  return `${parsed.protocol}//${parsed.host}${path}`;
+  if (!parsed) return "";
+  return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
 }

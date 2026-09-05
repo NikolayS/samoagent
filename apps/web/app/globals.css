@@ -1518,10 +1518,10 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 /* M4 — collapse the call-view header on a phone (mobile audit §1 C/D). The page
    heading shrinks, and the sticky panel head stays ONE row (call id + state chip
    + timer) instead of the 161px three-row stack. The `header.` qualifier raises
-   specificity over the later `@media (max-width: 48rem)` block, which stacks the
+   specificity over the later same-width block, which stacks the
    head and foot into a column — that block sits among the transcript-row rules
    another change owns, so it is overridden here rather than edited. */
-@media (max-width: 47.99rem) {
+@media (max-width: 48rem) {
   .samograph-call-view-heading {
     margin-bottom: var(--space-3);
   }

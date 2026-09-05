@@ -14,7 +14,7 @@ const slice3 = css.slice(css.indexOf("/* ===== Slice 3 — Transcript instrument
 // The compact-header mobile rules live inside the Slice 3 region, before the
 // transcript-row blocks other engineers own.
 const mobile = (() => {
-  const start = slice3.indexOf("@media (max-width: 47.99rem)");
+  const start = slice3.indexOf("@media (max-width: 48rem)");
   if (start < 0) return "";
   // Nested-free block: read to the matching closing brace.
   let depth = 0;
@@ -38,7 +38,7 @@ describe("M4 call-view header CSS", () => {
     expect(slice3).toMatch(/\.samograph-call-view-url\s*\{[^}]*white-space\s*:\s*nowrap/s);
   });
 
-  it("has a mobile block below the 768px breakpoint inside Slice 3", () => {
+  it("has a mobile block on the 48rem boundary inside Slice 3", () => {
     expect(mobile).not.toBe("");
   });
 
