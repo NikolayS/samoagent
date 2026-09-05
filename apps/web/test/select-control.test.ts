@@ -80,7 +80,13 @@ describe(".samograph-select", () => {
 
   it("styles hover, focus and disabled consistently with inputs", () => {
     expect(rule(".samograph-select:hover > select")).toMatch(/border-color\s*:\s*var\(--ink\)/);
-    expect(rule(".samograph-select > select:focus-visible")).toMatch(/outline\s*:/);
+    const focus = rule(".samograph-select > select:focus-visible");
+    expect(focus).toMatch(/outline\s*:/);
+    // `.samograph-select > select` (0,1,1) sets `border` and sits AFTER the
+    // shared `select:focus-visible { border-color: var(--ink) }` (also 0,1,1),
+    // so it wins on source order and a focused select would keep the resting
+    // --control-border that inputs drop. Restate it here.
+    expect(focus).toMatch(/border-color\s*:\s*var\(--ink\)/);
     const disabled = rule(".samograph-select > select:disabled");
     expect(disabled).toMatch(/cursor\s*:\s*not-allowed/);
     expect(disabled).toMatch(/color\s*:\s*var\(--muted\)/);

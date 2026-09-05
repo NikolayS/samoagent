@@ -529,7 +529,11 @@ button:hover {
 .samograph-select:hover > select { border-color: var(--ink); }
 .samograph-select:hover::before { background: var(--hover-surface); }
 .samograph-select:hover::after { background: var(--ink); }
-.samograph-select > select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* `border-color` is restated here because `.samograph-select > select` above
+   sets `border` and outranks the shared `select:focus-visible` rule on source
+   order (both are 0,1,1) — without it a focused select keeps its resting
+   border while every input darkens to --ink. */
+.samograph-select > select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-color: var(--ink); }
 .samograph-select > select:disabled { color: var(--muted); background: var(--field-bg-disabled); cursor: not-allowed; }
 .samograph-select:has(> select:disabled)::before { background: var(--field-bg-disabled); }
 .samograph-select:has(> select:disabled)::after { background: var(--faint); }
