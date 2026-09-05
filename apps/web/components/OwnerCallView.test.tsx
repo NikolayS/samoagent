@@ -41,11 +41,64 @@ function renderOwner(
 }
 
 describe("OwnerCallView — owner per-call page (SPEC §4.1, Stories 1/2/4)", () => {
-  it("renders exactly one h1 and a Dashboard back link", () => {
+  it("renders exactly one h1 — the readable meeting name, not the raw URL", () => {
     const { getAllByRole, getByRole } = renderOwner();
     expect(getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(getAllByRole("heading", { level: 1 })[0]?.textContent).toBe(MEETING_URL);
+    expect(getAllByRole("heading", { level: 1 })[0]?.textContent).toBe("Google Meet \u00b7 abc-defg-hij");
     expect(getByRole("link", { name: /dashboard/i }).getAttribute("href")).toBe("/dashboard");
+  });
+
+  it("demotes the meeting URL to a small secondary line that opens the meeting", () => {
+    const { container } = renderOwner();
+    const link = container.querySelector("a.samograph-call-view-url");
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toBe(MEETING_URL);
+    expect(link?.getAttribute("href")).toBe(MEETING_URL);
+    expect(link?.getAttribute("rel")).toBe("noreferrer noopener");
+  });
+
+  it("never renders a Zoom join password in the header", () => {
+    const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const { container } = render(
+      <OwnerCallView
+        streamClient={stream}
+        shareClient={createFakeShareApiClient()}
+        appClient={createFakeAppApiClient()}
+        callId="call_1"
+        meetingUrl="https://zoom.us/j/1234567890?pwd=s3cr3tPassw0rd"
+        redirect={() => {}}
+      />,
+    );
+    const heading = container.querySelector(".samograph-call-view-heading");
+    expect(heading?.querySelector("h1")?.textContent).toBe("Zoom \u00b7 123 456 7890");
+    expect(heading?.textContent).not.toContain("s3cr3tPassw0rd");
+    expect(heading?.querySelector("a.samograph-call-view-url")?.textContent).toBe(
+      "https://zoom.us/j/1234567890",
+    );
+  });
+
+  it("falls back to the call id when no meeting URL is known", () => {
+    const stream = createFakeTranscriptStreamClient({ callDetail: detail() });
+    const { container } = render(
+      <OwnerCallView
+        streamClient={stream}
+        shareClient={createFakeShareApiClient()}
+        appClient={createFakeAppApiClient()}
+        callId="call_abcdefgh"
+        meetingUrl=""
+        redirect={() => {}}
+      />,
+    );
+    expect(container.querySelector("h1")?.textContent).toBe("Call call_abc");
+    expect(container.querySelector("a.samograph-call-view-url")).toBeNull();
+  });
+
+  it("classes the panel-header URL and dictionary so mobile can drop them", () => {
+    const { container } = renderOwner();
+    expect(container.querySelector(".samograph-instrument-url")?.textContent).toBe(MEETING_URL);
+    expect(container.querySelector(".samograph-instrument-dictionary")?.textContent).toBe(
+      "dictionary: account default",
+    );
   });
 
   it("renders the transcript as the shared instrument panel", () => {

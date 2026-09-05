@@ -365,8 +365,8 @@ export function PerCallTranscript({
       <header className="samograph-status samograph-instrument-head" data-status-kind={view.kind}>
         <div className="samograph-instrument-meta">
           {auth.kind === "session" ? <strong>call / {callId.slice(0, 8)}</strong> : <strong>shared transcript</strong>}
-          {auth.kind === "session" && meetingUrl ? <><i aria-hidden="true">|</i><span>{meetingUrl}</span></> : null}
-          {auth.kind === "session" ? <><i aria-hidden="true">|</i><span>dictionary: account default</span></> : null}
+          {auth.kind === "session" && meetingUrl ? <><i aria-hidden="true">|</i><span className="samograph-instrument-url">{meetingUrl}</span></> : null}
+          {auth.kind === "session" ? <><i aria-hidden="true">|</i><span className="samograph-instrument-dictionary">dictionary: account default</span></> : null}
         </div>
         <div className="samograph-instrument-state">
           <span className="samograph-status-label">{view.label}</span>
