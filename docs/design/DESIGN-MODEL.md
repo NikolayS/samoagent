@@ -118,9 +118,9 @@ are page-level only. Ban raw px in new rules.
 **Radius** — `--radius-control` (6) for every interactive box; `--radius-lg` (8) for cards and
 panels; `--radius-pill` for chips and the switcher.
 
-**Fluid gutter** — `--gutter: clamp(16px, 5vw, var(--space-8))`, replacing the `:root` override
-inside a `40rem` media query with one expression that covers the 20px mobile gutter and the 32px
-desktop gutter.
+**Fluid gutter** — `--gutter: clamp(var(--space-4), 5vw, var(--space-8))`, replacing the `:root`
+override inside a `40rem` media query with one expression: 16px at 320px, ~19.5px at 390px, 24px
+at 480px, and the full 32px from 640px up. Shipped in M9.
 
 ---
 
@@ -308,6 +308,14 @@ base        < 480px    one column, everything full-bleed within the gutter
 --bp-lg     1024px     nav spreads, transcript takes its 4-column form
 ```
 Author new rules `@media (min-width: …)`. Convert legacy `max-width` blocks opportunistically.
+
+**Shipped in M9.** These three numbers are now the ONLY width values `globals.css` may name, in
+ONE unit — px — with `apps/web/lib/breakpoints.ts` as the JS-readable source of truth and
+`apps/web/test/breakpoints.test.ts` as the guard. `@media` cannot read a custom property, so the
+numbers stay literal in each prelude. Two forms only: `(min-width: 768px)` at and above, and
+`(max-width: 767.98px)` strictly below — the `.02px` shim leaves no viewport width matching both
+or neither. `rem` breakpoints were dropped: text zoom moves a `rem` boundary without moving the
+device width the layout was measured against.
 
 ### Nav collapse
 Below `--bp-md`: brand + a single `☰` disclosure (44×44, `aria-expanded`/`aria-controls`) on row

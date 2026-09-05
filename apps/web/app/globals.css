@@ -143,7 +143,37 @@
   --width-app: 1120px;
   --width-prose: 720px;
   --width-form: 480px;
-  --gutter: var(--space-8);
+  /* THE BREAKPOINTS (PLAN.md M9, DESIGN-MODEL §5 "Layout + responsive model").
+     Three, in ONE unit — pixels — and nowhere else in this file:
+
+       --bp-sm   480px   two-up action rows, meta inline, 16px form fields
+       --bp-md   768px   list rows go 3-column, forms side-by-side, nav un-collapses
+       --bp-lg  1024px   nav spreads, transcript takes its 4-column form
+
+     They are NOT custom properties, because `@media (max-width: var(--x))` is
+     invalid and drops the whole block. The numbers therefore live literally in
+     each `@media` prelude, with `apps/web/lib/breakpoints.ts` as the JS-readable
+     source of truth and `test/breakpoints.test.ts` as the guard that no other
+     value ever appears. Conventions, both enforced by that guard:
+
+       - `@media (min-width: 768px)`     — at and above; the mobile-first form.
+       - `@media (max-width: 767.98px)`  — strictly below; the `.02px` shim keeps
+         the pair from both matching at a fractional 768px viewport width, and is
+         too small for any viewport to fall into.
+
+     Before M9 the same three boundaries were written seven ways — `40rem`,
+     `48rem` (768px INCLUSIVE, so it overlapped `min-width: 768px`), `59.99rem`,
+     `63.99rem`, `767.98px`, `768px`. `rem` breakpoints were dropped outright: a
+     reader who scales text moves a `rem` breakpoint without moving the device
+     width the layout was measured against. */
+
+  /* Fluid page gutter (DESIGN-MODEL §3 "Fluid gutter"). ONE expression instead
+     of a `:root` override inside a media query: 16px at 320px, ~19.5px at 390px,
+     and the full 32px from 640px up. `5vw` is the middle term, so the gutter
+     tracks the viewport instead of jumping 12px at a boundary. Every consumer
+     reads it through `max(var(--gutter), var(--safe-*))`, which still collapses
+     to the plain gutter wherever the safe-area inset is 0. */
+  --gutter: clamp(var(--space-4), 5vw, var(--space-8));
 
   /* The page container (design audit §3, PLAN.md PR 4). ONE max-width and ONE
      gutter, shared by the app-nav inner box and by `<main>`, so their left
@@ -313,8 +343,13 @@
    above it, on the shared --gutter. Before this it was 68px on a private
    56px gutter — audit finding 7, "two design languages in one product". */
 @media (min-width: 768px) { .samograph-site-nav { min-height: 64px; } }
-@media (max-width: 59.99rem) { .samograph-landing-hero { padding: 72px var(--gutter) 96px; } }
-/* Below 40rem, three decisions:
+/* M9: was `59.99rem` (959.84px), an eighth boundary of its own. Snapped to
+   --bp-lg, so the hero's mid step now starts one notch later — the 104/128
+   desktop padding holds from 1024px instead of 960px. */
+@media (max-width: 1023.98px) { .samograph-landing-hero { padding: 72px var(--gutter) 96px; } }
+/* Below --bp-md, three decisions (M9: this block was `40rem`/640px; the
+   boundary it actually marks is "the nav collapses and the hero goes compact",
+   which is --bp-md's job, so it moved to 767.98px):
    - The nav's 32px flex gap does not fit a 320px phone: the box is
      320 - 2 x --gutter(20) = 280px and the wordmark (~153px) + CTA (~112px) +
      32px gap is ~297px, so the CTA overhung the right edge (#290 review).
@@ -324,9 +359,9 @@
      in win; theme follows the OS here and is still switchable inside the app.
    - The three footer links wrap at this width, and a leading separator would
      then dangle at the start of the wrapped row. Drop the glyphs and let a
-     wider gap separate the links. Above 40rem all three fit on one line
-     (400px of links in a >=576px content box), so the separators stay. */
-@media (max-width: 40rem) { .samograph-site-nav { gap: var(--space-3); }.samograph-site-footer nav { column-gap: var(--space-4); }.samograph-site-footer nav i { display: none; }.samograph-brand { font-size: .82rem; }.samograph-nav-actions .samograph-theme-switcher { display: none; }.samograph-landing-hero { padding: 52px var(--gutter) 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px var(--gutter) 44px; } }
+     wider gap separate the links. At and above --bp-md all three fit on one
+     line (400px of links in a >=704px content box), so the separators stay. */
+@media (max-width: 767.98px) { .samograph-site-nav { gap: var(--space-3); }.samograph-site-footer nav { column-gap: var(--space-4); }.samograph-site-footer nav i { display: none; }.samograph-brand { font-size: .82rem; }.samograph-nav-actions .samograph-theme-switcher { display: none; }.samograph-landing-hero { padding: 52px var(--gutter) 72px; }.samograph-landing-hero h1 { font-size: 1.95rem; }.samograph-hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }.samograph-site-footer { padding: 36px var(--gutter) 44px; } }
 @media (prefers-reduced-motion: reduce) { .samograph-instrument-state > span > b { animation: none; } }
 
 /* Dark by OS preference. The explicit `data-theme` blocks below have higher
@@ -880,8 +915,8 @@ button:hover {
    first line. Every element that OWNS the gutter yields to the inset here.
 
    One grouped rule, and it sits after the @media blocks that restate these
-   paddings (the landing hero/footer at 59.99rem and 40rem, the app nav at
-   768px): each of those carries the same `var(--gutter)` inline and varies only
+   paddings (the landing hero at --bp-lg, the hero/footer below --bp-md, the
+   app nav at --bp-md): each of those carries the same `var(--gutter)` inline and varies only
    the BLOCK padding, so overriding the inline half in one place is equivalent
    at every width. `max()` collapses to plain `--gutter` wherever the inset is
    0 — i.e. everywhere except a notched phone held sideways. */
@@ -916,10 +951,6 @@ button:hover {
 .samograph-skip-link:focus {
   color: var(--ground);
   transform: translateY(0);
-}
-
-@media (max-width: 40rem) {
-  :root { --gutter: var(--space-5); }
 }
 
 /* Compact segmented theme control; each hit target remains 44px tall. */
@@ -1460,7 +1491,7 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 .samograph-meeting-item[data-declined="true"] { opacity: 0.65; }
 .samograph-btn--sm { height: var(--control-h-sm); padding-inline: var(--space-3); font-size: var(--text-xs); }
 
-@media (max-width: 40rem) {
+@media (max-width: 767.98px) {
   .samograph-dash-hero-form { grid-template-columns: 1fr; }
   .samograph-dash-hero-form .samograph-btn { width: 100%; }
   .samograph-call-row,
@@ -2207,7 +2238,7 @@ textarea { resize: vertical; font-family: var(--font-mono); }
 }
 
 /* M4:compact-call-header — the unique anchor for apps/web/test/call-header-css.test.ts.
-   Slice 3 holds more than one `@media (max-width: 48rem)` block, so the guard
+   Slice 3 holds more than one `@media (max-width: 767.98px)` block, so the guard
    locates THIS one by this marker, not by the media query text. Keep the marker
    immediately above the block.
 
@@ -2217,7 +2248,7 @@ textarea { resize: vertical; font-family: var(--font-mono); }
    specificity over the later same-width block, which stacks the
    head and foot into a column — that block sits among the transcript-row rules
    another change owns, so it is overridden here rather than edited. */
-@media (max-width: 48rem) {
+@media (max-width: 767.98px) {
   .samograph-call-view-heading {
     margin-bottom: var(--space-3);
   }
@@ -2474,7 +2505,7 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   border-radius: var(--radius-pill);
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 767.98px) {
   .samograph-percall .samograph-status.samograph-instrument-head,
   .samograph-percall .samograph-controls.samograph-instrument-foot {
     align-items: flex-start;
@@ -2492,7 +2523,7 @@ textarea { resize: vertical; font-family: var(--font-mono); }
  * row 1 = speaker + clock, row 2 = the full-width utterance. At 390px this takes the
  * utterance from ~114px (33% of the content box) to the whole content width at 14px.
  */
-@media (max-width: 63.99rem) {
+@media (max-width: 1023.98px) {
   .samograph-instrument-lines > li.samograph-transcript-row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
