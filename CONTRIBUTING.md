@@ -32,7 +32,7 @@ Both must be clean locally before you open a PR, and green in CI before it merge
    against; a fix, rebase, or conflict-resolution merge voids it. Green CI is not a
    review.
 5. **Squash-merge** and delete the branch, once the latest PASS is on the exact SHA
-   being merged.
+   being merged. **Human owner approval is required for merge.**
 
 ## Bugfixes are red/green TDD — no exceptions
 
@@ -46,7 +46,7 @@ Three steps, and the PR description pastes the output of steps 2 and 3:
 1. **Write the reproducing test** in the file next to the code under test:
 
    ```ts
-   // packages/orchestrator/status-poller.test.ts
+   // apps/bot-orchestrator/statusPoller.test.ts
    test("sweep keeps polling after one bot errors", async () => {
      const poller = makePoller([failingBot, healthyBot]);
      await poller.sweep();
@@ -57,7 +57,7 @@ Three steps, and the PR description pastes the output of steps 2 and 3:
 2. **Show it RED** on unfixed `main` — paste the failure into the PR:
 
    ```text
-   $ bun test packages/orchestrator/status-poller.test.ts
+   $ bun test apps/bot-orchestrator/statusPoller.test.ts
    error: expect(received).toBe(expected)  Expected: true  Received: false
    1 fail
    ```
@@ -65,7 +65,7 @@ Three steps, and the PR description pastes the output of steps 2 and 3:
 3. **Fix the code, show it GREEN** — paste the passing run into the same PR:
 
    ```text
-   $ bun test packages/orchestrator/status-poller.test.ts
+   $ bun test apps/bot-orchestrator/statusPoller.test.ts
    1 pass, 0 fail
    ```
 
