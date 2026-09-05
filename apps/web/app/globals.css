@@ -157,6 +157,30 @@
      a coarse pointer, and it may be met by an invisible pseudo-element. */
   --tap-min: 44px;
 
+  /* Safe area (mobile audit M6). iOS reports the notch and the home indicator
+     ONLY when the document opts in with `viewport-fit=cover` — that half lives
+     in `app/layout.tsx`'s `export const viewport`; without it these all resolve
+     to 0 and nothing moves. The `0px` fallback is not decoration: a bare
+     `env()` a browser does not understand is invalid at computed-value time and
+     drops the WHOLE declaration (the #255 failure mode). Every safe-area read
+     in this stylesheet goes through these four tokens — grep for `--safe-` to
+     find them all. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  /* The sticky settings savebar's own height, derived from the control scale
+     rather than measured after the fact: one 44px control between two
+     `--space-3` rails plus the 2px top rule. `.samograph-settings` reserves
+     exactly this much at the end of the page, so the bar floats over reserved
+     emptiness instead of over the last select (audit `d01`). */
+  --savebar-h: calc(var(--control-h) + var(--space-3) * 2 + var(--border-strong));
+  /* Elevation is reserved for things that genuinely float (DESIGN-MODEL §3):
+     the savebar and the jump-to-live pill. Upward-only, since the bar's shadow
+     falls on the content it sits above. */
+  --elev-savebar: 0 -4px 16px color-mix(in srgb, var(--ink) 10%, transparent);
+
   /* Interaction */
   --focus-ring: var(--ink);
   --hover-surface: color-mix(in srgb, var(--ink) 5%, var(--surface));
@@ -441,7 +465,11 @@ button:hover {
 .samograph-page {
   max-width: var(--page-max);
   margin: 0 auto;
-  padding: var(--space-8) var(--gutter) var(--space-16);
+  /* The trailing rail is the savebar's reserved ground (M6): never smaller than
+     a floating bar plus the home-indicator inset, so a sticky bar at the end of
+     a page always has somewhere to come to rest that is not on top of a
+     control. `--space-16` stays the floor for every other page. */
+  padding: var(--space-8) var(--gutter) max(var(--space-16), calc(var(--savebar-h) + var(--safe-bottom)));
 }
 
 /* `--form` / `--prose` narrow the CONTENT, not the page (DESIGN-MODEL §5,
@@ -748,6 +776,25 @@ button:hover {
   .samograph-app-nav-menu[data-open] { display: contents; }
 
   .samograph-app-nav-right { margin-left: auto; }
+}
+
+/* Horizontal safe area (M6 review). `viewport-fit=cover` lets the page paint
+   under the notch, so in landscape on a notched phone the notch eats into the
+   gutter — the nav's leftmost link, the page's left rail, the landing hero's
+   first line. Every element that OWNS the gutter yields to the inset here.
+
+   One grouped rule, and it sits after the @media blocks that restate these
+   paddings (the landing hero/footer at 59.99rem and 40rem, the app nav at
+   768px): each of those carries the same `var(--gutter)` inline and varies only
+   the BLOCK padding, so overriding the inline half in one place is equivalent
+   at every width. `max()` collapses to plain `--gutter` wherever the inset is
+   0 — i.e. everywhere except a notched phone held sideways. */
+.samograph-page,
+.samograph-app-nav-inner,
+.samograph-site-nav,
+.samograph-landing-hero,
+.samograph-site-footer {
+  padding-inline: max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right));
 }
 
 /* The PUBLIC shell (/auth, /auth/callback, /c/<token>) has no menu to disclose:
@@ -1361,16 +1408,65 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   border-top: var(--border-strong) solid var(--line-strong);
 }
 
+/* Mobile audit M6. A sticky bottom bar is pulled UP to the viewport edge while
+   its resting place is still below the fold, so it floats over whatever content
+   happens to be at the bottom of the screen — at 1024 that was the bottom
+   border of the "Chat chime" select (`d01-settings-1024.jpg`). Two things make
+   that safe: nothing may be TRAPPED under the bar (the bar is the last child
+   here, and `.samograph-page` reserves at least the bar's own height of ground
+   beneath it, so scrolling to the end always clears every control), and the bar
+   must read as ABOVE the page rather than as another rule inside the form —
+   hence the upward shadow, the stacking context below, and the edge-to-edge
+   bleed on the widths where the column is the page (see the --bp-md block).
+
+   Deliberately NOT `padding-bottom` on this wrapper: the wrapper is the bar's
+   containing block, and a sticky box is never pushed DOWN past its flow
+   position, so padding here only raises where the bar comes to rest. Measured
+   at 1024x900: the bar ended 174px above the viewport bottom instead of 80px. */
 .samograph-savebar {
   position: sticky;
   bottom: 0;
+  z-index: 2;
+  /* Explicit box + explicit height: the page can only reserve the bar's
+     footprint if that footprint is a stated number (--savebar-h) rather than
+     the accidental sum of font metrics. */
+  box-sizing: border-box;
+  min-height: calc(var(--savebar-h) + var(--safe-bottom));
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
   padding-block: var(--space-3);
+  padding-bottom: calc(var(--space-3) + var(--safe-bottom));
   background: var(--surface);
   border-top: var(--border-strong) solid var(--line-strong);
+  box-shadow: var(--elev-savebar);
+}
+
+/* Any programmatic scroll — an anchor, `scrollIntoView`, the browser bringing a
+   focused control into view — must land the control ABOVE the bar, not under
+   it. */
+.samograph-settings .samograph-field {
+  scroll-margin-bottom: calc(var(--savebar-h) + var(--safe-bottom) + var(--space-3));
+}
+
+/* Where the bar may bleed, and where it may not (M6 review NB3). Since #241/#287
+   `<main>` is the full --page-max box and `.samograph-settings` is a --width-prose
+   column LEFT-aligned inside it, so cancelling the page gutter with negative
+   margins up there would push the bar 32px past the column's left edge and still
+   leave it hundreds of px short of the page's right edge — a slab aligned to
+   nothing. Above --bp-md the bar therefore spans its own column, exactly.
+
+   Below --bp-md the content box (<= 704px at 768) is narrower than the 720px cap,
+   so the column IS the page's content box and cancelling the page's inline
+   padding lands the bar precisely on the two screen edges. The expression mirrors
+   the page's own `max(--gutter, --safe-*)` term by term, so it cancels exactly in
+   landscape too and never adds a scrollable pixel. */
+@media (max-width: 767.98px) {
+  .samograph-savebar {
+    margin-inline: calc(-1 * max(var(--gutter), var(--safe-left))) calc(-1 * max(var(--gutter), var(--safe-right)));
+    padding-inline: max(var(--gutter), var(--safe-left)) max(var(--gutter), var(--safe-right));
+  }
 }
 
 .samograph-savebar-status {
@@ -2159,7 +2255,8 @@ textarea { resize: vertical; font-family: var(--font-mono); }
   position: absolute;
   z-index: 3;
   right: 16px;
-  bottom: 78px;
+  /* Above the panel's foot rail, and above the home indicator with it (M6). */
+  bottom: calc(78px + var(--safe-bottom));
   min-height: var(--control-h);
   color: var(--panel-ground);
   background: var(--accent-live);
