@@ -352,6 +352,9 @@ select {
 textarea {
   min-height: calc(var(--control-h) * 2);
   padding: var(--space-3);
+  /* --leading-tight pins a ONE-line control to an exact height; a textarea
+     wraps, so its lines stay on the body rhythm. */
+  line-height: var(--leading-normal);
 }
 
 .samograph-keyterms {

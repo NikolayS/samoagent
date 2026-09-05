@@ -62,6 +62,12 @@ describe("one recipe, so the height is exact", () => {
     expect(textarea).toMatch(/min-height\s*:\s*calc\(var\(--control-h\)\s*\*\s*2\)/);
   });
 
+  it("keeps body leading in the textarea — the tight leading is for one-line boxes", () => {
+    // --leading-tight (1.2) exists to pin a single-line control to an exact
+    // height. A textarea wraps, so its lines must stay on the body rhythm.
+    expect(rule("textarea")).toMatch(/line-height\s*:\s*var\(--leading-normal\)/);
+  });
+
   it("keeps one radius across fields and buttons", () => {
     expect(rule('input:where(:not([type="checkbox"], [type="radio"])), select, textarea')).toMatch(
       /border-radius\s*:\s*var\(--radius-control\)/,
