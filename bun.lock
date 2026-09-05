@@ -22,6 +22,16 @@
       "name": "@samograph/bot-worker",
       "version": "0.0.0",
     },
+    "apps/g2-hub-app": {
+      "name": "@samograph/g2-hub-app",
+      "version": "0.1.0",
+      "dependencies": {
+        "@evenrealities/even_hub_sdk": "0.0.14",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
+    },
     "apps/ingest": {
       "name": "@samograph/ingest",
       "version": "0.0.0",
@@ -51,12 +61,12 @@
       "name": "@samograph/shared",
       "version": "0.0.0",
     },
-    "packages/test-fakes/google-oauth": {
-      "name": "@samograph/test-fakes-google-oauth",
-      "version": "0.0.0",
-    },
     "packages/test-fakes/google-calendar": {
       "name": "@samograph/test-fakes-google-calendar",
+      "version": "0.0.0",
+    },
+    "packages/test-fakes/google-oauth": {
+      "name": "@samograph/test-fakes-google-oauth",
       "version": "0.0.0",
     },
     "packages/test-fakes/recall": {
@@ -72,6 +82,8 @@
     "@babel/runtime": ["@babel/runtime@7.29.7", "", {}, "sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.11.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA=="],
+
+    "@evenrealities/even_hub_sdk": ["@evenrealities/even_hub_sdk@0.0.14", "", {}, "sha512-lNtyIldZfe0dhAVxCfNuJ7waH2lMPli8DyklA8jF4DlvByQtbK1janodPNo7M8+7Plp30mlQT8d+vYU3gO8vKQ=="],
 
     "@happy-dom/global-registrator": ["@happy-dom/global-registrator@20.10.6", "", { "dependencies": { "@types/node": ">=20.0.0", "happy-dom": "^20.10.6" } }, "sha512-Nu/IjRkkNxmeG2ywWsyJSO4d1BrWTqVzxCPL+gXj0b97klhmjd6wLzt6Bx/laNpkZ3WLW7zNCqmtMIbIlahqug=="],
 
@@ -149,13 +161,15 @@
 
     "@samograph/bot-worker": ["@samograph/bot-worker@workspace:apps/bot-worker"],
 
+    "@samograph/g2-hub-app": ["@samograph/g2-hub-app@workspace:apps/g2-hub-app"],
+
     "@samograph/ingest": ["@samograph/ingest@workspace:apps/ingest"],
 
     "@samograph/shared": ["@samograph/shared@workspace:packages/shared"],
 
-    "@samograph/test-fakes-google-oauth": ["@samograph/test-fakes-google-oauth@workspace:packages/test-fakes/google-oauth"],
-
     "@samograph/test-fakes-google-calendar": ["@samograph/test-fakes-google-calendar@workspace:packages/test-fakes/google-calendar"],
+
+    "@samograph/test-fakes-google-oauth": ["@samograph/test-fakes-google-oauth@workspace:packages/test-fakes/google-oauth"],
 
     "@samograph/test-fakes-recall": ["@samograph/test-fakes-recall@workspace:packages/test-fakes/recall"],
 

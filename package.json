@@ -9,6 +9,7 @@
     "apps/app-api",
     "apps/ingest",
     "apps/ws-hub",
+    "apps/g2-hub-app",
     "apps/bot-worker",
     "apps/bot-orchestrator",
     "packages/shared",
