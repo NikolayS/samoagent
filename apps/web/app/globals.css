@@ -779,10 +779,14 @@ button:hover {
  * DEVIATION from DESIGN-MODEL §4, which writes the base as
  * `border: 1px solid transparent`: the base border-color is `--control-border`
  * and the base fill is `--surface`, i.e. the base IS the neutral variant.
- * `--sm` is a SIZE, not a colour variant, so `.samograph-btn--sm` buttons and
- * links (the dense row actions in UpcomingMeetings) carry no colour variant at
- * all and took their box from the `button` rule; a transparent base would have
- * silently deleted it, and the `<a>` among them never had one to begin with.
+ * Every call site today does carry a colour variant, so nothing in the app
+ * renders the base colours as-is. It is a real box anyway for two reasons.
+ * First, `.samograph-btn` on an `<a>` never got a border at all — anchors
+ * don't match the `button` rule this base replaces — so the base is the only
+ * place that can give a link-button the same box as the `<button>` beside it.
+ * Second, a button that loses or never gets its variant (a typo, a new variant
+ * landing in a later PR) then degrades to a plain neutral control instead of
+ * disappearing into the page — a transparent base makes that failure silent.
  * Colour variants still override all three properties, so the model's intent —
  * base owns geometry, variant owns colour — holds unchanged.
  */

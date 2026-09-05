@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -259,6 +259,26 @@ describe("buttons on the instrument panel (DESIGN-MODEL §4 --on-panel)", () => 
   it("covers the `.samograph-controls` half of the footer's class pair too", () => {
     expect(css).toContain(".samograph-controls .samograph-btn--secondary");
     expect(css).toContain(".samograph-controls .samograph-btn--danger");
+  });
+
+  /* The panel recipe is scoped by ancestor, which is only safe while
+     `samograph-controls` means "the instrument footer" and nothing else. If a
+     second component ever wears that class somewhere on the page ground, its
+     buttons would silently take panel inks — so pin the site count. */
+  it("keeps `samograph-controls` to exactly one JSX site (PerCallTranscript's footer)", () => {
+    const roots = [join(import.meta.dir, "..", "components"), join(import.meta.dir, "..", "app")];
+    const sites: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.tsx$/.test(entry.name) && !/\.test\.tsx$/.test(entry.name)) {
+          for (const _ of readFileSync(full, "utf8").matchAll(/samograph-controls\b/g)) sites.push(full);
+        }
+      }
+    };
+    for (const root of roots) walk(root);
+    expect(sites.map((f) => f.split("/").at(-1))).toEqual(["PerCallTranscript.tsx"]);
   });
 
   for (const theme of ["light", "dark"] as const) {
